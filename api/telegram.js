@@ -148,7 +148,7 @@ module.exports = async (req, res) => {
         return json(res, 200, { ok: true });
       }
       const delivered = await recordSupportReply(reqst.visitorId, codeMessage(code, reqst.mt5Login,
-        `Your ID ${reqst.mt5Login} is confirmed under our community — here is your download code:`));
+        `Your MT5 ID ${reqst.mt5Login} is confirmed under our community — here is your download code:`));
       await say(chatId, delivered
         ? `✅ Approved. Code <code>${code}</code> sent to ${reqst.name} (${reqst.email}), ID <code>${reqst.mt5Login}</code>.${alsoSettled > 1 ? ` Their ${alsoSettled - 1} other open request${alsoSettled === 2 ? "" : "s"} left the waiting list with it.` : ""}`
         : `⚠️ Code <code>${code}</code> was issued but could not be delivered. Send it to ${reqst.email} yourself.`,
@@ -165,7 +165,7 @@ module.exports = async (req, res) => {
     let first, second = true;
     if (times > 1) {
       first = await recordSupportReply(reqst.visitorId, [
-        `We checked again and MT5 login ${reqst.mt5Login} is still not showing under our Headway partner group.`,
+        `We checked again and MT5 ID ${reqst.mt5Login} is still not showing under our Headway partner group.`,
         reason, "",
         "Headway has to attach it — we cannot do it from our side. Ask Headway support to move your account under our partner code, or open a new account through our link, which places it under us automatically:",
         "",
@@ -176,9 +176,9 @@ module.exports = async (req, res) => {
       ].filter((line, i) => i !== 1 || line !== "").join("\n"));
     } else {
       first = await recordSupportReply(reqst.visitorId, [
-        `We could not find MT5 login ${reqst.mt5Login} under our Headway partner group, so we cannot send a code for it yet.`,
+        `We could not find MT5 ID ${reqst.mt5Login} under our Headway partner group, so we cannot send a code for it yet.`,
         reason, "",
-        `First, check you sent the right number. Your MT5 login is shown at ${DERIV_PROFILE} — reply here with it:`,
+        `First, check you sent the right number. Your MT5 ID is shown at ${DERIV_PROFILE} — reply here with it:`,
         "",
         `(It looks like ${EXAMPLE_CLIENT_ID})`,
       ].filter((line, i) => i !== 1 || line !== "").join("\n"));

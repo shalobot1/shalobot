@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Dashboard | Shalobot</title>
 <meta name="robots" content="noindex,nofollow" />
-<meta name="theme-color" content="#0b1220" />
+<meta name="theme-color" content="#070b12" />
 <link rel="icon" href="/favicon.ico" sizes="48x48" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
@@ -26,7 +26,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
   <div class="bleed nav-inner">
     <a class="brand" href="/">
       <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="15" fill="#0b1220"/><path d="M17 41c0 8 8 10 15 10s15-2 15-9c0-8-10-8-15-9s-14-2-14-9c0-7 7-9 13-9 5 0 9 1 12 4" fill="none" stroke="#3ddc97" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="46" cy="17" r="5.5" fill="#ffb020"/></svg>
+        <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="15" fill="#070b12"/><path d="M17 41c0 8 8 10 15 10s15-2 15-9c0-8-10-8-15-9s-14-2-14-9c0-7 7-9 13-9 5 0 9 1 12 4" fill="none" stroke="#3ddc97" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="46" cy="17" r="5.5" fill="#ffb020"/></svg>
       </span>
       <span class="brand-name">Shalobot</span>
     </a>
@@ -163,17 +163,17 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 
     <div class="ea-body">
       <section id="eaForm">
-        <p class="ea-lede">The EA takes its signals from our engine, so it goes to Shalobot&rsquo;s own Headway community. Paste your MT5 login and we check it against our partner list — usually within a day.</p>
+        <p class="ea-lede">The EA is free for Shalobot&rsquo;s own Headway community. Paste your MT5 ID with the <b>exact name and email you registered with at Headway</b> — that is how we match you against our partner list, approve fast, and send your download code. <b>The EA works only on the account we approve.</b></p>
 
         <div class="ea-acct ea-acct--hw">
           <div class="ea-acct-l">
-            <span>No Headway MT5 account yet?</span>
+            <span>No Headway MT5 account yet? Open one through our link and <b>claim $150 + a 50% bonus</b>.</span>
             <a class="ea-mt5" href="https://headway.partners/user/signup?hwp=8abf6d" target="_blank" rel="noopener noreferrer sponsored">
               <span class="ea-hw">headway</span>
               <span>Create account</span>
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
             </a>
-            <small>Opening it through this link places the account under our partner group — that is what we check.</small>
+            <small>Opening it through this link places the account under our partner group — that is what we check. Then come back here with your new MT5 ID.</small>
           </div>
           <a class="ea-qr" href="https://headway.partners/user/signup?hwp=8abf6d" target="_blank" rel="noopener noreferrer sponsored" aria-label="Scan to open a Headway account">
             <img src="/logos/headway-signup-qr.svg" alt="" width="84" height="84" />
@@ -183,13 +183,13 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 
         <div id="eaFields">
           <label class="ea-f">
-            <span>Your MT5 login</span>
+            <span>MT5 ID</span>
             <input class="field" id="eaId" placeholder="1234567" autocomplete="off" inputmode="numeric" spellcheck="false" />
             <small>The account number MetaTrader 5 shows at the top of the terminal, before the server name. It is also in your Headway personal area.</small>
           </label>
           <div class="ea-two">
-            <label class="ea-f"><span>Name</span><input class="field" id="eaName" placeholder="Your name" autocomplete="name" /></label>
-            <label class="ea-f"><span>Email</span><input class="field" id="eaMail" type="email" placeholder="you@email.com" autocomplete="email" /></label>
+            <label class="ea-f"><span>Name — as registered at Headway</span><input class="field" id="eaName" placeholder="Your name" autocomplete="name" /></label>
+            <label class="ea-f"><span>Email — as registered at Headway</span><input class="field" id="eaMail" type="email" placeholder="you@email.com" autocomplete="email" /></label>
           </div>
           <p class="ea-limit" id="eaLimit" hidden>You have sent this three times. Wait for our reply in the support window — it unlocks sending again.</p>
           <button type="button" class="btn btn-blue ea-send" id="eaSend" disabled>
@@ -226,7 +226,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
         </div>
 
         <p class="ea-err" id="eaErr" hidden></p>
-        <p class="ea-foot">If your account is not under us we say so, and tell you how to ask Headway to attach it to partner code <code>8abf6d</code> — reply in the support window once it is done and we check again.</p>
+        <p class="ea-foot">Use the exact name and email on your Headway account — a mismatch is the usual reason a check takes longer. If your account is not under us we say so, and tell you how to ask Headway to attach it to partner code <code>8abf6d</code> — reply in the support window once it is done and we check again.</p>
       </section>
 
       <section class="ea-done" id="eaDone" hidden>
@@ -234,7 +234,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
         </span>
         <h3>Downloaded</h3>
-        <p><code>ShalobotMT5.mq5</code> is in your downloads. Follow the install steps on this page next. Keep your code — it works again on this browser if you ever need the file back.</p>
+        <p><code>ShalobotMT5.mq5</code> is in your downloads. Follow the install steps on this page next. It works only on the Headway account we approved — any other account receives wrong data. Keep your code; it works again on this browser if you ever need the file back.</p>
         <button type="button" class="btn btn-blue" id="eaDoneClose">Done</button>
       </section>
     </div>

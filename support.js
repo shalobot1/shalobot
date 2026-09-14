@@ -367,9 +367,25 @@
     if (!reps || !reps.length) return;
     var next = state.thread.slice();
     reps.forEach(function (rep) {
-      var line = { id: rep.id, text: rep.body, at: rep.createdAt, from: "us", file: rep.attachment || null };
+      /* A line from the server is ours unless it says otherwise: the thread
+         fetch also returns what THEY sent, which is drawn on their side. */
+      if (rep.from === "them" && rep.email && isEmail(rep.email) && !isEmail(state.email)) { state.email = rep.email; set(MAIL_KEY, rep.email); }
+      if (rep.from === "them" && rep.name && !state.name) { state.name = rep.name; set(NAME_KEY, rep.name); }
+      var line = rep.from === "them"
+        ? { id: rep.id, text: rep.body, at: rep.createdAt, from: "them", sent: true }
+        : { id: rep.id, text: rep.body, at: rep.createdAt, from: "us", file: rep.attachment || null };
       var at = -1;
       for (var i = 0; i < next.length; i++) if (next[i].id === rep.id) { at = i; break; }
+      /* Their own lines were saved here under an id of this browser's making
+         before the server ever saw them, so the server's copy is matched on
+         the words and the minute instead of the id. */
+      if (at < 0 && line.from === "them") {
+        for (var j = 0; j < next.length; j++) {
+          var l = next[j];
+          if (l.from === "them" && l.text === line.text && Math.abs(new Date(l.at || 0) - new Date(line.at || 0)) < 180000) { at = j; break; }
+        }
+        if (at >= 0) { next[at] = Object.assign({}, next[at], { id: rep.id, sent: true }); return; }
+      }
       if (at >= 0) next[at] = Object.assign({}, next[at], line); else next.push(line);
     });
     next.sort(function (a, b) { return String(a.at || "").localeCompare(String(b.at || "")); });
@@ -500,7 +516,7 @@
      shape — the row is already marked seen, so the ordinary poll never offers
      it again — and it refills the thread on a device that cleared storage. */
   function refetchRecent() {
-    fetch("/api/support-replies?visitorId=" + encodeURIComponent(id) + "&recent=1", { cache: "no-store" })
+    fetch("/api/support-replies?visitorId=" + encodeURIComponent(id) + "&thread=1", { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         var reps = (d && d.replies) || [];

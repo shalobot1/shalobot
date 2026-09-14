@@ -151,7 +151,7 @@
         if (window.SHALO_SUPPORT_ASK) {
           window.SHALO_SUPPORT_ASK({
             name: name, email: email,
-            text: T(x.j.already ? "Asked for the Shalobot EA again — client / MT5 ID {id}." : "Requested the Shalobot EA — client / MT5 ID {id}.", { id: id }),
+            text: T(x.j.already ? "Asked for the Shalobot EA again — MT5 ID {id}." : "Requested the Shalobot EA — MT5 ID {id}.", { id: id }),
           });
         }
       })

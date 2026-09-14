@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
   const page = clean(body.page, 200);
 
   if (!visitorId) return json(res, 400, { error: "Reload the page and try again." });
-  if (!mt5Login) return json(res, 422, { error: "Please paste your MT5 login." });
+  if (!mt5Login) return json(res, 422, { error: "Please paste your MT5 ID." });
   if (name.length < 2) return json(res, 422, { error: "Please give us a name to put to the account." });
   if (!isEmail(email)) return json(res, 422, { error: "That email does not look right." });
 
@@ -127,7 +127,7 @@ module.exports = async (req, res) => {
   const request = [
     "<b>MT5 EA access request</b>",
     "",
-    `MT5 login: <code>${esc(mt5Login)}</code>`,
+    `MT5 ID: <code>${esc(mt5Login)}</code>`,
     "",
     `Check this login under Headway partner code <code>${PARTNER_ID}</code>.`,
     "",

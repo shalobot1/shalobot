@@ -183,6 +183,25 @@ async function recentSupportReplies(visitorId, limit) {
   return (r.data || []).map(replyRow).reverse();
 }
 
+/** The whole conversation, both directions, oldest first, marking nothing.
+ *  The bubble asks for this when it opens, so a browser that lost its storage
+ *  — or a person on a new device with the same id — sees everything that was
+ *  said, theirs and ours, not only our replies. Inbound rows carry no
+ *  attachment: those went to Telegram, not into the thread. */
+async function supportThread(visitorId, limit) {
+  if (!visitorId || !configured()) return [];
+  const r = await select(
+    SUPPORT,
+    `select=id,direction,body,created_at,attachment_url,attachment_name,attachment_type,name,email&visitor_id=eq.${encodeURIComponent(visitorId)}&order=created_at.desc&limit=${limit || 40}`,
+  );
+  if (!r.ok) { console.error("[shalo] thread failed:", r.error); return []; }
+  // Their name and email ride on their own lines, so a browser that lost them
+  // gets them back with the conversation.
+  return (r.data || []).map((x) => Object.assign(replyRow(x), x.direction === "out"
+    ? { from: "us" }
+    : { from: "them", name: x.name || null, email: x.email || null })).reverse();
+}
+
 /** What has already been said to this person, oldest first — attached to
  *  their next message so the answer can be written without remembering them. */
 async function supportHistory(visitorId, limit) {
@@ -287,6 +306,6 @@ async function clearBans(which) {
 
 module.exports = {
   configured, rest, select, insert, update, readBody, json,
-  recordSupportInbound, supportVisitorFor, supportVisitorById, recordSupportReply, collectSupportReplies, recentSupportReplies, supportHistory, listPeople,
+  recordSupportInbound, supportVisitorFor, supportVisitorById, recordSupportReply, collectSupportReplies, recentSupportReplies, supportThread, supportHistory, listPeople,
   isBanned, findBan, banPerson, unbanPerson, listBans, clearBans,
 };
