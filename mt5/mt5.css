@@ -1,0 +1,663 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Shalobot — MT5 automation.
+
+   The dotted ground, the flat surfaces and the 1px borders all come from
+   styles.css, so this page belongs to the site rather than resembling it.
+   Everything here is a token, which is the whole reason light and dark both
+   work without a second set of rules: light is what the page is by default,
+   dark is the same page with the palette swapped underneath it.
+
+   Blue is the accent throughout — it carries "running", "chosen" and "buy".
+   Red is reserved for the one thing that should ever be red on a trading
+   page: the direction you are short, and the stop that protects you.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Full-bleed, like every other page on the site: the gutter in styles.css is
+   the only thing between the content and the edge of the screen. A centred
+   column here left a wide monitor with a third of itself empty. */
+
+/* ── The eyebrow ────────────────────────────────────────────────────────
+   Where you are on the left, when the market was last read on the right. */
+
+.mt5-eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.mt5-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  color: var(--ink);
+}
+.mt5-crumb svg { color: var(--blue); }
+
+.mt5-eyebrow-r {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.mt5-stamp { font-size: 11.5px; color: var(--ink-faint); }
+.mt5-stamp[hidden] { display: none; }
+
+.btn-sm {
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+}
+
+/* The refresh arrow turns while a scan is in flight — the only motion on the
+   page, and the only thing that says the button did something. */
+.is-busy #refresh-icon { animation: mt5-spin 0.9s linear infinite; }
+@keyframes mt5-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .is-busy #refresh-icon { animation: none; opacity: 0.5; }
+}
+
+.mt5-intro { max-width: 640px; }
+
+.mt5-t {
+  margin: 0;
+  font-size: clamp(1.6rem, 3.4vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.mt5-lede {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ink-muted);
+}
+
+.mt5-err {
+  margin: 18px 0 0;
+  padding: 11px 14px;
+  font-size: 13px;
+  color: var(--danger);
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+}
+.mt5-err[hidden] { display: none; }
+
+/* ── The three steps of the page ────────────────────────────────────────
+   Numbered, because the order matters: there is nothing to choose a risk
+   profile for until the file is installed. */
+
+.mt5-sec { margin-top: 30px; }
+
+.mt5-sec-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.mt5-n {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--on-accent);
+  background: var(--blue);
+}
+
+.mt5-k {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.mt5-meta {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.mt5-panel {
+  margin-top: 14px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* ── 1 · install ────────────────────────────────────────────────────── */
+
+.mt5-get {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.mt5-get .btn { gap: 8px; }
+.mt5-get-s { font-size: 12px; color: var(--ink-faint); }
+
+.mt5-steps {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+.mt5-steps li {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink-muted);
+}
+.mt5-steps b { color: var(--ink); font-weight: 650; }
+
+.mt5-step-n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  margin-top: 1px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--blue);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+/* A path or a setting name, set apart from the sentence around it. */
+.mt5 code {
+  padding: 1.5px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.mt5-note {
+  margin: 18px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink-faint);
+}
+.mt5-note--loose { margin-top: 10px; }
+
+/* ── 2 · the risk profiles ──────────────────────────────────────────────
+   Three cards, one chosen. The chosen one is outlined and tinted rather than
+   filled: it has to stay readable, and it sits beside two others that must
+   stay readable too. */
+
+.mt5-profiles {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.mt5-prof {
+  padding: 16px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.mt5-prof:hover { border-color: var(--line-hi); }
+
+.mt5-prof.is-on {
+  border-color: var(--blue);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--blue);
+}
+
+.mt5-prof-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mt5-prof-h svg { flex: none; color: var(--ink-faint); }
+.mt5-prof.is-on .mt5-prof-h svg { color: var(--blue); }
+.mt5-prof-t { font-size: 14px; font-weight: 700; }
+.mt5-prof-tick { margin-left: auto; color: var(--blue); display: none; }
+.mt5-prof.is-on .mt5-prof-tick { display: block; }
+
+.mt5-prof-s {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-muted);
+}
+
+.mt5-prof-r {
+  margin-top: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* ── 3 · the signals ────────────────────────────────────────────────── */
+
+.mt5-sigs {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.mt5-sig {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.mt5-sig-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mt5-sig-h > svg { flex: none; color: var(--ink-faint); }
+.mt5-sig-n { font-size: 13.5px; font-weight: 700; }
+
+.mt5-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--on-accent);
+}
+.mt5-side--buy  { background: var(--blue); }
+.mt5-side--sell { background: var(--danger); }
+
+.mt5-sig-why {
+  margin: 7px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+/* Entry, stop and target side by side — the three numbers that describe the
+   whole trade, and the only ones worth reading at a glance. */
+.mt5-legs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  text-align: center;
+}
+.mt5-leg {
+  padding: 8px 4px;
+  background: var(--surface-2);
+  border-radius: 9px;
+}
+.mt5-leg-k {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.mt5-leg-v {
+  margin-top: 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  word-break: break-all;
+}
+.mt5-leg--stop .mt5-leg-v   { color: var(--danger); }
+.mt5-leg--target .mt5-leg-v { color: var(--ok); }
+
+.mt5-sig-f {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+.mt5-conf {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+}
+.mt5-bar {
+  display: block;
+  width: 62px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.mt5-bar span { display: block; height: 100%; border-radius: 999px; background: var(--blue); }
+.mt5-bar--sell span { background: var(--danger); }
+
+/* Nothing firing is a normal state, not a failure — so it gets a calm panel
+   that says what the engine is doing, rather than an empty space. */
+.mt5-quiet {
+  display: grid;
+  place-items: center;
+  margin-top: 14px;
+  padding: 30px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.mt5-quiet-in { display: inline-flex; align-items: center; gap: 9px; }
+.mt5-quiet-in svg { color: var(--blue); animation: mt5-spin 0.9s linear infinite; }
+
+/* Every market that did NOT fire, and why. Folded away, because it is the
+   answer to a question most people will not ask — but when the page is quiet
+   it is the only thing that proves the bot is awake. */
+.mt5-aside {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.mt5-aside summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.mt5-aside summary::marker { color: var(--ink-faint); }
+.mt5-aside-l {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 20px;
+  margin-top: 10px;
+}
+.mt5-aside-r {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.mt5-aside-s { font-weight: 650; color: var(--ink-muted); white-space: nowrap; }
+.mt5-aside-w { text-align: right; }
+
+.mt5-disc {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+.mt5-disc svg { flex: none; margin-top: 3px; color: var(--blue); }
+
+/* ── Wide ──────────────────────────────────────────────────────────────
+   Past this the page is wider than two cards have any use for, and a signal
+   card stretched to 800px is mostly empty. A third column fills the room the
+   full-bleed layout opened up. */
+
+@media (min-width: 1500px) {
+  .mt5-sigs,
+  .mt5-aside-l { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ── Narrow ────────────────────────────────────────────────────────────
+   Two columns of trade legs on a phone would wrap the prices onto three
+   lines each, so the cards go single-file well before that happens. */
+
+@media (max-width: 860px) {
+  .mt5-sigs { grid-template-columns: 1fr; }
+  .mt5-aside-l { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .mt5-profiles { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .mt5-panel { padding: 16px; }
+  .mt5-eyebrow-r { width: 100%; margin-left: 0; }
+  .mt5-stamp { margin-right: auto; }
+  .mt5-meta { width: 100%; margin-left: 0; }
+}
+
+/* ── the access sheet ───────────────────────────────────────────────────
+   Centred card on a wide screen, a sheet rising from the bottom on a phone.
+   One form rather than a stack of numbered cards: the ID, the two lines
+   about you, one button — and the code field folded away until a code is
+   what you are holding. Flat, like the rest of the site. */
+
+.ea-root {
+  position: fixed; inset: 0; z-index: 120;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(6, 6, 10, 0.55);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.ea-root[hidden] { display: none; }
+body.ea-open { overflow: hidden; }
+
+.ea {
+  width: 100%; max-height: 92dvh;
+  display: flex; flex-direction: column;
+  background: var(--raise);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.25);
+  animation: ea-up .22s ease-out;
+}
+@keyframes ea-up { from { transform: translateY(24px); opacity: 0; } }
+@media (min-width: 640px) {
+  .ea-root { align-items: center; padding: 24px; }
+  .ea { width: 460px; max-height: calc(100dvh - 48px); border-bottom: 1px solid var(--line); border-radius: 20px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3); }
+}
+@media (prefers-reduced-motion: reduce) { .ea { animation: none; } }
+
+.ea-head {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 18px 18px 0 20px;
+}
+.ea-head-t { flex: 1; min-width: 0; }
+.ea-eyebrow {
+  display: block; margin-bottom: 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--blue);
+}
+.ea-head h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.ea-x {
+  flex: none; width: 34px; height: 34px; margin: -4px -4px 0 0;
+  display: grid; place-items: center;
+  border: 0; border-radius: 999px; background: transparent; color: var(--ink-muted);
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.ea-x:hover { background: var(--surface-2); color: var(--ink); }
+
+/* Three stops, the current one lit, the ones behind it ticked. */
+.ea-track {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  margin: 16px 20px 0; padding: 0; list-style: none;
+}
+.ea-track li {
+  position: relative; padding-top: 10px;
+  font-size: 11.5px; font-weight: 600; color: var(--ink-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ea-track li i { position: absolute; top: 0; left: 0; right: 0; height: 4px; border-radius: 999px; background: var(--line); }
+.ea-track li.on { color: var(--ink); }
+.ea-track li.on i { background: var(--blue); }
+.ea-track li.past { color: var(--ink-muted); }
+.ea-track li.past i { background: var(--ok); }
+
+.ea-body { flex: 1; overflow-y: auto; padding: 14px 20px 20px; scrollbar-width: thin; }
+.ea-lede { margin: 0 0 14px; font-size: 14px; line-height: 1.55; color: var(--ink-muted); }
+
+.ea-acct {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 14px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 13px; color: var(--ink-muted);
+}
+/* The way in: a button carrying Headway's name, and the same link as a
+   code to scan — a phone can open the account while the desk keeps the
+   terminal. */
+.ea-acct--hw { align-items: stretch; }
+.ea-acct-l { flex: 1; min-width: 0; display: grid; gap: 8px; align-content: center; }
+.ea-acct-l small { font-size: 11.5px; line-height: 1.45; color: var(--ink-faint); }
+.ea-mt5 {
+  display: inline-flex; align-items: center; gap: 8px; width: max-content; max-width: 100%;
+  padding: 7px 11px;
+  border: 1px solid var(--line-hi); border-radius: 10px;
+  background: var(--raise); color: var(--ink); text-decoration: none;
+  font-size: 12.5px; font-weight: 700;
+  transition: border-color .15s, background .15s;
+}
+.ea-mt5:hover { border-color: var(--blue); }
+.ea-mt5 svg { color: var(--ink-faint); }
+.ea-hw { font-weight: 800; letter-spacing: -0.03em; color: #e6002d; font-size: 13.5px; }
+:root[data-theme="dark"] .ea-hw { color: #ff5468; }
+.ea-qr {
+  flex: none; display: grid; justify-items: center; gap: 4px; align-content: center;
+  text-decoration: none; color: var(--ink-faint); font-size: 10.5px; font-weight: 600;
+}
+.ea-qr img { display: block; width: 84px; height: 84px; padding: 4px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+@media (max-width: 420px) {
+  .ea-acct { flex-direction: column; align-items: stretch; }
+  .ea-mt5 { justify-content: center; width: 100%; }
+  .ea-qr { flex-direction: row; justify-content: center; align-items: center; gap: 10px; }
+  .ea-qr img { width: 64px; height: 64px; }
+}
+
+.ea-f { display: block; margin-bottom: 12px; }
+.ea-f > span { display: block; margin-bottom: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.ea-f small { display: block; margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--ink-faint); }
+.ea-f small a { color: var(--blue); font-weight: 600; }
+.ea .field {
+  width: 100%;
+  border: 1px solid var(--line-hi); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink);
+  padding: 11px 12px; font: inherit; font-size: 14.5px; line-height: 1.3;
+  outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.ea .field:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(13, 142, 207, 0.16); }
+.ea .field::placeholder { color: var(--ink-faint); }
+.ea .field:disabled { opacity: .6; }
+.ea-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 420px) { .ea-two { grid-template-columns: 1fr; gap: 0; } }
+.ea-send { width: 100%; gap: 8px; margin-top: 2px; }
+.ea-limit {
+  margin: 0 0 10px; padding: 9px 12px;
+  border: 1px solid var(--amber); border-radius: var(--radius-sm);
+  color: var(--amber); font-size: 12.5px; line-height: 1.45;
+}
+.ea .btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+.ea-summary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-bottom: 10px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2);
+}
+.ea-summary-t { flex: 1; min-width: 0; }
+.ea-summary-t b { display: block; font-size: 13.5px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ea-summary-t span { display: block; font-size: 12px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ea-link {
+  all: unset; cursor: pointer; flex: none;
+  font-size: 13px; font-weight: 700; color: var(--blue);
+}
+.ea-link:hover { text-decoration: underline; }
+
+.ea-sent {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-bottom: 14px; padding: 11px 12px;
+  border: 1px solid var(--ok); border-radius: var(--radius-sm);
+  background: var(--real-tint);
+  font-size: 13px; line-height: 1.5; color: var(--ink);
+}
+.ea-sent svg { flex: none; margin-top: 2px; color: var(--ok); }
+
+.ea-code { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+.ea-code-toggle { display: block; }
+.ea-row { display: flex; gap: 8px; }
+.ea-row .field { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .04em; text-transform: uppercase; }
+.ea-row .btn { flex: none; gap: 7px; padding: 0 16px; }
+
+.ea-err {
+  margin: 12px 0 0; padding: 9px 12px;
+  border: 1px solid var(--danger); border-radius: var(--radius-sm);
+  color: var(--danger); font-size: 13px; line-height: 1.45;
+}
+.ea-foot { margin: 14px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-faint); }
+.ea-foot code { font-size: 11px; word-break: break-all; }
+
+.ea-done { text-align: center; padding: 18px 8px 8px; }
+.ea-done-ico {
+  display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto 14px;
+  border-radius: 999px; background: var(--ok); color: #fff;
+}
+.ea-done h3 { margin: 0 0 8px; font-size: 20px; letter-spacing: -0.02em; }
+.ea-done p { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: var(--ink-muted); }
+/* `hidden` must beat the display rules above, or a folded-away part shows. */
+.ea [hidden] { display: none !important; }
+
+/* ── the install steps: copy the address, and MT5's own on/off ───────────
+   The WebRequest address is the one string in the steps that has to be
+   typed exactly, so it has a button. Algo Trading is drawn the way MT5's
+   toolbar draws it — a green play for on, a red stop for off — because
+   "enable it" is easy to think you have done. */
+.mt5-copy {
+  display: inline-flex; align-items: center; gap: 5px; vertical-align: middle;
+  margin-left: 4px; padding: 3px 8px;
+  border: 1px solid var(--line-hi); border-radius: 999px;
+  background: var(--raise); color: var(--ink-muted);
+  font: inherit; font-size: 11.5px; font-weight: 700; line-height: 1.2;
+  cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+}
+.mt5-copy:hover { color: var(--blue); border-color: var(--blue); }
+.mt5-copy.is-copied { color: var(--on-accent); background: var(--ok); border-color: var(--ok); }
+
+.algo {
+  display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
+  margin: 0 2px; padding: 2px 8px 2px 6px;
+  border: 1px solid var(--line-hi); border-radius: 4px;
+  background: var(--raise);
+  font-size: 12px; font-weight: 600; color: var(--ink);
+  white-space: nowrap;
+}
+.algo i { width: 10px; height: 10px; flex: none; }
+.algo-on { border-color: #14a05a; }
+.algo-on i { background: #14a05a; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.algo-off { border-color: #d92d20; }
+.algo-off i { background: #d92d20; border-radius: 2px; }
+:root[data-theme="dark"] .algo-on { border-color: #5fd39a; }
+:root[data-theme="dark"] .algo-on i { background: #5fd39a; }
+:root[data-theme="dark"] .algo-off { border-color: #ff6a6a; }
+:root[data-theme="dark"] .algo-off i { background: #ff6a6a; }

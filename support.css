@@ -1,0 +1,243 @@
+/*
+ * THE SUPPORT BUBBLE.
+ *
+ * A launcher in the corner and a card that opens above it. Built on the same
+ * tokens as the rest of the site — flat surfaces, 1px lines, no gradients —
+ * so it follows the light/dark choice without a rule of its own. Every token
+ * carries a literal fallback so the bubble looks like itself even on a page
+ * that does not load styles.css (the terminal defines its own palette).
+ *
+ * Blue is the bubble's accent: pink on this site means "free", blue means
+ * "go", and a conversation is the second of those.
+ */
+
+.sup-btn {
+  position: fixed; right: 20px; bottom: 20px; z-index: 80;
+  width: 56px; height: 56px; border-radius: 999px; border: 0;
+  background: var(--blue, #0d8ecf); color: var(--on-accent, #fff);
+  display: grid; place-items: center; cursor: pointer;
+  box-shadow: 0 10px 28px rgba(13, 142, 207, 0.32);
+  transition: transform .15s, background .15s;
+}
+.sup-btn:hover { transform: translateY(-1px); background: var(--blue-hi, #0a76ae); }
+.sup-btn:active { transform: scale(.97); }
+.sup-btn.sup-left { right: auto; left: 20px; }
+
+.sup[hidden] { display: none; }
+.sup {
+  position: fixed; right: 20px; bottom: 88px; z-index: 79;
+  width: min(384px, calc(100vw - 24px));
+  max-height: min(640px, calc(100dvh - 112px));
+  display: flex; flex-direction: column;
+  border: 1px solid var(--line, #e2e6ec);
+  border-radius: var(--radius, 16px);
+  background: var(--raise, #fff);
+  color: var(--ink, #14161a);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  font-family: Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px; line-height: 1.5;
+}
+.sup.sup-left { right: auto; left: 20px; }
+:root[data-theme="dark"] .sup { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6); }
+
+@media (max-width: 480px) {
+  .sup, .sup.sup-left { right: 12px; left: 12px; bottom: 84px; width: auto; }
+  .sup-btn { right: 14px; bottom: 14px; }
+  .sup-btn.sup-left { left: 14px; }
+}
+
+/* ── head ─────────────────────────────────────────────────────────────── */
+.sup-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 14px 14px 16px;
+  border-bottom: 1px solid var(--line, #e2e6ec);
+  background: var(--surface-2, #f1f3f6);
+}
+.sup-avatar {
+  flex: none; width: 36px; height: 36px; border-radius: 999px;
+  display: grid; place-items: center;
+  background: var(--blue, #0d8ecf); color: var(--on-accent, #fff);
+}
+.sup-title { min-width: 0; flex: 1; }
+.sup-title-main { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+.sup-title-sub { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 12px; color: var(--ink-muted, #59616d); }
+.sup-title-sub i { width: 7px; height: 7px; border-radius: 999px; background: var(--ok, #14a05a); flex: none; }
+.sup-close {
+  flex: none; display: grid; place-items: center;
+  width: 32px; height: 32px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--ink-muted, #59616d); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.sup-close:hover { background: var(--line, #e2e6ec); color: var(--ink, #14161a); }
+
+/* ── the thread ───────────────────────────────────────────────────────── */
+.sup-body { flex: 1; overflow-y: auto; padding: 16px; display: grid; gap: 12px; align-content: start; }
+
+/* The widget's own words — greeting, the "say more" nudge. Quiet. */
+.sup-msg {
+  max-width: 88%;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--surface-2, #f1f3f6);
+  padding: 10px 13px;
+  font-size: 13px; line-height: 1.55;
+  color: var(--ink-muted, #59616d);
+}
+
+/* What they sent. Solid blue, the way every phone draws "mine". */
+.sup-mine {
+  max-width: 88%; margin-left: auto;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--blue, #0d8ecf); color: var(--on-accent, #fff);
+  padding: 10px 13px;
+  font-size: 13.5px; line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.sup-sent { font-size: 11px; color: var(--ok, #14a05a); text-align: right; margin-top: 4px; font-weight: 600; }
+.sup-time-mine { color: var(--ink-faint, #838b97); font-weight: 500; }
+
+/* A real answer from a person — the one thing here somebody needs to read. */
+.sup-reply { max-width: 88%; }
+.sup-reply-who {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 5px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--blue, #0d8ecf);
+}
+.sup-reply-who i { width: 6px; height: 6px; border-radius: 999px; background: var(--ok, #14a05a); flex: none; }
+.sup-reply-who .sup-new {
+  margin-left: 2px; padding: 2px 6px; border-radius: 999px;
+  background: var(--ok, #14a05a); color: #fff;
+  font-size: 9px; font-weight: 800; letter-spacing: 0;
+}
+.sup-reply-who .sup-time { margin-left: auto; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink-faint, #838b97); }
+.sup-reply-body {
+  border-radius: 16px 16px 16px 4px;
+  border: 1px solid var(--line-hi, #cdd3dc);
+  background: var(--surface, #fff);
+  padding: 11px 13px;
+  font-size: 14px; line-height: 1.55;
+  color: var(--ink, #14161a);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.sup-reply-body.bare { padding: 5px; }
+.sup-link { color: var(--blue, #0d8ecf); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+/* A download code, and the one warning that goes with it. */
+.sup-code {
+  display: inline-block; margin: 2px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 17px; font-weight: 800; letter-spacing: .08em;
+  color: var(--ok, #14a05a);
+}
+.sup-warn { color: var(--danger, #d92d20); font-weight: 700; }
+
+/* ── attachments ──────────────────────────────────────────────────────── */
+.sup-att-img { display: block; margin-top: 8px; }
+.sup-att-img.bare { margin-top: 0; }
+.sup-att-img img { display: block; max-width: 100%; max-height: 280px; width: auto; border-radius: 10px; border: 1px solid var(--line, #e2e6ec); }
+.sup-att-file {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 8px;
+  border: 1px solid var(--line, #e2e6ec); border-radius: 10px; padding: 7px 10px;
+  color: var(--ink, #14161a); text-decoration: none; font-size: 12.5px; font-weight: 600;
+  background: var(--surface-2, #f1f3f6);
+}
+.sup-att-file.bare { margin-top: 0; }
+.sup-att-file svg { color: var(--blue, #0d8ecf); flex: none; }
+.sup-att-file span { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sup-shot { display: flex; align-items: center; gap: 4px; margin-top: 5px; font-size: 11.5px; opacity: .85; }
+.sup-shot svg { width: 11px; height: 11px; }
+
+/* ── who you are ──────────────────────────────────────────────────────── */
+.sup-who { border-top: 1px solid var(--line, #e2e6ec); padding: 12px 16px; display: grid; gap: 8px; background: var(--surface-2, #f1f3f6); }
+.sup-who-row { display: flex; align-items: center; gap: 8px; }
+.sup-who-hint { flex: 1; min-width: 0; font-size: 12px; color: var(--ink-muted, #59616d); }
+.sup-done {
+  all: unset; cursor: pointer; flex: none;
+  padding: 5px 12px; border-radius: 999px;
+  background: var(--blue, #0d8ecf); color: var(--on-accent, #fff);
+  font-size: 12px; font-weight: 700;
+}
+.sup-done:hover { background: var(--blue-hi, #0a76ae); }
+.sup-change {
+  all: unset; cursor: pointer; display: flex; gap: 8px; align-items: center; width: 100%;
+  font-size: 12px; color: var(--ink-muted, #59616d);
+}
+.sup-change .mono { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sup-change-cta { color: var(--blue, #0d8ecf); font-weight: 700; }
+.sup .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+.sup .field {
+  width: 100%;
+  border: 1px solid var(--line-hi, #cdd3dc);
+  border-radius: var(--radius-sm, 12px);
+  background: var(--raise, #fff);
+  color: var(--ink, #14161a);
+  padding: 10px 12px;
+  font-size: 14px; font-family: inherit; line-height: 1.4;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.sup .field:focus { border-color: var(--blue, #0d8ecf); box-shadow: 0 0 0 3px rgba(13, 142, 207, 0.15); }
+.sup .field::placeholder { color: var(--ink-faint, #838b97); }
+
+/* ── composing ────────────────────────────────────────────────────────── */
+.sup-foot { border-top: 1px solid var(--line, #e2e6ec); padding: 12px; display: flex; gap: 8px; align-items: flex-end; }
+.sup-foot textarea { flex: 1; resize: none; min-height: 42px; max-height: 120px; }
+.sup-attach {
+  flex: none; width: 42px; height: 42px; border-radius: var(--radius-sm, 12px);
+  border: 1px solid var(--line-hi, #cdd3dc); background: var(--raise, #fff);
+  color: var(--ink-muted, #59616d); display: grid; place-items: center; cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.sup-attach:hover { color: var(--blue, #0d8ecf); border-color: var(--blue, #0d8ecf); }
+.sup-send {
+  flex: none; width: 42px; height: 42px; border-radius: 999px; border: 0;
+  background: var(--blue, #0d8ecf); color: var(--on-accent, #fff);
+  display: grid; place-items: center; cursor: pointer;
+  transition: background .15s, transform .06s;
+}
+.sup-send:hover { background: var(--blue-hi, #0a76ae); }
+.sup-send:active { transform: scale(.96); }
+.sup-send svg { margin-left: -2px; }
+
+.sup-picked {
+  display: flex; align-items: center; gap: 8px; margin: 10px 12px 0;
+  border: 1px solid var(--ok, #14a05a); border-radius: 10px;
+  background: var(--real-tint, rgba(20, 160, 90, 0.10));
+  padding: 6px 10px; font-size: 12.5px; color: var(--ink, #14161a);
+}
+.sup-picked svg { color: var(--ok, #14a05a); flex: none; }
+.sup-picked span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sup-picked button { all: unset; cursor: pointer; padding: 0 6px; font-size: 18px; line-height: 1; color: var(--ink-muted, #59616d); }
+.sup-picked button:hover { color: var(--ink, #14161a); }
+.sup-err {
+  margin: 10px 12px 0; border: 1px solid var(--danger, #d92d20); border-radius: 10px;
+  background: var(--raise, #fff); color: var(--danger, #d92d20);
+  padding: 8px 10px; font-size: 12.5px; line-height: 1.45;
+}
+
+/* ── the badge and its ring ───────────────────────────────────────────── */
+.sup-badge {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 22px; height: 22px; padding: 0 6px;
+  border-radius: 999px; display: grid; place-items: center;
+  background: var(--ok, #14a05a); color: #fff;
+  font-size: 11.5px; font-weight: 800; line-height: 1;
+  border: 2px solid var(--base, #f3f4f7);
+  overflow: visible;
+}
+.sup-ping {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: var(--ok, #14a05a); opacity: .5;
+  animation: sup-ping 1.1s cubic-bezier(0, 0, .2, 1) infinite;
+}
+@keyframes sup-ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sup-ping { animation: none; } }
+
+/* ── the scrollbar ────────────────────────────────────────────────────── */
+.sup-body { scrollbar-width: thin; scrollbar-color: var(--line-hi, #cdd3dc) transparent; scrollbar-gutter: stable; }
+.sup-body::-webkit-scrollbar { width: 6px; }
+.sup-body::-webkit-scrollbar-track { background: transparent; }
+.sup-body::-webkit-scrollbar-thumb { background: var(--line-hi, #cdd3dc); border-radius: 999px; }
+.sup-foot textarea { scrollbar-width: thin; scrollbar-color: var(--line-hi, #cdd3dc) transparent; }
+.sup-foot textarea::-webkit-scrollbar { width: 6px; }
+.sup-foot textarea::-webkit-scrollbar-thumb { background: var(--line-hi, #cdd3dc); border-radius: 999px; }

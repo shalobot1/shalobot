@@ -1,0 +1,1391 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Shalobot — the site
+
+   Flat by design: every colour is a solid value. There is not a single
+   gradient in this file — no linear-gradient, no radial-gradient, no
+   gradient text. Depth comes from solid surfaces, 1px borders and
+   spacing instead.
+
+   Full-bleed: content runs to the edges of the viewport with a padding
+   gutter, so nothing is boxed into a narrow centred column.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Theme ──────────────────────────────────────────────────────────────
+   Navy is the default; light is one class away: everything below is a token, so the palette swaps and
+   nothing else moves.
+
+   data-theme on <html> wins over the system preference, because a person
+   who has pressed the button has said what they want.                     */
+
+:root {
+  /* Surfaces — four flat steps from the page up to a raised card. Light mode
+     is the alternative here; Shalobot is navy first. */
+  --base:      #f4f6f9;
+  --raise:     #ffffff;
+  --surface:   #ffffff;
+  --surface-2: #eef2f6;
+
+  --line:      #dfe5ec;
+  --line-hi:   #c9d2dd;
+
+  --ink:       #0f172a;
+  --ink-muted: #526175;
+  --ink-faint: #7f8c9e;
+
+  /* Mint is the action colour, amber the accent; both deep enough here to
+     carry their text on a light page. */
+  --pink:      #b45f00;
+  --pink-hi:   #955000;
+  --blue:      #0d8f62;
+  --blue-hi:   #0a7852;
+  --ok:        #0d8f62;
+  --real:      #0d8f62;
+  --real-tint: rgba(13, 143, 98, 0.10);
+  --danger:    #d92d20;
+  --amber:     #b45f00;
+  --violet:    #6d3bd8;
+  --teal:      #0f7f8a;
+
+  --on-accent: #ffffff;
+  --ring:      rgba(0, 0, 0, 0.45);
+
+  --dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Ccircle cx='1.5' cy='1.5' r='1.5' fill='%23000000' fill-opacity='0.06'/%3E%3C/svg%3E");
+  --alt-tint: rgba(0, 0, 0, 0.025);
+
+  --gutter:    clamp(20px, 4.5vw, 72px);
+  --radius:    16px;
+  --radius-sm: 12px;
+}
+
+:root[data-theme="dark"] {
+  --base:      #0b1220;
+  --raise:     #101a2c;
+  --surface:   #121d31;
+  --surface-2: #18253c;
+
+  --line:      #22304a;
+  --line-hi:   #2f405e;
+
+  --ink:       #f2f5f9;
+  --ink-muted: #9aa8b8;
+  --ink-faint: #6b7a8f;
+
+  --pink:      #ffb020;
+  --pink-hi:   #ffc24d;
+  --blue:      #3ddc97;
+  --blue-hi:   #5fe6ab;
+  --ok:        #3ddc97;
+  --real:      #3ddc97;
+  --real-tint: rgba(61, 220, 151, 0.14);
+  --danger:    #ff6a6a;
+  --amber:     #ffb020;
+  --violet:    #b794ff;
+  --teal:      #4fd1c5;
+
+  /* Mint and amber sit on navy and carry dark text. */
+  --on-accent: #0b1220;
+  --ring:      rgba(255, 255, 255, 0.55);
+
+  --dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26'%3E%3Ccircle cx='1.5' cy='1.5' r='1.5' fill='%23ffffff' fill-opacity='0.07'/%3E%3C/svg%3E");
+  --alt-tint: rgba(255, 255, 255, 0.026);
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 76px; /* anchors clear the fixed nav */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  /* Dotted ground. The dots are an SVG tile of solid circles rather than a
+     radial-gradient, so the page keeps its no-gradient rule. `fixed` pins the
+     grid to the viewport, so it never scrolls out of register or stretches —
+     the tile is a constant 26px at every screen size, which is why this needs
+     no breakpoints. */
+  background-color: var(--base);
+  background-image: var(--dots);
+  background-size: 26px 26px;
+  background-attachment: fixed;
+  font-family: Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3 { margin: 0; line-height: 1.1; letter-spacing: -0.025em; }
+p { margin: 0; }
+ul, ol, dl { margin: 0; padding: 0; list-style: none; }
+
+/* Full width, gutter only — no max-width, so the page fills the screen. */
+.bleed { width: 100%; padding-inline: var(--gutter); }
+
+/* ── Home dashboard ─────────────────────────────────────────────────────── */
+
+/* A column the height of the window, so the footer sits at the bottom of the
+   screen rather than floating with dead ground beneath it, and so the grid
+   inside can be told to take whatever is left over. */
+.dash { display: flex; flex-direction: column; min-height: 100svh; }
+
+/* Clearing the fixed header and no more. The nav is 68px, so that plus a
+   breath is the whole requirement — clamp(84px, 9vh, 100px) was clearing a bar
+   that is 68px tall and spending the difference on nothing, and 56px of bottom
+   padding on a laptop is most of a tile.
+
+   `flex: 1` so this takes the height the header leaves, and a column so the
+   grid inside it can be handed the remainder. */
+.dash-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: calc(68px + clamp(10px, 1.4vh, 18px));
+  padding-bottom: clamp(10px, 1.4vh, 16px);
+}
+.dash-title {
+  margin-bottom: clamp(10px, 1.3vw, 14px);
+  font-size: clamp(1.45rem, 2.4vw, 1.8rem);
+  font-weight: 700;
+}
+
+/* The real balance, perched top right in the nav. */
+.perch { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.perch-v {
+  font-size: clamp(0.95rem, 1.8vw, 1.15rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  /* The same ink as the Real balance in the portfolio below it. It is the
+     same money, in both modes, and two colours for one figure read as two
+     figures. */
+  color: var(--real);
+}
+
+
+/* Real vs demo. Blue is the live account; the demo is deliberately quieter so
+   the two can never be mistaken for one another at a glance. */
+.badge {
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--blue);
+  background: transparent;
+  border: 1px solid var(--blue);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.badge:hover { color: var(--blue-hi); border-color: var(--blue-hi); }
+
+/* The two things you can actually do from here. */
+/* Three across rather than two and a stray, and each one the size of the
+   thing it is — a link with a name and a line under it. They were card-sized
+   before, which made a dashboard of three links look like a whole page. */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.tile {
+  display: grid;
+  gap: 4px;
+  padding: 16px 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.tile:hover { background: var(--surface-2); border-color: var(--line-hi); }
+.tile-icon {
+  display: grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  margin-bottom: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-hi);
+  border-radius: 9px;
+}
+.tile-icon svg { width: 17px; height: 17px; }
+.tile-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tile-t { font-size: 0.95rem; font-weight: 650; }
+.tile-s { font-size: 0.82rem; line-height: 1.5; color: var(--ink-muted); }
+
+/* What the tile actually is. Outlined rather than filled, so it labels the
+   heading without competing with it. */
+.tag-bot {
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--blue);
+  border: 1px solid var(--blue);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* The MetaTrader mark is a WIDE wordmark, not a square glyph. Squeezed into
+   the 42px icon box it came out 24x4 and unreadable, so this tile's box grows
+   to fit the logo instead of the logo shrinking to fit the box. */
+.tile--logo .tile-icon { width: auto; min-width: 32px; padding: 0 10px; }
+.tile-logo { height: 15px; width: auto; max-width: 130px; object-fit: contain; }
+
+/* The MetaTrader wordmark ships white, which disappears on the light theme.
+   Two files, one per ground; the theme picks which one is painted. */
+.tile-logo--pale { display: none; }
+:root[data-theme="dark"] .tile-logo--ink { display: none; }
+:root[data-theme="dark"] .tile-logo--pale { display: block; }
+
+/* A blank canvas for a page that has not been built yet. */
+
+/* ── Detail sheet ───────────────────────────────────────────────────────── */
+
+.sheet { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px; }
+.sheet[hidden] { display: none; }
+.sheet-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.62); opacity: 0; transition: opacity 0.2s ease; }
+.sheet.is-in .sheet-back { opacity: 1; }
+
+.sheet-card {
+  position: relative;
+  width: min(100%, 480px);
+  max-height: min(84vh, 680px);
+  overflow-y: auto;
+  padding: clamp(22px, 3vw, 28px);
+  background: var(--surface);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--radius);
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.sheet.is-in .sheet-card { opacity: 1; transform: none; }
+
+.sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.sheet-k {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+}
+.sheet-t { margin-top: 6px; font-size: 1.2rem; font-weight: 700; }
+.sheet-x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  color: var(--ink-muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.sheet-x:hover { color: var(--ink); border-color: var(--line-hi); }
+
+.sheet-body { margin-top: 20px; }
+.sheet-who { font-size: 14px; font-weight: 650; margin-bottom: 16px; }
+.sheet-note { margin-top: 18px; font-size: 12.5px; line-height: 1.55; color: var(--ink-faint); }
+.sheet-note strong { color: var(--ink-muted); font-weight: 650; }
+.sheet-foot { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+
+/* The two answers on the connect card, each the full width of it: this is a
+   choice between them, not a main action with an afterthought beside it. */
+.choice-actions { display: grid; gap: 10px; margin-top: 22px; }
+.choice-actions .btn { width: 100%; }
+
+.grp + .grp { margin-top: 18px; }
+.grp-t {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+
+/* The Real group carries the account's own colour: a coloured pill on the
+   title and the balance in the same ink, so the row that is actual money is
+   the one the eye lands on. Demo stays quiet. Same in practice mode — the
+   figure changes, the emphasis does not. */
+.grp--real .grp-t {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--real-tint); color: var(--real);
+}
+.grp--real .grp-t::before {
+  content: ""; width: 6px; height: 6px; border-radius: 999px;
+  background: var(--real); box-shadow: 0 0 0 3px var(--real-tint);
+}
+.grp--real .acct-bal { color: var(--real); font-weight: 750; }
+
+/* Every account: kind, id, balance — the figures line up down the right. */
+.accts { border-top: 1px solid var(--line); }
+.acct {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.acct:last-child { border-bottom: 0; }
+.acct-kind {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-faint);
+  background: var(--surface-2);
+  border-radius: 6px;
+}
+.acct-id { color: var(--ink-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.acct-bal { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.acct--none { display: block; color: var(--ink-faint); }
+
+/* The one link that stays on the page. */
+.notice-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--blue);
+  border: 1px solid var(--line-hi);
+  border-radius: 999px;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.notice-go:hover { color: var(--blue-hi); border-color: var(--blue); background: var(--surface); }
+
+/* ── Flash messages ─────────────────────────────────────────────────────── */
+
+.flash {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 20px;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.flash.is-in { opacity: 1; transform: none; }
+.flash[hidden] { display: none; }
+.flash--ok { color: var(--ok); border-color: var(--ok); background: var(--surface); }
+
+/* On the landing page the flash is a failure, and floats over the page. */
+.flash--error {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 80;
+  transform: translate(-50%, 8px);
+  color: var(--pink);
+  border-color: var(--pink);
+  background: var(--surface);
+  max-width: calc(100vw - 40px);
+  text-align: center;
+}
+.flash--error.is-in { transform: translate(-50%, 0); }
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 11px 20px;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  /* Explicit, because a <button> defaults to the OS button face — without
+     this, .btn-line renders as a white pill instead of an outline. */
+  background: transparent;
+  color: var(--ink);
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.btn-lg { padding: 14px 28px; font-size: 15.5px; }
+
+/* Two bright solid fills, equal weight — pink for "free", blue to start. */
+.btn-solid { background: var(--pink); color: var(--on-accent); }
+.btn-solid:hover { background: var(--pink-hi); }
+
+.btn-blue { background: var(--blue); color: var(--on-accent); }
+.btn-blue:hover { background: var(--blue-hi); }
+
+.btn-line { border-color: var(--line-hi); color: var(--ink); }
+.btn-line:hover { background: var(--surface); border-color: #45454f; }
+
+
+/* ── Nav ────────────────────────────────────────────────────────────── */
+
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  background: var(--base);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+.nav.is-stuck { border-bottom-color: var(--line); }
+
+.nav-inner { display: flex; align-items: center; gap: 20px; height: 68px; }
+
+.brand { display: inline-flex; align-items: center; gap: 10px; }
+.brand-mark { display: block; width: 30px; height: 30px; flex: none; }
+.brand-name { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+
+.nav-cta { display: flex; gap: 8px; margin-left: auto; }
+
+/* ── Hero ───────────────────────────────────────────────────────────── */
+
+.hero { padding-top: clamp(104px, 13vh, 148px); border-bottom: 1px solid var(--line); }
+
+.hero-inner {
+  display: grid;
+  /* Copy takes the room it needs; the panel is a fixed-ish companion.
+     Below 1040px they stack (see the breakpoint). */
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+  padding-bottom: clamp(48px, 7vh, 84px);
+}
+
+.hero-copy { display: grid; gap: 22px; justify-items: start; }
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pink); flex: none; }
+
+.hero-title {
+  font-size: clamp(2.5rem, 5.6vw, 4.4rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  max-width: 16ch;
+}
+
+.hero-sub {
+  max-width: 52ch;
+  font-size: clamp(1rem, 1.35vw, 1.14rem);
+  color: var(--ink-muted);
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* The spec card beside the headline — flat surface, plain rows. */
+/* ══ The hero tape ═════════════════════════════════════════════════════════
+   A market moving, rather than a card claiming things about one. The old
+   panel listed a symbol, a timeframe and a risk figure that were decoration
+   dressed as data; this states nothing it cannot back up and still says the
+   thing that matters — something is running. */
+
+.hero-panel {
+  position: relative;
+  overflow: hidden;
+  min-height: clamp(240px, 30vw, 340px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.tape {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+.tape-grid line {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* One width of travel, linear, forever. Linear matters: any easing would put
+   a pause at each end of the cycle, and a market that hesitates on a beat
+   reads as a loop rather than as a feed. */
+.tape-run { animation: tape-slide 18s linear infinite; }
+
+@keyframes tape-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(-600px); }
+}
+
+.tape-line {
+  fill: none;
+  stroke: var(--pink);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* The line keeps its weight however the card is stretched — without this
+     the non-uniform viewBox scaling would thin it out on a wide screen. */
+  vector-effect: non-scaling-stroke;
+}
+
+/* A flat tint under the curve, not a gradient: this page does not have one
+   anywhere and a chart is not the place to start. */
+.tape-fill { fill: var(--pink); opacity: 0.09; }
+
+.live {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ok);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+/* The dot, drawn rather than marked up, so the badge stays one element. */
+.live::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+/* Motion is decoration here. Anyone who has asked for less of it gets the
+   same picture, held still. */
+@media (prefers-reduced-motion: reduce) {
+  .tape-run, .live::before { animation: none; }
+}
+
+/* Full-width mark strip across the bottom of the hero — every platform and
+   prop firm in one quiet row, so the fold answers "does it work with mine?" */
+.marks { padding-block: clamp(26px, 3.4vw, 40px); border-top: 1px solid var(--line); }
+
+.marks-label {
+  margin-bottom: clamp(18px, 2.2vw, 26px);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-faint);
+}
+
+.marks-row {
+  /* A grid rather than a wrapped flex row: twelve marks of twelve different
+     widths packed into a full row and a stranded pair.
+
+     The column count is written out rather than left to auto-fit, because
+     auto-fit fits as many as will go — eleven and one at this width — and
+     twelve only looks deliberate in rows that divide it. Six and six, four
+     and four and four, three by four, two by six. Never a widow. */
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: clamp(22px, 3vw, 42px) clamp(20px, 2.4vw, 40px);
+}
+.marks-row li { display: flex; align-items: center; justify-content: center; }
+.marks-row img {
+  /* A definite height, not max-height: several of these SVGs carry a viewBox
+     with no width/height, so they have no intrinsic size and would collapse
+     to 0x0 in a flex row. Fixing the height lets the aspect ratio set width. */
+  height: 26px;
+  width: auto;
+  max-width: 130px;
+  object-fit: contain;
+  /* Muted by default so the row reads as one texture, not twelve brands
+     competing with the headline; each lifts to full on hover. */
+  opacity: 0.62;
+  transition: opacity 0.18s ease;
+}
+.marks-row li:hover img { opacity: 1; }
+
+@media (max-width: 1180px) { .marks-row { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .marks-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 460px) { .marks-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Tile icons on the dashboard. */
+.icon-pink { color: var(--pink); }
+.icon-blue { color: var(--blue); }
+
+/* ── Bands: how it works, and the questions ───────────────────────────────
+   The two sections of prose under the hero. Same vocabulary as everything
+   above them — flat surfaces, 1px lines, no gradient anywhere — so they read
+   as more of the page rather than as something bolted on for a crawler.
+
+   `band--alt` is the only difference between the two: a barely-there tint, so
+   the second one is separated from the first by something other than a gap. */
+
+.band { padding-block: clamp(48px, 7vw, 88px); border-top: 1px solid var(--line); }
+.band--alt { background: var(--alt-tint); }
+
+.band-k {
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-faint);
+}
+
+.band-t {
+  margin: 0 0 clamp(28px, 3.6vw, 44px);
+  max-width: 22ch;
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/* Three across where there is room, stacked where there is not. */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: clamp(18px, 2.4vw, 28px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.steps li {
+  padding: clamp(20px, 2.2vw, 26px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.steps h3 {
+  margin: 14px 0 8px;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.steps p { margin: 0; font-size: 0.92rem; line-height: 1.65; color: var(--ink-muted); }
+.steps strong { color: var(--ink); font-weight: 650; }
+
+.step-n {
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--pink);
+  border-radius: 9px;
+}
+
+/* Two columns of questions on a wide screen. Every answer is visible: a page
+   that hides its content behind a control is a page a crawler reads less of,
+   and somebody scanning for one answer should not have to open eight things
+   to find it. */
+.faq {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: clamp(20px, 2.6vw, 34px) clamp(28px, 4vw, 56px);
+}
+.faq-i h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.faq-i p { margin: 0; font-size: 0.92rem; line-height: 1.7; color: var(--ink-muted); }
+
+/* ── Footer ─────────────────────────────────────────────────────────── */
+
+.footer { padding: clamp(40px, 5vw, 60px) 0 32px; }
+.footer-inner { display: flex; flex-wrap: wrap; gap: 30px; justify-content: space-between; align-items: flex-start; }
+.footer-brand { max-width: 42ch; }
+.footer-brand p { margin-top: 10px; font-size: 0.9rem; color: var(--ink-faint); }
+.footer-legal { margin-top: 30px; padding-top: 22px; }
+.footer-legal p { font-size: 0.76rem; color: var(--ink-faint); border-top: 1px solid var(--line); padding-top: 22px; }
+
+/* ── Reveal on scroll ───────────────────────────────────────────────── */
+
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.5s ease, transform 0.5s ease; }
+.reveal.is-in { opacity: 1; transform: none; }
+
+/* ── Width breakpoints ──────────────────────────────────────────────── */
+
+@media (max-width: 1040px) {
+  /* The spec panel stops earning its column and moves under the copy. */
+  .hero-inner { grid-template-columns: minmax(0, 1fr); }
+  .hero-title { max-width: 20ch; }
+}
+
+@media (max-width: 900px) {
+  /* The bar is the brand and the two buttons now — there is no menu left to
+     fold away, so the buttons stay put rather than hiding behind a hamburger
+     that would open on nothing. */
+  .nav-cta { gap: 6px; }
+}
+
+@media (max-width: 620px) {
+  /* Tighter mark spacing so the strip stays a few rows, not a long ladder. */
+  .marks-row { gap: 22px 30px; }
+  .marks-row img { height: 22px; max-width: 104px; }
+  .actions { width: 100%; }
+  .actions .btn { flex: 1 1 100%; }
+}
+
+/* ── Accessibility ──────────────────────────────────────────────────── */
+
+:focus-visible { outline: 2px solid var(--pink); outline-offset: 3px; border-radius: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+}
+
+/* ── Shalobotmatic Ai ───────────────────────────────────────────────────────── */
+
+/* Settings is a control column at a readable width; Session takes whatever is
+   left. On a wide screen that fills the page instead of leaving the right half
+   empty, and the two cards stay the same height so the layout does not step. */
+.run {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 14px;
+}
+
+.panel-solid {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: clamp(20px, 2.4vw, 28px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.grp-t--sub { margin-top: 24px; }
+
+.fld { display: block; margin-top: 14px; }
+
+/* The A in "Account" — a handle, not a button. It looks like the rest of the
+   label until it has been used, so nothing advertises the demo accounts.
+   NOT named .reveal: that class already exists for the landing page's
+   scroll-in animation and starts at opacity 0, which would hide this. */
+.acct-reveal { cursor: pointer; user-select: none; }
+.acct-reveal--on { color: var(--blue); }
+.fld-k {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-faint);
+}
+.fld-i {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--ink);
+  background: var(--base);
+  border: 1px solid var(--line-hi);
+  border-radius: 10px;
+}
+.fld-i:focus { outline: 2px solid var(--blue); outline-offset: 1px; border-color: var(--blue); }
+.fld-i:disabled { opacity: 0.55; cursor: not-allowed; }
+/* `display` on .fld beats [hidden] on its own. */
+.fld[hidden] { display: none; }
+
+.fld-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); gap: 12px; }
+
+/* Pushed to the bottom of the card, so Settings and Session line up however
+   tall the trade list grows. */
+.run-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; padding-top: 20px; }
+.run-actions .btn { flex: 1 1 130px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Which account is about to be traded. Real money says so, in pink. */
+.risk { margin-top: 14px; font-size: 12.5px; line-height: 1.5; color: var(--ink-faint); }
+/* The real-account line reads as reassurance, not alarm: it is confirming the
+   trades are the genuine article on the account the trader chose. Pink made a
+   correct, expected state look like something had gone wrong — and it is the
+   state most people are deliberately in. Green is what the rest of the app
+   uses for "this is working". */
+.risk--real { color: var(--ok); }
+
+.status { margin-top: 8px; font-size: 13px; line-height: 1.5; color: var(--ink-muted); min-height: 1.2em; }
+.status--error { color: var(--pink); }
+.status--success { color: var(--ok); }
+.status--warning { color: #e3b341; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+  gap: 16px 14px;
+  margin-top: 16px;
+}
+.stats-grid > div { min-width: 0; }
+.stats-grid dt {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-faint);
+}
+.stats-grid dd {
+  margin: 5px 0 0;
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.stats-grid .is-up { color: var(--ok); }
+.stats-grid .is-down { color: var(--pink); }
+
+/* One colour each, so six numbers read as six different things instead of one
+   grey block. Flat fills from the palette already in use — no gradients here
+   or anywhere else on the site. Profit and win rate take their colour from
+   their VALUE, because for those two the colour is information; the rest are
+   simply told apart. */
+.stat--count { color: var(--blue); }
+.stat--stake { color: var(--amber); }
+.stat--market { color: var(--violet); }
+.stat--time { color: var(--teal); }
+.stat--rate.is-up { color: var(--ok); }
+.stat--rate.is-down { color: var(--pink); }
+
+/* The trade list fills the rest of the card and scrolls inside itself, so the
+   page never grows a second scrollbar as a session runs on. */
+.hist {
+  /* Takes whatever the card has left. The cap this replaces stopped the list
+     short of the bottom of a card that had already been stretched to the
+     height of the settings beside it, leaving a band of empty panel under the
+     trades — space the list could have been using. The card does not grow to
+     suit it: the row height is set by the column opposite, and the list
+     scrolls inside whatever that leaves. */
+  flex: 1 1 0;
+  min-height: 150px;
+  margin-top: 8px;
+  padding-top: 4px;
+  /* A gutter for the scrollbar. Without it the bar is drawn over the profit
+     figure — the one number in the row anybody is actually reading. */
+  padding-right: 14px;
+  overflow-y: auto;
+  /* The list keeps its own scrolling. Reaching the top used to hand the
+     gesture to the page, which then scrolled the whole card out of view: you
+     went looking for an earlier trade and the panel left the screen. */
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--line);
+  /* A thin, self-coloured bar — the OS default is a light slab on a dark card. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-hi) transparent;
+  overscroll-behavior: contain;
+}
+.hist::-webkit-scrollbar { width: 8px; }
+.hist::-webkit-scrollbar-track { background: transparent; }
+.hist::-webkit-scrollbar-thumb {
+  background: var(--line-hi);
+  border-radius: 999px;
+  /* Inset from the edge so the bar reads as a thin pill, not a filled gutter. */
+  border: 2px solid var(--surface);
+}
+.hist::-webkit-scrollbar-thumb:hover { background: #45454f; }
+
+.trade {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.trade:last-child { border-bottom: 0; }
+.trade-r {
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  border-radius: 7px;
+}
+.trade--win .trade-r { color: var(--ok); background: rgba(95, 211, 154, 0.12); }
+.trade--loss .trade-r { color: var(--pink); background: rgba(255, 61, 135, 0.12); }
+.trade-m { color: var(--ink-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* The result of the trade, and the reason the row exists. Everything else in
+   it is context. */
+.trade-p {
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.trade--win .trade-p { color: var(--ok); }
+.trade--loss .trade-p { color: var(--pink); }
+
+@media (max-width: 860px) {
+  /* Below this the control column has nothing to sit beside. */
+  .run { grid-template-columns: minmax(0, 1fr); }
+  .run-actions { margin-top: 20px; padding-top: 0; }
+
+  /* Stacked, the card has no column opposite to take its height from, so the
+     list needs a limit of its own or a long session grows the page. */
+  .hist { flex: 0 1 auto; max-height: clamp(200px, 42vh, 440px); }
+}
+
+/* ── Home: content + markets rail ───────────────────────────────────────── */
+
+/* On a wide screen the rail fills the space the tiles were leaving empty on
+   the right. Below 1180px it drops underneath them, full width. */
+/* Two columns across the whole width.
+
+   The gulf that used to sit between them was never the grid's fault: the left
+   column's CONTENT was capped at 660px while its track kept growing, so the
+   tiles stayed small and the space went nowhere. The caps are gone, so the
+   tiles and the account panel fill whatever they are given, and the rail keeps
+   the fixed width a list of ten sparklines wants. Nothing is centred and
+   nothing is held back — the page uses the screen it is on. */
+.dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 400px);
+  /* minmax(0, 1fr), not the default auto: an auto row is never smaller than its
+     contents, so on a short window the prices panel pushed the page into
+     scrolling instead of scrolling inside itself. This lets the row shrink, and
+     the panel handles its own overflow. */
+  grid-template-rows: minmax(0, 1fr);
+  gap: clamp(14px, 1.8vw, 24px);
+  /* Stretched, not start-aligned: a column only as tall as its content cannot
+     grow into the space, which is what left a band of empty ground between the
+     last card and the small print. */
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: clamp(12px, 1.6vh, 18px);
+}
+/* A column too, so the account panel below the tiles can be told to take the
+   rest of it. */
+.dash-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+.markets {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;   /* so it can be shorter than its list and let it scroll */
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* A heading, not a button. It used to fold the rail away, which is how a
+   panel meant to be watched came to be hidden — there is nothing to collapse
+   any more. */
+.mk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+
+/* A quiet pulse while prices are arriving. */
+.mk-live {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  animation: mk-pulse 2s ease-in-out infinite;
+}
+@keyframes mk-pulse { 50% { opacity: 0.3; } }
+
+/* Exactly the height the panel has, no more and no less: whatever is left
+   after the heading. Ten markets show without scrolling wherever there is room
+   for ten, and the list scrolls inside itself where there is not — rather than
+   the page scrolling. */
+.mk-list {
+  display: block;
+  padding: 4px 6px 6px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-hi) transparent;
+}
+
+.mk {
+  display: grid;
+  /* Name takes the slack; the sparkline and the figure keep fixed widths so
+     the percentages line up as a column down the right. */
+  grid-template-columns: minmax(0, 1fr) 96px 64px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+}
+.mk:first-child { border-top: 0; }
+
+.mk-name {
+  font-size: 12px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mk-spark { display: block; width: 96px; height: 34px; }
+
+/* The slot the sparkline drops into. It holds the row's height before any
+   price has arrived, which is what stops the rail growing under the cursor
+   on a refresh. */
+.mk-slot { display: block; width: 96px; height: 34px; }
+
+/* A row waiting for its first price: present, sized, and plainly not a
+   number yet. */
+.mk-pct--idle { color: var(--ink-faint); background: var(--surface-2); }
+
+.mk-pct {
+  padding: 4px 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+.mk-pct--up { color: var(--ok); background: rgba(95, 211, 154, 0.12); }
+.mk-pct--down { color: var(--pink); background: rgba(255, 61, 135, 0.12); }
+
+
+@media (max-width: 1180px) {
+  /* No room beside the tiles — the rail goes under them, full width.
+
+     Stacked, there is no second column to balance against and nothing above the
+     fold to protect, so everything goes back to its natural height and the page
+     scrolls the way a phone expects. Two rows now, both auto: the single-row
+     track above would have squeezed the first and left the second to fend for
+     itself. */
+  .dash-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; flex: none; }
+  .dash-col { display: block; }
+  .markets { max-width: 520px; }
+
+  /* An ordinary block again, and this is not cosmetic.
+
+     Stacked, the rail stands at its full height and has nothing to scroll
+     inside itself — but `overflow-y: auto` still made it a scroll container,
+     and `overscroll-behavior: contain` on a scroll container stops the gesture
+     reaching the page. So a swipe that began anywhere on the card scrolled
+     neither the card, which had nowhere to go, nor the page. On a phone the
+     card is most of the screen, which is why the page seemed to lock near the
+     footer. Both properties belong to the desktop layout, where the list
+     really does scroll within a fixed panel, so they are dropped here rather
+     than removed above. */
+  .mk-list { flex: none; overflow: visible; overscroll-behavior: auto; }
+}
+
+/* The light/dark button. Icon plus word, so it is not a mystery glyph. */
+.theme-b { display: inline-flex; align-items: center; gap: 7px; }
+
+/* ── The header on a small screen ───────────────────────────────────────
+   A balance like "USD 10,000.00" plus a badge plus two buttons will not fit
+   375px at full size. Everything shrinks together and the theme button
+   drops to its icon; nothing is removed, because each part is the answer to
+   a question someone opens this page to ask. */
+
+@media (max-width: 640px) {
+  .nav-inner { gap: 8px; height: 58px; }
+  .brand-mark { width: 26px; height: 26px; }
+  .brand-name { font-size: 16px; }
+
+  .perch { gap: 6px; min-width: 0; }
+  .perch-v {
+    font-size: 13px;
+    letter-spacing: -0.03em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .badge { padding: 4px 8px; font-size: 9.5px; letter-spacing: 0.06em; }
+  .perch .btn { padding: 7px 11px; font-size: 12.5px; }
+
+  /* The moon says it on its own at this size. */
+  .theme-b [data-theme-label] { display: none; }
+  .theme-b { padding: 7px 9px; }
+
+  /* The pages behind the connection clear the shorter bar. */
+  .dash-main { padding-top: 76px; }
+}
+
+@media (max-width: 400px) {
+  .brand-name { display: none; }   /* the mark alone still says Shalobot */
+  .perch-v { font-size: 12px; }
+  .perch .btn { padding: 6px 9px; font-size: 12px; }
+}
+
+/* ══ Install ═══════════════════════════════════════════════════════════════
+   The button is hidden in the markup and shown by install.js, so a browser
+   with no install path never renders a button that cannot do anything. */
+
+.btn-install { display: inline-flex; align-items: center; gap: 7px; }
+.btn-install[hidden] { display: none; }
+
+@media (max-width: 720px) {
+  /* The label is the first thing to go when the bar gets tight — the tray
+     icon carries the meaning on its own at that size. */
+  .btn-install span { display: none; }
+}
+
+/* How-to, for the browsers that keep installing in a menu of their own. */
+.how {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(6, 6, 10, 0.55);
+}
+.how-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+.how-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.how-head h3 { margin: 0; font-size: 1rem; }
+.how-x {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.how-card > p { margin: 8px 0 14px; font-size: 0.85rem; color: var(--ink-soft); }
+.how-steps { margin: 0 0 16px; padding-left: 20px; list-style: decimal; font-size: 0.86rem; }
+.how-steps li { margin-bottom: 8px; }
+.how-ok { width: 100%; }
+
+/* ══ Disclaimer ════════════════════════════════════════════════════════════
+   The same sentence on every page, at the bottom of each. Quiet, but never
+   behind a click: the pages above it place real money. */
+
+.disclaimer {
+  margin: 0 0 10px;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  color: var(--ink-faint);
+}
+
+/* Pinned to the bottom by the auto margin, and as small as a line of small
+   print should be: it is a caution, not a section. */
+.dash-foot {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.dash-foot .disclaimer { margin: 0; }
+
+/* ══ The door ══════════════════════════════════════════════════════════════
+   Three clicks on the "o" of Home. It carries no affordance on purpose — a
+   dotted underline or a cursor change would turn a quiet mode into a thing
+   every visitor pokes at. `cursor: text` is what the rest of a heading already
+   shows, so the letter gives nothing away by looking selectable. */
+
+.door { cursor: text; }
+
+/* The field the first visit asks for. No placeholder, no label, no width worth
+   noticing — it borrows the page's own input colours so that a person who has
+   opened it by accident sees a stray box rather than a prompt. */
+.door-key {
+  width: 6.5em;
+  margin-left: 10px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  vertical-align: middle;
+}
+.door-key:focus { outline: none; border-color: var(--line-hi); }
+.door-key[hidden] { display: none; }
+
+/* The whole of the announcement: one second on the word, then gone. It fades
+   in and out rather than switching, so a repeat press reads as a deliberate
+   pulse instead of a flicker. Anybody not watching the word misses it, which
+   is the intention. */
+@keyframes door-lit {
+  0%   { color: var(--ink); }
+  22%  { color: var(--blue); }
+  70%  { color: var(--blue); }
+  100% { color: var(--ink); }
+}
+.dash-title.lit { animation: door-lit 1s ease-in-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-title.lit { animation-duration: 1ms; color: var(--blue); }
+}
+
+/* ══ The account, on the page ══════════════════════════════════════════════
+   The same portfolio the sheet shows, sitting in the column beside the tiles
+   instead of behind a double click. On a wide screen that space was empty and
+   the answer to "which account am I on?" was hidden; here it is simply read.
+
+   Below 1180px it is not rendered at all — the rail moves under the tiles at
+   that width, and a second tall block under that would push the disclaimer
+   somewhere nobody scrolls. The badge still opens the sheet there. */
+
+.acctp { display: none; }
+
+@media (min-width: 1180px) {
+  .acctp {
+    /* A column that takes the rest of the space under the tiles, so the left
+       side reaches the bottom of the screen the way the prices rail does. */
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    margin-top: clamp(10px, 1.2vw, 14px);
+    padding: 16px 18px 18px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+  }
+  .acctp[hidden] { display: none; }
+}
+
+.acctp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.acctp-k {
+  margin: 0 0 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.acctp-t { margin: 0; font-size: 0.95rem; font-weight: 650; }
+
+.acctp-note {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+}
+.acctp-note strong { color: var(--ink-muted); font-weight: 650; }
+
+/* Smaller than the standalone button it replaces: inside a panel it is one
+   line among several, not the thing the page is asking you to do. */
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.notice-go--sm { margin-top: 12px; padding: 8px 13px; font-size: 12px; }
+
+/* The account rows are denser here than in the sheet: a panel is read at a
+   glance beside other things, where the sheet has the screen to itself. */
+.acctp .grp + .grp { margin-top: 12px; }
+.acctp .acct { padding: 7px 0; font-size: 12px; }
+.acctp .sheet-who { margin-bottom: 10px; font-size: 12.5px; }
+
+
+/* Disconnect is the one button on this page that undoes something, so it is
+   the one button wearing the colour that means it. The border stays neutral
+   until hover: a permanently red outline in a quiet panel reads as an alert
+   about the account rather than an action available on it. */
+.btn-danger { color: var(--danger); }
+.btn-danger:hover { color: var(--danger); border-color: var(--danger); }
+
+/* A row that is waiting for the portfolio call. Same height as a real one, so
+   the panel does not resize when the accounts land. */
+.acct--wait { color: var(--ink-faint); }
+
+/* ══ Switch ════════════════════════════════════════════════════════════════
+   The martingale on the analysis page, the take profit and stop loss on the
+   bot, "first trade loses" on both simulation cards. It lived in analysis.css
+   until the Shalobotmatic Ai simulation used one without loading that file and
+   the control simply was not there — a switch you cannot see is a setting
+   nobody knows they have. */
+
+.tog {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  padding: 0;
+  flex: none;
+  background: var(--surface-2);
+  border: 1px solid var(--line-hi);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.tog-dot {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 12px; height: 12px;
+  background: var(--ink-faint);
+  border-radius: 50%;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+/* On is green, and the knob moves as well as the colour changing, so it does
+   not rest on hue alone. */
+.tog[aria-checked="true"] { background: rgba(20, 160, 90, 0.18); border-color: var(--ok); }
+.tog[aria-checked="true"] .tog-dot { transform: translateX(16px); background: var(--ok); }
+

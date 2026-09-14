@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Dashboard | Shalobot</title>
+<meta name="robots" content="noindex,nofollow" />
+<meta name="theme-color" content="#0b1220" />
+<link rel="icon" href="/favicon.ico" sizes="48x48" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<script>
+/* Applied before paint: a saved light choice must not flash navy first.
+   Navy is the default when nothing has been chosen. */
+(function(){try{var t=localStorage.getItem("shalo_theme");
+document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();
+</script>
+<link rel="stylesheet" href="/styles.css" />
+<link rel="stylesheet" href="/mt5/mt5.css" />
+<link rel="stylesheet" href="/support.css" />
+</head>
+<body class="dash">
+
+<header class="nav">
+  <div class="bleed nav-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="15" fill="#0b1220"/><path d="M17 41c0 8 8 10 15 10s15-2 15-9c0-8-10-8-15-9s-14-2-14-9c0-7 7-9 13-9 5 0 9 1 12 4" fill="none" stroke="#3ddc97" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="46" cy="17" r="5.5" fill="#ffb020"/></svg>
+      </span>
+      <span class="brand-name">Shalobot</span>
+    </a>
+    <div class="perch">
+      <button class="btn btn-line theme-b" data-theme-toggle type="button" aria-pressed="true" title="Switch to light">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <span data-theme-label>Light</span>
+      </button>
+      <a class="btn btn-line" href="/">Home</a>
+    </div>
+  </div>
+</header>
+
+<main class="bleed dash-main mt5">
+
+  <!-- The eyebrow: where you are, and when the panel below last spoke to the
+       market. The refresh button is here rather than beside the signals so it
+       stays reachable without scrolling back down. -->
+  <div class="mt5-eyebrow">
+    <span class="mt5-crumb">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4M8 16h.01M16 16h.01"/></svg>
+      FREE MT5 BOTS
+    </span>
+    <div class="mt5-eyebrow-r">
+      <span class="mt5-stamp" id="stamp" hidden></span>
+      <button class="btn btn-line btn-sm" id="refresh" type="button">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="refresh-icon"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="mt5-intro">
+    <h1 class="mt5-t">Headway MT5 — full automation</h1>
+    <p class="mt5-lede">
+      One Expert Advisor that trades forex, gold and crypto automatically on your own
+      MetaTrader 5 terminal. Install it once on a single chart and it handles the rest.
+    </p>
+  </div>
+
+  <p class="mt5-err" id="err" hidden></p>
+
+  <!-- ── 1 · install ──────────────────────────────────────────────────── -->
+  <section class="mt5-sec">
+    <div class="mt5-sec-head">
+      <span class="mt5-n">1</span>
+      <h2 class="mt5-k">Get it running</h2>
+    </div>
+
+    <div class="mt5-panel">
+      <div class="mt5-get">
+        <button class="btn btn-blue" id="get-ea" type="button">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download Shalobot EA
+        </button>
+        <span class="mt5-get-s">Free for our Headway community — a quick check, then the file.</span>
+      </div>
+
+      <ol class="mt5-steps">
+        <li><span class="mt5-step-n">1</span><span>Copy the file into MT5&rsquo;s <code>MQL5/Experts</code> folder — find it via <code>File → Open Data Folder</code>.</span></li>
+        <li><span class="mt5-step-n">2</span><span class="mt5-step-t"><span>In MT5 go to <code>Tools → Options → Expert Advisors</code>, tick <b>Allow WebRequest</b> and add <code>https://www.shalobot.com</code>.</span> <button type="button" class="mt5-copy" data-copy="https://www.shalobot.com" aria-label="Copy the address"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button></span></li>
+        <li><span class="mt5-step-n">3</span><span>Restart MT5, or press <b>Compile</b> in MetaEditor. The bot then appears under Expert Advisors.</span></li>
+        <li><span class="mt5-step-n">4</span><span>Drag it onto <b>any one chart</b>, set <code>InpProfile</code> to your risk level, and enable <b>Algo Trading</b> — the toolbar button must be green: <span class="algo algo-on"><i></i>Algo Trading</span> is <b>on</b>, <span class="algo algo-off"><i></i>Algo Trading</span> is <b>off</b>.</span></li>
+        <li><span class="mt5-step-n">5</span><span>(Recommended) Right-click the bot → <b>Register a Virtual Server</b> so it keeps trading with your computer off.</span></li>
+      </ol>
+
+      <p class="mt5-note">
+        You keep full custody — it runs on your own terminal and we never see a
+        password. Once it is set up it needs nothing further from this page.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 2 · risk ─────────────────────────────────────────────────────── -->
+  <section class="mt5-sec">
+    <div class="mt5-sec-head">
+      <span class="mt5-n">2</span>
+      <h2 class="mt5-k">Choose your risk profile</h2>
+    </div>
+
+    <div class="mt5-profiles" id="profiles"></div>
+
+    <p class="mt5-note mt5-note--loose">
+      Set the same level in the bot&rsquo;s <code>InpProfile</code> input. You can change it
+      at any time without reinstalling.
+    </p>
+  </section>
+
+  <!-- ── 3 · signals ──────────────────────────────────────────────────── -->
+  <section class="mt5-sec">
+    <div class="mt5-sec-head">
+      <span class="mt5-n">3</span>
+      <h2 class="mt5-k">Live signals</h2>
+      <span class="mt5-meta" id="sig-meta"></span>
+    </div>
+
+    <div id="signals"></div>
+    <div id="aside"></div>
+  </section>
+
+  <div class="dash-foot">
+    <p class="disclaimer mt5-disc">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10.1 2.2a10 10 0 0 1 3.8 0M2.2 10.1a10 10 0 0 1 1.9-3.3M2.2 13.9a10 10 0 0 0 1.9 3.3M10.1 21.8a10 10 0 0 0 3.8 0M21.8 13.9a10 10 0 0 1-1.9 3.3M21.8 10.1a10 10 0 0 0-1.9-3.3M6.8 20a10 10 0 0 0 3.3 1.8M17.2 20a10 10 0 0 1-3.3 1.8M6.8 4a10 10 0 0 1 3.3-1.8M17.2 4a10 10 0 0 0-3.3-1.8"/></svg>
+      Trading carries risk. This is an automated tool, not financial advice or a profit
+      guarantee. Never risk more than you can afford to lose.
+    </p>
+  </div>
+
+</main>
+
+
+<!-- ── the access sheet ────────────────────────────────────────────────────
+     The EA is free but not public: it runs on our engine's signals, so it
+     goes to people who came to Headway through us. One form asks for the MT5
+     login that proves that, the answer comes back in the support bubble, and
+     the code it carries unlocks the download — on this browser only. -->
+<div class="ea-root" id="eaRoot" hidden role="dialog" aria-modal="true" aria-label="Get the Shalobot EA">
+  <div class="ea">
+    <header class="ea-head">
+      <div class="ea-head-t">
+        <span class="ea-eyebrow">MT5 · Shalobot EA</span>
+        <h2>Get the Shalobot EA</h2>
+      </div>
+      <button type="button" class="ea-x" id="eaClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+
+    <ol class="ea-track" id="eaTrack" aria-hidden="true">
+      <li data-k="form"><i></i>Your details</li>
+      <li data-k="sent"><i></i>We check</li>
+      <li data-k="done"><i></i>Download</li>
+    </ol>
+
+    <div class="ea-body">
+      <section id="eaForm">
+        <p class="ea-lede">The EA takes its signals from our engine, so it goes to Shalobot&rsquo;s own Headway community. Paste your MT5 login and we check it against our partner list — usually within a day.</p>
+
+        <div class="ea-acct ea-acct--hw">
+          <div class="ea-acct-l">
+            <span>No Headway MT5 account yet?</span>
+            <a class="ea-mt5" href="https://headway.partners/user/signup?hwp=8abf6d" target="_blank" rel="noopener noreferrer sponsored">
+              <span class="ea-hw">headway</span>
+              <span>Create account</span>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+            </a>
+            <small>Opening it through this link places the account under our partner group — that is what we check.</small>
+          </div>
+          <a class="ea-qr" href="https://headway.partners/user/signup?hwp=8abf6d" target="_blank" rel="noopener noreferrer sponsored" aria-label="Scan to open a Headway account">
+            <img src="/logos/headway-signup-qr.svg" alt="" width="84" height="84" />
+            <span>or scan</span>
+          </a>
+        </div>
+
+        <div id="eaFields">
+          <label class="ea-f">
+            <span>Your MT5 login</span>
+            <input class="field" id="eaId" placeholder="1234567" autocomplete="off" inputmode="numeric" spellcheck="false" />
+            <small>The account number MetaTrader 5 shows at the top of the terminal, before the server name. It is also in your Headway personal area.</small>
+          </label>
+          <div class="ea-two">
+            <label class="ea-f"><span>Name</span><input class="field" id="eaName" placeholder="Your name" autocomplete="name" /></label>
+            <label class="ea-f"><span>Email</span><input class="field" id="eaMail" type="email" placeholder="you@email.com" autocomplete="email" /></label>
+          </div>
+          <p class="ea-limit" id="eaLimit" hidden>You have sent this three times. Wait for our reply in the support window — it unlocks sending again.</p>
+          <button type="button" class="btn btn-blue ea-send" id="eaSend" disabled>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+            Send for checking
+          </button>
+        </div>
+
+        <!-- After sending, the three fields fold into one line. -->
+        <div class="ea-summary" id="eaSummary" hidden>
+          <div class="ea-summary-t"><b id="eaSumId"></b><span id="eaSumWho"></span></div>
+          <button type="button" class="ea-link" id="eaEdit">Edit</button>
+        </div>
+        <div class="ea-sent" id="eaSent" hidden>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>Sent.</b> We are checking your ID now. Your code arrives in the <b>support window</b> at the corner of this page — keep it open, the reply lands there.</span>
+        </div>
+
+        <div class="ea-code" id="eaCodeWrap">
+          <button type="button" class="ea-link ea-code-toggle" id="eaHaveCode">Already have a code?</button>
+          <div class="ea-code-f" id="eaCodeField" hidden>
+            <label class="ea-f">
+              <span>Download code</span>
+              <div class="ea-row">
+                <input class="field ea-code-in" id="eaCode" placeholder="SHALO-XXXX-XXXX" autocomplete="off" spellcheck="false" />
+                <button type="button" class="btn btn-solid" id="eaRedeem" disabled>
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                  Download
+                </button>
+              </div>
+              <small>Your code works only on this browser.</small>
+            </label>
+          </div>
+        </div>
+
+        <p class="ea-err" id="eaErr" hidden></p>
+        <p class="ea-foot">If your account is not under us we say so, and tell you how to ask Headway to attach it to partner code <code>8abf6d</code> — reply in the support window once it is done and we check again.</p>
+      </section>
+
+      <section class="ea-done" id="eaDone" hidden>
+        <span class="ea-done-ico">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </span>
+        <h3>Downloaded</h3>
+        <p><code>ShalobotMT5.mq5</code> is in your downloads. Follow the install steps on this page next. Keep your code — it works again on this browser if you ever need the file back.</p>
+        <button type="button" class="btn btn-blue" id="eaDoneClose">Done</button>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+  // The access code arrives as a support reply, so the bubble on this page is
+  // where it lands.
+  window.SHALO_SUPPORT_SOURCE = "MT5 bots";
+  window.SHALO_SUPPORT_GREETING = "ask us anything about the Shalobot EA or your Headway account. Tell us what happened and what you expected.";
+</script>
+<script src="/mt5/mt5.js"></script>
+<script src="/mt5/access.js" defer></script>
+<script src="/theme.js"></script>
+<script src="/support.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+/*
+ * SHALOBOT — the landing page.
+ *
+ * Full-bleed on the site's own tokens: navy ground, mint for the action,
+ * amber for the spark. Flat surfaces and 1px lines, no gradients. One set of
+ * rules holds from a phone to a wide desktop; the grid collapses to one
+ * column below 900px and the numbers shrink with clamp().
+ */
+
+main { padding-top: 68px; }
+
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 0 0 18px; padding: 6px 12px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface);
+  font-size: 12.5px; font-weight: 600; color: var(--ink-muted);
+}
+.eyebrow .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--blue); }
+
+/* ── hero ─────────────────────────────────────────────────────────────── */
+.hero { padding: clamp(40px, 8vh, 96px) var(--gutter) clamp(40px, 7vh, 80px); border-bottom: 1px solid var(--line); }
+.hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: clamp(28px, 5vw, 72px); align-items: center; }
+.hero h1 { margin: 0; font-size: clamp(38px, 6vw, 72px); line-height: 1.02; letter-spacing: -0.035em; font-weight: 800; }
+.hero .hl { color: var(--blue); }
+.lede { margin: 20px 0 0; max-width: 540px; font-size: clamp(16px, 1.6vw, 18.5px); line-height: 1.6; color: var(--ink-muted); }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.hero-actions .btn { gap: 8px; }
+.hero-facts { display: flex; flex-wrap: wrap; gap: 24px 36px; margin: 34px 0 0; padding: 0; list-style: none; }
+.hero-facts li { display: flex; align-items: baseline; gap: 8px; }
+.hero-facts b { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); }
+.hero-facts span { font-size: 13px; color: var(--ink-muted); }
+
+.hero-card {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--raise); padding: 18px 18px 8px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.25);
+}
+.hero-card-top { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--ink-muted); }
+.pill-up { padding: 3px 9px; border-radius: 999px; background: var(--real-tint); color: var(--ok); font-weight: 700; font-size: 12px; }
+.equity { width: 100%; height: auto; margin: 10px 0 6px; display: block; }
+.equity .grid path { stroke: var(--line); stroke-width: 1; }
+.equity .area { fill: var(--real-tint); }
+.equity .line { fill: none; stroke: var(--blue); stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.equity .tip { fill: var(--pink); }
+.hero-card-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 2px; border-top: 1px solid var(--line);
+  font-size: 13.5px; color: var(--ink-muted);
+}
+.hero-card-row i { font-style: normal; font-weight: 700; color: var(--ink); margin-right: 6px; }
+.hero-card-row b { font-variant-numeric: tabular-nums; }
+.hero-card-row .up { color: var(--ok); }
+.hero-card-row .down { color: var(--danger); }
+
+/* ── how ──────────────────────────────────────────────────────────────── */
+.howit { padding: clamp(48px, 8vh, 96px) var(--gutter); border-bottom: 1px solid var(--line); }
+.howit h2, .cta h2 { margin: 0 0 28px; font-size: clamp(28px, 3.6vw, 44px); letter-spacing: -0.03em; font-weight: 800; }
+.steps3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.steps3 article {
+  position: relative; padding: 24px 22px 22px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--raise);
+}
+.steps3 .n {
+  display: grid; place-items: center; width: 32px; height: 32px; margin-bottom: 16px;
+  border-radius: 999px; background: var(--blue); color: var(--on-accent);
+  font-size: 14px; font-weight: 800;
+}
+.steps3 h3 { margin: 0 0 8px; font-size: 18px; letter-spacing: -0.015em; }
+.steps3 p { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--ink-muted); }
+
+/* ── features ─────────────────────────────────────────────────────────── */
+.feats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: clamp(40px, 6vh, 72px) var(--gutter); border-bottom: 1px solid var(--line); }
+.feat { padding: 4px 6px; }
+.feat svg { color: var(--blue); }
+.feat h3 { margin: 12px 0 6px; font-size: 16px; letter-spacing: -0.01em; }
+.feat p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--ink-muted); }
+
+/* ── broker ───────────────────────────────────────────────────────────── */
+.broker { padding: clamp(40px, 6vh, 72px) var(--gutter); border-bottom: 1px solid var(--line); }
+.broker-card {
+  display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center;
+  padding: clamp(22px, 3vw, 36px);
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--raise);
+}
+.broker-copy h2 { margin: 0 0 10px; font-size: clamp(26px, 3vw, 36px); letter-spacing: -0.03em; font-weight: 800; }
+.broker-copy p { margin: 0; max-width: 560px; font-size: 15px; line-height: 1.6; color: var(--ink-muted); }
+.broker-copy code { font-size: 13px; padding: 1px 6px; border-radius: 6px; background: var(--surface-2); color: var(--ink); }
+.broker-copy .hero-actions { margin-top: 20px; }
+.broker-qr { margin: 0; text-align: center; }
+.broker-qr img { display: block; width: 150px; height: 150px; padding: 8px; border-radius: 12px; background: #fff; border: 1px solid var(--line); }
+.broker-qr figcaption { margin-top: 8px; font-size: 12px; color: var(--ink-faint); }
+
+/* ── final call, footer ───────────────────────────────────────────────── */
+.cta { padding: clamp(48px, 8vh, 96px) var(--gutter); text-align: center; border-bottom: 1px solid var(--line); }
+.cta h2 { margin-bottom: 8px; }
+.cta p { margin: 0 0 22px; color: var(--ink-muted); font-size: 16px; }
+.foot { padding: 28px var(--gutter) 40px; }
+.foot .disclaimer { margin: 0 0 14px; max-width: 760px; font-size: 12.5px; line-height: 1.6; color: var(--ink-faint); }
+.foot-line { margin: 0; font-size: 12.5px; color: var(--ink-faint); }
+.foot-line a { color: var(--ink-muted); }
+
+/* ── smaller screens ──────────────────────────────────────────────────── */
+@media (max-width: 1100px) { .feats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .steps3 { grid-template-columns: 1fr; }
+  .broker-card { grid-template-columns: 1fr; }
+  .broker-qr { justify-self: start; }
+}
+@media (max-width: 560px) {
+  .feats { grid-template-columns: 1fr; }
+  .hero-actions .btn { width: 100%; justify-content: center; }
+  .hero-facts { gap: 16px 24px; }
+}
