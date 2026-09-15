@@ -1,7 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true,
+  "cleanUrls": false,
   "trailingSlash": false,
+  "redirects": [
+    { "source": "/dashboard.html", "destination": "/dashboard", "permanent": true },
+    { "source": "/index.html", "destination": "/", "permanent": true }
+  ],
+  "rewrites": [
+    { "source": "/dashboard", "destination": "/dashboard.html" }
+  ],
   "functions": {
     "api/mt5/signals.js": { "maxDuration": 30 },
     "api/mt5/ea-download.js": { "includeFiles": "api/_files/**" }
