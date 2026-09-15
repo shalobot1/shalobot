@@ -517,7 +517,12 @@ body.ea-open { overflow: hidden; }
 .ea-track li.past { color: var(--ink-muted); }
 .ea-track li.past i { background: var(--ok); }
 
-.ea-body { flex: 1; overflow-y: auto; padding: 14px 20px 20px; scrollbar-width: thin; }
+.ea-body { flex: 1; overflow-y: auto; padding: 14px 20px 20px; scrollbar-width: thin; scrollbar-color: var(--line-hi) transparent; }
+/* A thin, quiet scrollbar on the sheet — the site's own hairline, no track. */
+.ea-body::-webkit-scrollbar { width: 6px; }
+.ea-body::-webkit-scrollbar-track { background: transparent; }
+.ea-body::-webkit-scrollbar-thumb { background: var(--line-hi); border-radius: 999px; }
+.ea-body::-webkit-scrollbar-button { display: none; height: 0; }
 .ea-lede { margin: 0 0 14px; font-size: 14px; line-height: 1.55; color: var(--ink-muted); }
 
 .ea-acct {

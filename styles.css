@@ -45,6 +45,7 @@
   --amber:     #b45f00;
   --violet:    #6d3bd8;
   --teal:      #0f7f8a;
+  --code:      #0369a1;
 
   --on-accent: #ffffff;
   --ring:      rgba(0, 0, 0, 0.45);
@@ -83,6 +84,7 @@
   --amber:     #ffb020;
   --violet:    #b794ff;
   --teal:      #4fd1c5;
+  --code:      #7dd3fc;
 
   /* Mint and amber sit on charcoal and carry dark text. */
   --on-accent: #04121f;

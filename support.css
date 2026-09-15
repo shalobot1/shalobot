@@ -126,7 +126,8 @@
   display: inline-block; margin: 2px 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 17px; font-weight: 800; letter-spacing: .08em;
-  color: var(--ok, #14a05a);
+  /* Blue, so the code reads as the thing to copy and not as a "success" line. */
+  color: var(--code, #38bdf8);
 }
 .sup-warn { color: var(--danger, #d92d20); font-weight: 700; }
 
