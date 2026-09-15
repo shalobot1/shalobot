@@ -2,7 +2,7 @@
   "name": "Shalobot",
   "short_name": "Shalobot",
   "description": "Free MT5 trading bots that trade for you.",
-  "start_url": "/dashboard.html",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "background_color": "#070b12",

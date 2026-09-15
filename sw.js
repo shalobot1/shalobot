@@ -25,15 +25,15 @@
  * under /api is ever cached, and neither is any other origin.
  */
 
-const VERSION = "shalo-shell-v3";
+const VERSION = "shalo-shell-v4";
 const NET_TIMEOUT_MS = 2500;
 
 /* What the launch screen is waiting on. The start page and everything it
    needs to paint; the other pages are cached as they are visited. */
 const SHELL = [
   "/",
-  "/index.html",
-  "/dashboard.html",
+  "/",
+  "/dashboard",
   "/styles.css",
   "/landing.css",
   "/mt5/mt5.css",
