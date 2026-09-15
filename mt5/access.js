@@ -80,6 +80,7 @@
   var codeOpen = false;
 
   function showErr(msg) {
+    if (msg && typeof window.tm === "function") msg = window.tm(msg);
     var e = $("eaErr");
     e.textContent = msg || "";
     e.hidden = !msg;

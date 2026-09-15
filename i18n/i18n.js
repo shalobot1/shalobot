@@ -14,8 +14,8 @@
  * bubble, a modal, a signal card.
  *
  * WHICH LANGUAGE. The one chosen last, if any; else the browser's own, when
- * it is Spanish, French or Portuguese; else — for a browser that only speaks
- * English — the language of the country the visitor is in, from a one-line
+ * it is one of ours (English included); else — for a browser that names none
+ * of them — the language of the country the visitor is in, from a one-line
  * endpoint that reads the request's country (Vercel stamps it on every
  * request); else English. The choice is kept in this browser and set on
  * <html lang>, so screen readers and spell-checkers follow it too.
@@ -57,21 +57,22 @@
   var attrOriginals = new WeakMap();
 
   /* ── choosing ─────────────────────────────────────────────────────────── */
-  /** The saved choice, else the browser's own non-English language. Returns
-   *  null when neither decides — the caller then asks where the visitor is. */
+  /** The saved choice, else the browser's own language — English included:
+   *  a browser set to English is a choice, wherever it is. Returns null only
+   *  when the browser names nothing we have; then the caller asks where the
+   *  visitor is. */
   function detect() {
     try { var saved = localStorage.getItem(KEY); if (saved && LANGS[saved]) return saved; } catch (e) {}
     var wants = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "en"]);
     for (var i = 0; i < wants.length; i++) {
       var code = String(wants[i] || "").slice(0, 2).toLowerCase();
-      if (code !== "en" && LANGS[code]) return code;
+      if (LANGS[code]) return code;
     }
     return null;
   }
 
-  /* The countries where one of our languages is the everyday one. A browser
-     left on English in São Paulo or Bogotá is common; the switcher is one tap
-     away for anyone who would rather read English. */
+  /* The countries where one of our languages is the everyday one — consulted
+     only when the browser's own languages name none of ours. */
   var COUNTRY_LANG = {
     es: "AR BO CL CO CR CU DO EC ES GQ GT HN MX NI PA PE PR PY SV UY VE",
     fr: "FR BE MC LU CH SN CI CM ML BF NE TG BJ GA CG CD MG GN HT DJ KM TD CF RW BI",
@@ -301,6 +302,39 @@
     if (!dict) return s;
     var out = dict[norm(s)];
     return out == null ? s : out;
+  };
+  /** For a line the server wrote: an exact entry if there is one, else the
+   *  first template entry ("Partner ID: {id}") whose shape the line fits —
+   *  the captured parts are carried into the translation in order. Anything
+   *  that fits nothing (an owner's own reply, a code) comes back untouched.
+   *  Templates are compiled once per dictionary. */
+  var tmCache = null, tmFor = null;
+  function templates() {
+    if (tmFor === dict && tmCache) return tmCache;
+    tmCache = []; tmFor = dict;
+    if (!dict) return tmCache;
+    for (var k in dict) {
+      if (k.indexOf("{") === -1) continue;
+      var names = [];
+      var rx = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\{([a-z]+)\\\}/g, function (_, n) { names.push(n); return "(.+?)"; });
+      tmCache.push({ rx: new RegExp("^" + rx + "$"), names: names, out: dict[k] });
+    }
+    return tmCache;
+  }
+  window.tm = function (s) {
+    if (!dict) return s;
+    var key = norm(String(s == null ? "" : s));
+    if (!key) return s;
+    if (dict[key] != null) return dict[key];
+    var list = templates();
+    for (var i = 0; i < list.length; i++) {
+      var m = key.match(list[i].rx);
+      if (!m) continue;
+      var out = list[i].out;
+      for (var j = 0; j < list[i].names.length; j++) out = out.split("{" + list[i].names[j] + "}").join(m[j + 1]);
+      return out;
+    }
+    return s;
   };
   window.i18n = { get lang() { return lang; }, set: function (c) { return apply(c, true); }, langs: LANGS };
 

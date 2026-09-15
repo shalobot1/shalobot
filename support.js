@@ -77,8 +77,12 @@
    *  the screen; a line beginning with ⚠ is red and bold, because it is the
    *  one thing they must not miss. Everything else is linkified text. */
   var CODE_LINE = /^[A-Z]{3,4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+  /* A line the server wrote, in the reader's language when the dictionary
+     knows its shape; the English otherwise. */
+  var TM = function (s) { return (typeof window.tm === "function") ? window.tm(s) : s; };
   function decorate(text) {
     return String(text || "").split("\n").map(function (line) {
+      line = TM(line);
       var t = line.trim();
       if (CODE_LINE.test(t)) return '<b class="sup-code">' + esc(t) + "</b>";
       if (t.charAt(0) === "⚠") return '<b class="sup-warn">' + linkify(t) + "</b>";
@@ -283,7 +287,7 @@
             '<span class="sup-change-cta">Change</span></button>') +
       "</div>" +
 
-      (state.err ? '<div class="sup-err">' + esc(state.err) + "</div>" : "") +
+      (state.err ? '<div class="sup-err">' + esc(TM(state.err)) + "</div>" : "") +
       (state.file
         ? '<div class="sup-picked">' + CLIP_ICON + '<span>' + esc(state.file.name) + "</span>" +
           '<button type="button" id="supUnpick" aria-label="Remove attachment">&times;</button></div>'
