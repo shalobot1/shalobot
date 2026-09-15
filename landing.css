@@ -39,6 +39,12 @@ main { padding-top: 68px; }
 :root[data-theme="light"] .fact--amber  { color: #b45f00; }
 :root[data-theme="light"] .fact--sky    { color: #0369a1; }
 :root[data-theme="light"] .fact--violet { color: #6d3bd8; }
+/* The two platforms, as their own wordmarks — white on navy, ink on light. */
+.fact--logo { display: inline-flex; align-items: center; padding: 6px 14px; border-color: var(--line-hi); background: var(--raise); }
+.fact--logo img { display: block; height: 22px; width: auto; }
+.fact--logo .lt { display: none; }
+:root[data-theme="light"] .fact--logo .dk { display: none; }
+:root[data-theme="light"] .fact--logo .lt { display: block; }
 
 .hero-card {
   border: 1px solid var(--line); border-radius: var(--radius);
