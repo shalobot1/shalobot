@@ -219,13 +219,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
           <div class="ea-sent-b">
             <span><b>Sent.</b> We are checking your ID now. Your code arrives in the <b>support window</b> at the corner of this page — keep it open, the reply lands there.</span>
-            <div class="ea-wait">
-              <span class="ea-wait-t">While you wait, join the community:</span>
-              <div class="ea-wait-r">
-                <a class="ea-mt5" href="https://whatsapp.com/channel/0029Vb6sxFG9xVJWbyIwL110" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2z"/><path fill="#fff" d="M9.2 7.4c-.2-.5-.4-.5-.6-.5h-.5c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.2 5 4.4 2.5 1 3 .8 3.5.7.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.1-.7.1-.2.3-.8 1-1 1.2-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.5-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5c.1-.2 0-.4 0-.5l-1-2.2z"/></svg><span>WhatsApp channel</span></a>
-                <a class="ea-mt5" href="https://t.me/magicabofficialchannel" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#2AABEE"/><path fill="#fff" d="M6.1 11.7l9.3-3.6c.4-.2.8.1.7.7l-1.6 7.4c-.1.5-.4.6-.8.4l-2.3-1.7-1.1 1.1c-.1.1-.2.2-.5.2l.2-2.4 4.3-3.9c.2-.2 0-.3-.3-.1l-5.3 3.3-2.3-.7c-.5-.2-.5-.5.1-.7z"/></svg><span>Telegram channel</span></a>
-              </div>
-            </div>
+            <button type="button" class="ea-link" id="eaWaitOpen">While you wait: the bonus and the community →</button>
           </div>
         </div>
 
@@ -259,6 +253,28 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
         <button type="button" class="btn btn-blue" id="eaDoneClose">Done</button>
       </section>
     </div>
+  </div>
+</div>
+
+<!-- ── while you wait ─────────────────────────────────────────────────────
+     Opens the moment a request is sent. Three doors: the Headway bonus to
+     claim now, and the two channels where the community lives. -->
+<div class="wait-root" id="waitRoot" hidden role="dialog" aria-modal="true" aria-label="While you wait">
+  <div class="wait">
+    <button type="button" class="wait-x" id="waitClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <span class="wait-ico">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    </span>
+    <h3>Sent — we are checking now</h3>
+    <p>Your code lands in the support window. While you wait:</p>
+    <div class="wait-list">
+      <a class="wait-b wait-b--bonus" href="https://headway.partners/user/signup?hwp=8abf6d" target="_blank" rel="noopener noreferrer sponsored"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg><span><b>Claim $150 + a 50% deposit bonus</b><small>New to Headway? Open your account through our link</small></span></a>
+      <a class="wait-b" href="https://whatsapp.com/channel/0029Vb6sxFG9xVJWbyIwL110" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2z"/><path fill="#fff" d="M9.2 7.4c-.2-.5-.4-.5-.6-.5h-.5c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.2 5 4.4 2.5 1 3 .8 3.5.7.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.1-.7.1-.2.3-.8 1-1 1.2-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.5-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5c.1-.2 0-.4 0-.5l-1-2.2z"/></svg><span><b>WhatsApp channel</b><small>Join the community</small></span></a>
+      <a class="wait-b" href="https://t.me/magicabofficialchannel" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#2AABEE"/><path fill="#fff" d="M6.1 11.7l9.3-3.6c.4-.2.8.1.7.7l-1.6 7.4c-.1.5-.4.6-.8.4l-2.3-1.7-1.1 1.1c-.1.1-.2.2-.5.2l.2-2.4 4.3-3.9c.2-.2 0-.3-.3-.1l-5.3 3.3-2.3-.7c-.5-.2-.5-.5.1-.7z"/></svg><span><b>Telegram channel</b><small>Join the community</small></span></a>
+    </div>
+    <button type="button" class="btn btn-line wait-done" id="waitDone">Back to the request</button>
   </div>
 </div>
 

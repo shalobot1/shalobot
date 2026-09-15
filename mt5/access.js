@@ -146,6 +146,7 @@
         set(NAME_KEY, name); set(MAIL_KEY, email); set(SENT_KEY, id);
         countSend();
         phase = "sent";
+        openWait();
         /* The bubble opens onto THIS conversation, with the request already in
            it, rather than onto an empty window. The answer lands there. */
         if (window.SHALO_SUPPORT_ASK) {
@@ -188,9 +189,20 @@
   /* ── wiring ─────────────────────────────────────────────────────────── */
   $("get-ea").addEventListener("click", open);
   $("eaClose").addEventListener("click", close);
+
+  /* The wait card: opened by a successful send, and again from the note. */
+  function openWait() { $("waitRoot").hidden = false; }
+  function closeWait() { $("waitRoot").hidden = true; }
+  $("eaWaitOpen").addEventListener("click", openWait);
+  $("waitClose").addEventListener("click", closeWait);
+  $("waitDone").addEventListener("click", closeWait);
+  $("waitRoot").addEventListener("click", function (e) { if (e.target === $("waitRoot")) closeWait(); });
   $("eaDoneClose").addEventListener("click", close);
   root.addEventListener("mousedown", function (e) { if (e.target === root) close(); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !root.hidden) close(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (!$("waitRoot").hidden) closeWait(); else if (!root.hidden) close();
+  });
   ["eaId", "eaName", "eaMail", "eaCode"].forEach(function (id) { $(id).addEventListener("input", paint); });
   $("eaSend").addEventListener("click", send);
   $("eaRedeem").addEventListener("click", redeem);
