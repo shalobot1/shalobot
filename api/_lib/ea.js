@@ -20,8 +20,10 @@ const { select, insert, update, configured } = require("./db");
 
 const TABLE = "shalo_ea_requests";
 
-/** Our Headway partner code — the group an account has to sit under. */
-const PARTNER_ID = "8abf6d";
+/** Our Headway Partner ID — the group an account has to sit under. The
+    sign-up link below carries a different token (hwp=8abf6d); that one is
+    the link's, this one is what Headway support asks for. */
+const PARTNER_ID = "6078336";
 /** Where somebody without an account is sent to open one under us. */
 const DERIV_SIGNUP = "https://headway.partners/user/signup?hwp=8abf6d";
 /** Where the client ID is copied from. Plain: the token belongs on signup. */

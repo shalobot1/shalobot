@@ -34,16 +34,16 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 {"@context":"https://schema.org","@graph":[
 {"@type":"Organization","@id":"https://www.shalobot.com/#org","name":"Shalobot","url":"https://www.shalobot.com/","logo":"https://www.shalobot.com/icons/icon-512.png","sameAs":["https://t.me/Theshalobot"],"contactPoint":{"@type":"ContactPoint","contactType":"customer support","url":"https://t.me/Theshalobot"}},
 {"@type":"WebSite","@id":"https://www.shalobot.com/#site","url":"https://www.shalobot.com/","name":"Shalobot","publisher":{"@id":"https://www.shalobot.com/#org"},"inLanguage":"en"},
-{"@type":"SoftwareApplication","@id":"https://www.shalobot.com/#app","name":"Shalobot MT5 Expert Advisor","alternateName":"Shalobot EA","applicationCategory":"FinanceApplication","applicationSubCategory":"Automated trading bot","operatingSystem":"MetaTrader 5 (Windows, macOS, Android, iOS)","url":"https://www.shalobot.com/dashboard","downloadUrl":"https://www.shalobot.com/dashboard","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","availability":"https://schema.org/InStock"},"description":"Free automated MT5 trading bot for forex, gold and crypto. One Expert Advisor on your own Headway MetaTrader 5 account.","featureList":["Forex, metals and crypto","Live signals every 30 seconds","Stop loss and take profit on every trade","Three risk profiles","Runs on your own MT5 account"],"publisher":{"@id":"https://www.shalobot.com/#org"}},
+{"@type":"SoftwareApplication","@id":"https://www.shalobot.com/#app","name":"Shalobot MT5 Expert Advisor","alternateName":"Shalobot EA","applicationCategory":"FinanceApplication","applicationSubCategory":"Automated trading bot","operatingSystem":"MetaTrader 5","url":"https://www.shalobot.com/dashboard","downloadUrl":"https://www.shalobot.com/dashboard","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","availability":"https://schema.org/InStock"},"description":"Free automated MT5 trading bot for forex, gold and crypto. One Expert Advisor on your own Headway MetaTrader 5 account.","featureList":["All markets — forex, metals and crypto","Live signals every 30 seconds","Stop loss and take profit on every trade","Three risk profiles","Runs on your own MT5 account"],"publisher":{"@id":"https://www.shalobot.com/#org"}},
 {"@type":"HowTo","name":"How to run a free MT5 trading bot on Headway","totalTime":"PT5M","step":[
-{"@type":"HowToStep","name":"Open a Headway MT5 account","text":"Register with Headway through the Shalobot link and open a MetaTrader 5 account.","url":"https://www.shalobot.com/#how"},
+{"@type":"HowToStep","name":"Download the EA","text":"Press Download Shalobot EA on the dashboard. It is free — no card, no subscription.","url":"https://www.shalobot.com/dashboard"},
 {"@type":"HowToStep","name":"Request the EA","text":"On the dashboard, enter your MT5 ID, registered name and email and send the request. You receive an access code in the support window.","url":"https://www.shalobot.com/dashboard"},
 {"@type":"HowToStep","name":"Install on one chart","text":"Download the Expert Advisor, allow the WebRequest address in MT5, drop the EA on one chart and switch Algo Trading on.","url":"https://www.shalobot.com/dashboard"}]},
 {"@type":"FAQPage","mainEntity":[
-{"@type":"Question","name":"Is the Shalobot MT5 trading bot really free?","acceptedAnswer":{"@type":"Answer","text":"Yes. There is no card, no subscription and no profit share. The bot is free for traders who open their MetaTrader 5 account with Headway through our link."}},
+{"@type":"Question","name":"Is the Shalobot MT5 trading bot really free?","acceptedAnswer":{"@type":"Answer","text":"Yes. There is no card, no subscription and no profit share."}},
 {"@type":"Question","name":"Which markets does the Expert Advisor trade?","acceptedAnswer":{"@type":"Answer","text":"Forex majors, metals such as gold (XAUUSD) and silver, and crypto such as BTCUSD and ETHUSD. One EA on one chart covers all of them."}},
 {"@type":"Question","name":"Does Shalobot need my MT5 password?","acceptedAnswer":{"@type":"Answer","text":"No. The EA runs inside your own MT5 terminal. Shalobot never holds funds, never sees a password and cannot withdraw."}},
-{"@type":"Question","name":"Does it work on a phone?","acceptedAnswer":{"@type":"Answer","text":"The EA must run in MT5 on Windows or a VPS. You can watch and manage the trades from the MT5 mobile app."}},
+{"@type":"Question","name":"Does it work on a phone?","acceptedAnswer":{"@type":"Answer","text":"Yes. You can see and manage every trade the bot opens from the MT5 app on your phone."}},
 {"@type":"Question","name":"Is automated trading risky?","acceptedAnswer":{"@type":"Answer","text":"Yes. Trading carries risk and no bot guarantees profit. Every Shalobot position opens with a stop loss and take profit, and you choose a conservative, moderate or aggressive risk profile."}}
 ]}
 ]}
@@ -85,13 +85,12 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
             Get started
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </a>
-          <a class="btn btn-line btn-lg" href="https://headway.partners/user/signup?hwp=8abf6d" target="_blank" rel="noopener noreferrer sponsored">Open a Headway account</a>
+          <a class="btn btn-line btn-lg" href="https://headway.partners/user/signup?hwp=8abf6d" target="_blank" rel="noopener noreferrer sponsored">New to Headway? Claim $150 + a 50% bonus</a>
         </div>
         <ul class="hero-facts">
-          <li class="fact fact--mint">Markets · forex, metals, crypto</li>
+          <li class="fact fact--mint">All markets</li>
           <li class="fact fact--amber">EA on any chart</li>
           <li class="fact fact--sky">No passwords shared</li>
-          <li class="fact fact--violet">New to Headway? Claim $150 + a 50% bonus</li>
         </ul>
       </div>
 
@@ -151,7 +150,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
   <section class="howit bleed" id="how">
     <h2>How the free MT5 bot works</h2>
     <ol class="steps">
-      <li><span class="step-n">1</span><h3>Open a Headway MT5 account</h3><p>Register through <a href="https://headway.partners/user/signup?hwp=8abf6d" target="_blank" rel="noopener noreferrer sponsored">our Headway link</a>, claim the $150 welcome and 50% deposit bonus, and open a MetaTrader 5 account.</p></li>
+      <li><span class="step-n">1</span><h3>Download the EA</h3><p>Press <b>Download Shalobot EA</b> on the <a href="/dashboard">dashboard</a>. It is free — no card, no subscription.</p></li>
       <li><span class="step-n">2</span><h3>Request the Expert Advisor</h3><p>On the <a href="/dashboard">dashboard</a>, enter your MT5 ID and the exact name and email you registered with. Your access code arrives in the support window.</p></li>
       <li><span class="step-n">3</span><h3>Install it on one chart</h3><p>Download the EA, allow the WebRequest address in MT5, drop it on a chart and switch Algo Trading on. It trades forex, gold and crypto from there.</p></li>
     </ol>
@@ -160,10 +159,10 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
   <!-- ── FAQ ───────────────────────────────────────────────────────────── -->
   <section class="qa bleed" id="faq">
     <h2>Free MT5 trading bot — questions</h2>
-    <details><summary>Is the Shalobot MT5 trading bot really free?</summary><p>Yes. No card, no subscription, no profit share. The bot is free for traders who open their MetaTrader 5 account with Headway through our link.</p></details>
+    <details><summary>Is the Shalobot MT5 trading bot really free?</summary><p>Yes. No card, no subscription, no profit share.</p></details>
     <details><summary>Which markets does the Expert Advisor trade?</summary><p>Forex majors, metals such as gold (XAUUSD) and silver, and crypto such as BTCUSD and ETHUSD. One EA on one chart covers all of them.</p></details>
     <details><summary>Does Shalobot need my MT5 password?</summary><p>No. The EA runs inside your own MT5 terminal. Shalobot never holds funds, never sees a password and cannot withdraw.</p></details>
-    <details><summary>Does it work on a phone?</summary><p>The EA must run in MT5 on Windows or a VPS. You can watch and manage the trades from the MT5 mobile app.</p></details>
+    <details><summary>Does it work on a phone?</summary><p>Yes. You can see and manage every trade the bot opens from the MT5 app on your phone.</p></details>
     <details><summary>Is automated trading risky?</summary><p>Yes. Trading carries risk and no bot guarantees profit. Every position opens with a stop loss and take profit, and you choose a conservative, moderate or aggressive risk profile.</p></details>
   </section>
 

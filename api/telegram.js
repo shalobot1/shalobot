@@ -167,9 +167,9 @@ module.exports = async (req, res) => {
       first = await recordSupportReply(reqst.visitorId, [
         `We checked again and MT5 ID ${reqst.mt5Login} is still not showing under our Headway partner group.`,
         reason, "",
-        "Headway has to attach it — we cannot do it from our side. Ask Headway support to move your account under our partner code, or open a new account through our link, which places it under us automatically:",
+        "Headway has to attach it — we cannot do it from our side. Ask Headway support to move your account under our Partner ID, or open a new account through our link, which places it under us automatically:",
         "",
-        `Partner code: ${PARTNER_ID}`,
+        `Partner ID: ${PARTNER_ID}`,
         `Sign-up link: ${DERIV_SIGNUP}`,
         "",
         "Reply here once it is done and we will check again.",
@@ -185,9 +185,9 @@ module.exports = async (req, res) => {
       second = await recordSupportReply(reqst.visitorId, [
         "If that login was already the right one, then your account is not under us yet — and only Headway can move it.",
         "",
-        "Ask Headway support to attach your account to our partner code:",
+        "Ask Headway support to attach your account to our Partner ID:",
         PARTNER_ID, "",
-        "That is OUR partner code, not yours — give them that one.",
+        "That is OUR Partner ID, not yours — give them that one.",
         "",
         `Or open a new Headway account through our link, which places it under us automatically: ${DERIV_SIGNUP}`,
         "",
@@ -196,7 +196,7 @@ module.exports = async (req, res) => {
     }
 
     await say(chatId, (first && second)
-      ? `Declined. ${reqst.name} (${reqst.email}) has been told, with the partner code and sign-up link.${times > 1 ? ` This is decline #${times} for them — they got the follow-up wording, not the first one again.` : ""}${alsoSettled > 1 ? ` Their ${alsoSettled - 1} other open request${alsoSettled === 2 ? "" : "s"} left the waiting list with it.` : ""}`
+      ? `Declined. ${reqst.name} (${reqst.email}) has been told, with the Partner ID and sign-up link.${times > 1 ? ` This is decline #${times} for them — they got the follow-up wording, not the first one again.` : ""}${alsoSettled > 1 ? ` Their ${alsoSettled - 1} other open request${alsoSettled === 2 ? "" : "s"} left the waiting list with it.` : ""}`
       : `Declined, but the message could not be delivered — tell ${reqst.email} yourself.`,
       msg.message_id);
     return json(res, 200, { ok: true });

@@ -31,4 +31,4 @@ Local copies live in `.env` (gitignored). `.env.example` lists the names.
 
 ## Broker
 
-Headway. Sign-up through our partner link places an account under partner code `8abf6d`, which is what an EA request is checked against.
+Headway. Sign-up through our partner link (`https://headway.partners/user/signup?hwp=8abf6d`) places an account under our Partner ID `6078336`, which is what an EA request is checked against.
