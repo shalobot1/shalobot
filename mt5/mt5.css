@@ -533,6 +533,16 @@ body.ea-open { overflow: hidden; }
 .ea-acct--hw { align-items: stretch; }
 .ea-acct-l { flex: 1; min-width: 0; display: grid; gap: 8px; align-content: center; }
 .ea-acct-l small { font-size: 11.5px; line-height: 1.45; color: var(--ink-faint); }
+/* The bonus, said once and loudly: amber on its own line, not folded into
+   the sentence above it. */
+.ea-bonus {
+  display: inline-flex; align-items: center; gap: 7px; width: max-content; max-width: 100%;
+  padding: 7px 12px; border-radius: 999px;
+  background: #ffb020; color: #1a1200;
+  font-size: 13px; font-weight: 800; letter-spacing: .01em;
+  box-shadow: 0 6px 18px rgba(255, 176, 32, .28);
+}
+.ea-bonus svg { flex: none; }
 .ea-mt5 {
   display: inline-flex; align-items: center; gap: 8px; width: max-content; max-width: 100%;
   padding: 7px 11px;
