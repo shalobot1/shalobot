@@ -458,7 +458,7 @@
 .ea-root {
   position: fixed; inset: 0; z-index: 120;
   display: flex; align-items: flex-end; justify-content: center;
-  background: rgba(6, 6, 10, 0.55);
+  background: rgba(3, 6, 12, 0.72);
   -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
 }
 .ea-root[hidden] { display: none; }
@@ -677,7 +677,7 @@ body.ea-open { overflow: hidden; }
 .wait-root {
   position: fixed; inset: 0; z-index: 130;
   display: flex; align-items: center; justify-content: center; padding: 16px;
-  background: rgba(6, 6, 10, 0.6);
+  background: rgba(3, 6, 12, 0.72);
   -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
 }
 .wait-root[hidden] { display: none; }

@@ -58,17 +58,19 @@
 }
 
 :root[data-theme="dark"] {
-  --base:      #070b12;
-  --raise:     #0e1522;
-  --surface:   #111a29;
-  --surface-2: #172234;
+  /* Clunoid Trading's ground, exactly: the warm charcoal #1F1E1C, its solid
+     panel #26241f, and its sky-blue hairlines at .14 — nothing navy. */
+  --base:      #1F1E1C;
+  --raise:     #26241f;
+  --surface:   #262523;
+  --surface-2: #2c2b29;
 
-  --line:      #22304a;
-  --line-hi:   #2f405e;
+  --line:      rgba(125, 211, 252, 0.14);
+  --line-hi:   rgba(125, 211, 252, 0.26);
 
-  --ink:       #f2f5f9;
-  --ink-muted: #9aa8b8;
-  --ink-faint: #6b7a8f;
+  --ink:       #eaf2fb;
+  --ink-muted: #93a7bd;
+  --ink-faint: #586a80;
 
   --pink:      #ffb020;
   --pink-hi:   #ffc24d;
@@ -82,8 +84,8 @@
   --violet:    #b794ff;
   --teal:      #4fd1c5;
 
-  /* Mint and amber sit on navy and carry dark text. */
-  --on-accent: #0b1220;
+  /* Mint and amber sit on charcoal and carry dark text. */
+  --on-accent: #04121f;
   --ring:      rgba(255, 255, 255, 0.55);
 
   /* The same dotted ground as Clunoid Trading: sky-blue dots at a tenth, on a
@@ -1190,7 +1192,7 @@ ul, ol, dl { margin: 0; padding: 0; list-style: none; }
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(6, 6, 10, 0.55);
+  background: rgba(3, 6, 12, 0.72);
 }
 .how-card {
   width: 100%;
