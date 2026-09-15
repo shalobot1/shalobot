@@ -189,7 +189,7 @@
       sigs.className = "mt5-quiet";
       sigs.innerHTML = '<span class="mt5-quiet-in">' +
         svg('<path d="M21 12a9 9 0 1 1-6.2-8.6"/>', 16) +
-        T("Scanning forex + Volatility…") + "</span>";
+        T("Scanning forex, metals + crypto…") + "</span>";
     }
 
     fetch(API + "?profile=" + encodeURIComponent(profile) + "&categories=" + CATEGORIES, { cache: "no-store" })

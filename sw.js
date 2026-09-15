@@ -25,7 +25,7 @@
  * under /api is ever cached, and neither is any other origin.
  */
 
-const VERSION = "shalo-shell-v5";
+const VERSION = "shalo-shell-v6";
 const NET_TIMEOUT_MS = 2500;
 
 /* What the launch screen is waiting on. The start page and everything it
@@ -40,6 +40,7 @@ const SHELL = [
   "/mt5/mt5.js",
   "/mt5/access.js",
   "/theme.js",
+  "/i18n/i18n.js",
   "/install.js",
   "/support.js",
   "/support.css",
