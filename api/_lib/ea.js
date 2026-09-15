@@ -43,7 +43,7 @@ function codeMessage(code, mt5Login, lead) {
     lead,
     "", code, "",
     `Paste it into the download step on the MT5 page to unlock the file. It works only on this browser, ${MAX_CODE_USES} times.`,
-    `⚠ Works only on Headway, on the approved MT5 account ${mt5Login}. Any other broker or account receives wrong data.`,
+    `⚠ Works only on Headway, on the approved account. Any other broker or account receives wrong data.`,
   ].join("\n");
 }
 
