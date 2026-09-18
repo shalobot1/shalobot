@@ -1,7 +1,8 @@
 /**
  * SOMEBODY ASKING FOR THE EVIE MT5 EA.
  *
- * The form on the bot's page collects a client or MT5 ID, a name and an email.
+ * The form on the bot's page collects the name and email as registered at
+ * Headway, a phone number and the channel to reach it on (WhatsApp/Telegram).
  * This records it, then posts it into Telegram THROUGH THE SUPPORT PIPE rather
  * than as its own kind of notification — so it arrives in the same chat as
  * everything else, carries the conversation this person has already had, and
@@ -21,6 +22,12 @@ const API = "https://api.telegram.org";
 const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || "").trim());
 const esc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const clean = (v, max) => (typeof v === "string" ? v.trim().slice(0, max).replace(/\s+/g, " ") : "");
+const CHANNELS = { whatsapp: "WhatsApp", telegram: "Telegram" };
+/** +254 712 345 678 — readable on a phone screen. */
+const prettyPhone = (p) => String(p || "").replace(/^(\+\d{1,3})(\d{3})(\d{3})(\d+)$/, "$1 $2 $3 $4");
+/** A tap-to-chat link for the channel they chose. */
+const chatLink = (phone, contact) => contact === "telegram" ? `https://t.me/${phone}` : `https://wa.me/${String(phone).replace(/\D/g, "")}`;
+const countryName = (iso) => { try { return new Intl.DisplayNames(["en"], { type: "region" }).of(iso); } catch (e) { return iso; } };
 
 function renderHistory(history) {
   if (!history || !history.length) return "";
@@ -34,16 +41,21 @@ module.exports = async (req, res) => {
 
   const body = await readBody(req);
   const visitorId = clean(body.visitorId, 64);
-  // 64, not 32: a UUID client ID is 36 characters.
-  const mt5Login = clean(body.mt5Login, 64).replace(/\s/g, "");
   const name = clean(body.name, 80);
   const email = clean(body.email, 160).toLowerCase();
+  const phone = clean(body.phone, 20).replace(/[^\d+]/g, "");
+  const contact = clean(body.contact, 12).toLowerCase();
+  const country = clean(body.country, 2).toUpperCase();
+  const lang = clean(body.lang, 8).toLowerCase();
   const page = clean(body.page, 200);
+  // The ID column stays filled so older rows and newer ones read the same way.
+  const mt5Login = phone;
 
   if (!visitorId) return json(res, 400, { error: "Reload the page and try again." });
-  if (!mt5Login) return json(res, 422, { error: "Please paste your MT5 ID." });
-  if (name.length < 2) return json(res, 422, { error: "Please give us a name to put to the account." });
+  if (name.length < 2) return json(res, 422, { error: "Please give us your full name as registered at Headway." });
   if (!isEmail(email)) return json(res, 422, { error: "That email does not look right." });
+  if (!/^\+[1-9]\d{6,14}$/.test(phone)) return json(res, 422, { error: "That phone number does not look right — choose the country and type the number." });
+  if (!CHANNELS[contact]) return json(res, 422, { error: "Choose WhatsApp or Telegram so we know where to reach you." });
 
   /* Barred people are turned away before anything is recorded or sent, so a
      ban is quiet: nothing reaches Telegram and no row accumulates. */
@@ -81,15 +93,15 @@ module.exports = async (req, res) => {
      time are checked again, by machine, and a fresh code is issued to THIS
      browser at once. The owner is told, with everything needed to /ban if it
      looks wrong, but is not asked. */
-  const match = await approvedMatch(email, mt5Login);
+  const match = await approvedMatch(email, phone);
   if (match) {
-    const newId = await createRequest({ visitorId, mt5Login, name, email, page });
+    const newId = await createRequest({ visitorId, mt5Login, name, email, page, phone, contact, country });
     const code = newId ? await approveRequest(newId) : null;
     if (code) {
       const why = already ? "your previous code was used up" : "you are on a new browser";
-      await recordSupportInbound({ visitorId, body: `Asked for the Shalobot EA again — ID ${mt5Login}`, email, name, source: "MT5 EA access", page });
+      await recordSupportInbound({ visitorId, body: `Asked for the Shalobot EA again — ${email}, ${phone} on ${CHANNELS[contact]}`, email, name, source: "MT5 EA access", page });
       await recordSupportReply(visitorId, codeMessage(code, mt5Login,
-        `Approved again automatically — same email and ID as before, and ${why}. Here is your new code:`));
+        `Approved again automatically — same email and phone as before, and ${why}. Here is your new code:`));
       await fetch(`${API}/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,10 +109,11 @@ module.exports = async (req, res) => {
           chat_id: chat, parse_mode: "HTML", disable_web_page_prshalow: true,
           text: [
             "<b>MT5 EA access · Shalobot — approved automatically</b>",
-            `<b>Name:</b> ${esc(name)} · <b>Reply to:</b> <a href="mailto:${esc(email)}">${esc(email)}</a>`,
-            `<b>Person:</b> <code>${esc(visitorId)}</code> · <b>ID:</b> <code>${esc(mt5Login)}</code>`,
+            `<b>Name:</b> ${esc(name)} · <b>Email:</b> <a href="mailto:${esc(email)}">${esc(email)}</a>`,
+            `<b>Phone:</b> <code>${esc(prettyPhone(phone))}</code> · <b>${CHANNELS[contact]}:</b> <a href="${chatLink(phone, contact)}">open chat</a>`,
+            `<b>Person:</b> <code>${esc(visitorId)}</code>`,
             "",
-            `Same email and ID as an earlier approval (${why}), so code <code>${code}</code> was issued without asking.`,
+            `Same email and phone as an earlier approval (${why}), so code <code>${code}</code> was issued without asking.`,
             "",
             "If that is not right, swipe-reply <code>/ban</code> — the code stops working with it.",
           ].join("\n"),
@@ -110,26 +123,28 @@ module.exports = async (req, res) => {
     }
   }
 
-  const id = await createRequest({ visitorId, mt5Login, name, email, page });
+  const id = await createRequest({ visitorId, mt5Login, name, email, page, phone, contact, country });
   const history = await supportHistory(visitorId);
 
-  /* Written the way it needs to be read on a phone: the ID first, because
-     checking it against the partner list is the only decision to make, and the
+  /* Written the way it needs to be read on a phone: the two facts to check
+     against the partner list first, then how to reach the person, then the
      two commands last, because that is the reply. */
+  const when = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
   const header = [
-    "<b>MT5 EA access · Shalobot (Headway)</b>",
-    `<b>Reply to:</b> <a href="mailto:${esc(email)}">${esc(email)}</a>`,
-    `<b>Name:</b> ${esc(name)}`,
-    page ? `<b>Page:</b> ${esc(page)}` : "",
-    `<b>Person:</b> <code>${esc(visitorId)}</code>`,
+    "<b>🤖 MT5 EA access · Shalobot (Headway)</b>",
+    "",
+    `<b>👤 Name:</b> ${esc(name)}`,
+    `<b>✉️ Email:</b> <a href="mailto:${esc(email)}">${esc(email)}</a>`,
+    `<b>📱 Phone:</b> <code>${esc(prettyPhone(phone))}</code>`,
+    `<b>💬 Contact on:</b> ${CHANNELS[contact]} — <a href="${chatLink(phone, contact)}">open chat</a>`,
+    country ? `<b>🌍 Country:</b> ${esc(countryName(country))} (${esc(country)})${lang ? ` · <b>Language:</b> ${esc(lang)}` : ""}` : (lang ? `<b>🌍 Language:</b> ${esc(lang)}` : ""),
+    `<b>🕒 Sent:</b> ${when}`,
+    page ? `<b>🔗 Page:</b> ${esc(page)}` : "",
+    `<b>🆔 Person:</b> <code>${esc(visitorId)}</code>`,
   ].filter(Boolean).join("\n");
 
   const request = [
-    "<b>MT5 EA access request</b>",
-    "",
-    `MT5 ID: <code>${esc(mt5Login)}</code>`,
-    "",
-    `Check this login under Headway Partner ID <code>${PARTNER_ID}</code>.`,
+    `<b>✅ To check:</b> the name and email above under Headway Partner ID <code>${PARTNER_ID}</code>.`,
     "",
     id
       ? "Swipe-reply /approve to send them a code, or /decline &lt;reason&gt; to say no."
@@ -163,7 +178,7 @@ module.exports = async (req, res) => {
      about anything the whole exchange is attached. */
   await recordSupportInbound({
     visitorId,
-    body: `Asked for the Shalobot EA — ID ${mt5Login}`,
+    body: `Asked for the Shalobot EA — ${email}, ${phone} on ${CHANNELS[contact]}`,
     tgMessageId: tgId,
     email,
     name,

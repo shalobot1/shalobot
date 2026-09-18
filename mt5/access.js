@@ -1,16 +1,17 @@
 /**
  * SHALOBOT — the access sheet on the MT5 page.
  *
- * The EA is free but not public. One form asks for the Deriv ID that proves
- * somebody is in our community, plus a name and an email; that lands in
+ * The EA is free but not public. One form asks for the name and email
+ * registered at Headway — that is what proves somebody is in our community —
+ * plus a phone number and the channel to guide them on; that lands in
  * Telegram through the support pipe, and the answer — a download code, or a
- * reason and the partner ID to give Deriv — comes back into the support
+ * reason and the partner ID to give Headway — comes back into the support
  * bubble on this page. The code unlocks the file, on this browser only.
  *
  * Three phases. `form`: the fields. `sent`: the fields fold into one line
  * and the code field opens, because that is now the only thing to do here.
  * `done`: the file is in their downloads. Name and email are remembered in
- * this browser, so a second visit only ever types the ID.
+ * this browser, so a second visit only ever checks them.
  */
 (function () {
   "use strict";
@@ -28,7 +29,7 @@
   var NAME_KEY = "shalo_support_name";
   var MAIL_KEY = "shalo_support_email";
   var ID_KEY = "shalo_support_id";
-  var SENT_KEY = "shalo_ea_sent";     // the ID a request went out for, so a reload keeps the sent state
+  var SENT_KEY = "shalo_ea_sent";     // the phone a request went out for, so a reload keeps the sent state
   var SENDS_KEY = "shalo_ea_sends";   // how many times since we last answered, and when
   var THREAD_KEY = "shalo_support_thread";
   var MAX_SENDS = 3;
@@ -85,8 +86,132 @@
     e.textContent = msg || "";
     e.hidden = !msg;
   }
+  /* ── phone: country code + number, and the channel ───────────────────────
+     The country is DETECTED, never demanded: the edge tells us where the
+     request came from (/api/geo), the browser's locale is the fallback, and a
+     choice made here is remembered and wins over both next time. The list is
+     every country, searchable by name (in the visitor's language), by ISO code
+     or by calling code. Nothing is forced — the person types the number they
+     want to be reached on. */
+  var CC_KEY = "shalo_cc", PHONE_KEY = "shalo_phone", CHAN_KEY = "shalo_contact";
+  var COUNTRIES = window.DIAL_COUNTRIES || [];
+  var cc = null;                                    // the chosen [iso, name, dial]
+  var chan = get(CHAN_KEY) === "telegram" ? "telegram" : (get(CHAN_KEY) === "whatsapp" ? "whatsapp" : "");
+  var namesOf = null;
+  try { namesOf = new Intl.DisplayNames([document.documentElement.lang || "en"], { type: "region" }); } catch (e) { namesOf = null; }
+  function countryName(c) {
+    if (namesOf) { try { var n = namesOf.of(c[0]); if (n && n !== c[0]) return n; } catch (e) {} }
+    return c[1];
+  }
+  // Windows has no flag glyphs, so the ISO code stands in for the flag there.
+  var NO_FLAGS = /Win/.test(navigator.platform || "");
+  function flagHtml(iso) {
+    if (NO_FLAGS) return '<span class="cc-flag iso">' + iso + "</span>";
+    var f = iso.replace(/./g, function (ch) { return String.fromCodePoint(127397 + ch.charCodeAt(0)); });
+    return '<span class="cc-flag">' + f + "</span>";
+  }
+  function findCountry(iso) {
+    iso = String(iso || "").toUpperCase();
+    for (var i = 0; i < COUNTRIES.length; i++) if (COUNTRIES[i][0] === iso) return COUNTRIES[i];
+    return null;
+  }
+  function setCountry(c, remember) {
+    if (!c) return;
+    cc = c;
+    $("ccFlag").outerHTML = flagHtml(c[0]).replace('class="cc-flag', 'id="ccFlag" class="cc-flag');
+    $("ccCode").textContent = "+" + c[2];
+    $("ccBtn").setAttribute("aria-label", countryName(c) + " +" + c[2]);
+    if (remember) set(CC_KEY, c[0]);
+    paint();
+  }
+  function detectCountry() {
+    var saved = findCountry(get(CC_KEY));
+    if (saved) { setCountry(saved, false); return; }
+    var loc = (navigator.language || "").split("-")[1];
+    var fromLocale = loc && loc.length === 2 ? findCountry(loc) : null;
+    if (fromLocale) setCountry(fromLocale, false);
+    fetch("/api/geo", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var g = j && findCountry(j.country);
+        // The edge knows where the request came from; the locale only guesses.
+        if (g && !get(CC_KEY)) setCountry(g, false);
+        else if (!cc && fromLocale) setCountry(fromLocale, false);
+      })
+      .catch(function () { if (!cc && fromLocale) setCountry(fromLocale, false); });
+  }
+  function renderList(q) {
+    q = (q || "").trim().toLowerCase().replace(/^\+/, "");
+    var list = $("ccList"), html = "", n = 0;
+    var rows = COUNTRIES.map(function (c) { return { c: c, n: countryName(c) }; })
+      .sort(function (a, b) { return a.n.localeCompare(b.n); });
+    // Words that START with the query first (ni → Niger, Nigeria, Nicaragua);
+    // anything merely containing it only when nothing starts with it.
+    var starts = function (name) { return (" " + name.toLowerCase()).indexOf(" " + q) >= 0; };
+    var hit = function (r) { return !q || starts(r.n) || starts(r.c[1]) || r.c[0].toLowerCase() === q || r.c[2].indexOf(q) === 0; };
+    var loose = function (r) { return r.n.toLowerCase().indexOf(q) >= 0 || r.c[1].toLowerCase().indexOf(q) >= 0; };
+    var shown = rows.filter(hit);
+    if (q && !shown.length) shown = rows.filter(loose);
+    for (var i = 0; i < shown.length; i++) {
+      var c = shown[i].c, name = shown[i].n;
+      n++;
+      html += '<li><button type="button" class="cc-item' + (cc && cc[0] === c[0] ? " is-active" : "") + '" data-iso="' + c[0] + '" role="option">'
+        + flagHtml(c[0]) + '<span class="cc-name">' + name.replace(/</g, "&lt;") + '</span><span class="cc-dial">+' + c[2] + "</span></button></li>";
+    }
+    list.innerHTML = n ? html : '<li class="cc-empty">' + T("No country matches that.") + "</li>";
+  }
+  function openCc() {
+    $("ccPop").hidden = false; $("ccBtn").setAttribute("aria-expanded", "true");
+    $("ccSearch").value = ""; renderList("");
+    setTimeout(function () { $("ccSearch").focus(); var a = $("ccList").querySelector(".is-active"); if (a) a.scrollIntoView({ block: "center" }); }, 20);
+  }
+  function closeCc() { $("ccPop").hidden = true; $("ccBtn").setAttribute("aria-expanded", "false"); }
+  $("ccBtn").onclick = function () { if ($("ccPop").hidden) openCc(); else closeCc(); };
+  $("ccSearch").addEventListener("input", function () { renderList($("ccSearch").value); });
+  $("ccSearch").addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { closeCc(); $("eaPhone").focus(); e.stopPropagation(); }
+    if (e.key === "Enter") { var f = $("ccList").querySelector(".cc-item"); if (f) f.click(); }
+  });
+  $("ccList").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-iso]"); if (!b) return;
+    setCountry(findCountry(b.getAttribute("data-iso")), true); closeCc(); $("eaPhone").focus();
+  });
+  document.addEventListener("mousedown", function (e) { if (!$("ccPop").hidden && !$("phoneWrap").contains(e.target)) closeCc(); });
+  // A number pasted with its own +code decides the country itself.
+  $("eaPhone").addEventListener("input", function () {
+    var v = $("eaPhone").value.replace(/[^\d+]/g, "");
+    if (v.charAt(0) === "+") {
+      var best = null;
+      for (var i = 0; i < COUNTRIES.length; i++) {
+        var d = COUNTRIES[i][2];
+        if (v.slice(1, 1 + d.length) === d && (!best || d.length > best[2].length) && (d !== "1" || !best)) best = COUNTRIES[i];
+      }
+      if (best && best[2] !== "1") { setCountry(best, true); $("eaPhone").value = v.slice(1 + best[2].length); }
+    }
+  });
+  /* The number in E.164: the country's code, then the digits typed, minus a
+     leading trunk zero — "0712…" in Kenya is "+254712…". */
+  function phoneE164() {
+    if (!cc) return "";
+    var digits = $("eaPhone").value.replace(/\D/g, "");
+    if (digits.charAt(0) === "0" && cc[2] !== "1") digits = digits.replace(/^0+/, "");
+    if (digits.length < 6 || digits.length + cc[2].length > 15) return "";
+    return "+" + cc[2] + digits;
+  }
+  function paintChan() {
+    Array.prototype.forEach.call(document.querySelectorAll(".chan-b"), function (b) {
+      b.setAttribute("aria-checked", b.getAttribute("data-chan") === chan ? "true" : "false");
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".chan-b"), function (b) {
+    b.onclick = function () { chan = b.getAttribute("data-chan"); set(CHAN_KEY, chan); paintChan(); paint(); };
+  });
+  paintChan();
+  detectCountry();
+
   function formOk() {
-    return $("eaId").value.trim().length > 0 && $("eaName").value.trim().length > 1 && isEmail($("eaMail").value);
+    return $("eaName").value.trim().length > 1 && isEmail($("eaMail").value)
+      && phoneE164() !== "" && (chan === "whatsapp" || chan === "telegram");
   }
 
   function paint() {
@@ -103,7 +228,7 @@
     $("eaLimit").hidden = left > 0;
     $("eaRedeem").disabled = !$("eaCode").value.trim() || busy;
     if (sent) {
-      $("eaSumId").textContent = $("eaId").value.trim();
+      $("eaSumId").textContent = (phoneE164() || get(SENT_KEY)) + " · " + (chan === "telegram" ? "Telegram" : "WhatsApp");
       $("eaSumWho").textContent = $("eaName").value.trim() + " · " + $("eaMail").value.trim();
     }
     Array.prototype.forEach.call($("eaTrack").children, function (li) {
@@ -117,14 +242,15 @@
   function open() {
     if (!$("eaName").value) $("eaName").value = get(NAME_KEY);
     if (!$("eaMail").value) $("eaMail").value = get(MAIL_KEY);
+    if (!$("eaPhone").value) $("eaPhone").value = get(PHONE_KEY);
     // A request already sent from this browser stays sent across a reload —
     // the code is on its way and the form has nothing to add.
     var sentFor = get(SENT_KEY);
-    if (sentFor && phase === "form") { $("eaId").value = sentFor; phase = "sent"; }
+    if (sentFor && phase === "form") phase = "sent";
     root.hidden = false;
     document.body.classList.add("ea-open");
     paint();
-    setTimeout(function () { (phase === "sent" ? $("eaCode") : $("eaId")).focus(); }, 80);
+    setTimeout(function () { (phase === "sent" ? $("eaCode") : $("eaName")).focus(); }, 80);
   }
   function close() {
     root.hidden = true;
@@ -134,17 +260,20 @@
   function send() {
     if (busy || !formOk() || sendsLeft() === 0) return;
     busy = true; showErr(null); paint();
-    var id = $("eaId").value.trim(), name = $("eaName").value.trim(), email = $("eaMail").value.trim();
+    var id = phoneE164(), name = $("eaName").value.trim(), email = $("eaMail").value.trim();
 
     fetch("/api/mt5/ea-request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ visitorId: visitorId(), mt5Login: id, name: name, email: email, page: location.pathname }),
+      body: JSON.stringify({
+        visitorId: visitorId(), name: name, email: email, phone: id, country: cc ? cc[0] : "", contact: chan,
+        lang: document.documentElement.lang || "", page: location.pathname,
+      }),
     })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (x) {
         if (!x.ok) throw new Error(x.j.error || T("Could not send that. Try again in a moment."));
-        set(NAME_KEY, name); set(MAIL_KEY, email); set(SENT_KEY, id);
+        set(NAME_KEY, name); set(MAIL_KEY, email); set(SENT_KEY, id); set(PHONE_KEY, $("eaPhone").value.trim());
         countSend();
         phase = "sent";
         openWait();
@@ -153,7 +282,7 @@
         if (window.SHALO_SUPPORT_ASK) {
           window.SHALO_SUPPORT_ASK({
             name: name, email: email,
-            text: T(x.j.already ? "Asked for the Shalobot EA again — MT5 ID {id}." : "Requested the Shalobot EA — MT5 ID {id}.", { id: id }),
+            text: T(x.j.already ? "Asked for the Shalobot EA again — {email}, {phone} on {channel}." : "Requested the Shalobot EA — {email}, {phone} on {channel}.", { email: email, phone: id, channel: chan === "telegram" ? "Telegram" : "WhatsApp" }),
           });
         }
       })
@@ -204,13 +333,13 @@
     if (e.key !== "Escape") return;
     if (!$("waitRoot").hidden) closeWait(); else if (!root.hidden) close();
   });
-  ["eaId", "eaName", "eaMail", "eaCode"].forEach(function (id) { $(id).addEventListener("input", paint); });
+  ["eaName", "eaMail", "eaPhone", "eaCode"].forEach(function (id) { $(id).addEventListener("input", paint); });
   $("eaSend").addEventListener("click", send);
   $("eaRedeem").addEventListener("click", redeem);
   $("eaCode").addEventListener("keydown", function (e) { if (e.key === "Enter") redeem(); });
   $("eaMail").addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
   $("eaHaveCode").addEventListener("click", function () { codeOpen = true; paint(); $("eaCode").focus(); });
-  $("eaEdit").addEventListener("click", function () { phase = "form"; set(SENT_KEY, ""); paint(); $("eaId").focus(); });
+  $("eaEdit").addEventListener("click", function () { phase = "form"; set(SENT_KEY, ""); paint(); $("eaName").focus(); });
 
   // Our reply landing in the bubble is what unlocks sending again.
   window.addEventListener("shalo:support-reply", function () { if (!root.hidden) paint(); });

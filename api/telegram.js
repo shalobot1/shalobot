@@ -100,7 +100,8 @@ module.exports = async (req, res) => {
       const waiting = await pendingRequests(20);
 
       if (named) {
-        reqst = waiting.find((w) => w.mt5Login === named[1]) || null;
+        const key = named[1].toLowerCase();
+        reqst = waiting.find((w) => (w.phone && w.phone === named[1]) || w.mt5Login === named[1] || (w.email && w.email.toLowerCase() === key)) || null;
         if (!reqst) {
           await say(chatId, `Nothing is waiting for a decision with ID <code>${named[1]}</code>.`, msg.message_id);
           return json(res, 200, { ok: true });
@@ -112,9 +113,9 @@ module.exports = async (req, res) => {
         await say(chatId, [
           `${waiting.length} requests are waiting. Say which one:`,
           "",
-          ...waiting.slice(0, 8).map((w) => `- <code>${w.mt5Login}</code> — ${w.name} (${w.email})`),
+          ...waiting.slice(0, 8).map((w) => `- ${w.name} — <code>${w.email}</code>${w.phone ? ` · ${w.phone}` : ""}`),
           "",
-          `Send <code>/${isApprove ? "approve" : "decline"} ${waiting[0].mt5Login}</code>, or swipe-reply to the one you mean.`,
+          `Send <code>/${isApprove ? "approve" : "decline"} ${waiting[0].email}</code>, or swipe-reply to the one you mean.`,
         ].join("\n"), msg.message_id);
         return json(res, 200, { ok: true });
       } else {
@@ -148,9 +149,9 @@ module.exports = async (req, res) => {
         return json(res, 200, { ok: true });
       }
       const delivered = await recordSupportReply(reqst.visitorId, codeMessage(code, reqst.mt5Login,
-        `Your MT5 ID ${reqst.mt5Login} is confirmed under our community — here is your download code:`));
+        `Your Headway account (${reqst.email}) is confirmed under our community — here is your download code:`));
       await say(chatId, delivered
-        ? `✅ Approved. Code <code>${code}</code> sent to ${reqst.name} (${reqst.email}), ID <code>${reqst.mt5Login}</code>.${alsoSettled > 1 ? ` Their ${alsoSettled - 1} other open request${alsoSettled === 2 ? "" : "s"} left the waiting list with it.` : ""}`
+        ? `✅ Approved. Code <code>${code}</code> sent to ${reqst.name} (${reqst.email}${reqst.phone ? `, ${reqst.phone}` : ""}).${alsoSettled > 1 ? ` Their ${alsoSettled - 1} other open request${alsoSettled === 2 ? "" : "s"} left the waiting list with it.` : ""}`
         : `⚠️ Code <code>${code}</code> was issued but could not be delivered. Send it to ${reqst.email} yourself.`,
         msg.message_id);
       return json(res, 200, { ok: true });
@@ -165,7 +166,7 @@ module.exports = async (req, res) => {
     let first, second = true;
     if (times > 1) {
       first = await recordSupportReply(reqst.visitorId, [
-        `We checked again and MT5 ID ${reqst.mt5Login} is still not showing under our Headway partner group.`,
+        `We checked again and your Headway account (${reqst.email}) is still not showing under our partner group.`,
         reason, "",
         "Headway has to attach it — we cannot do it from our side. Ask Headway support to move your account under our Partner ID, or open a new account through our link, which places it under us automatically:",
         "",
@@ -176,14 +177,12 @@ module.exports = async (req, res) => {
       ].filter((line, i) => i !== 1 || line !== "").join("\n"));
     } else {
       first = await recordSupportReply(reqst.visitorId, [
-        `We could not find MT5 ID ${reqst.mt5Login} under our Headway partner group, so we cannot send a code for it yet.`,
+        `We could not find a Headway account for ${reqst.name} (${reqst.email}) under our partner group, so we cannot send a code yet.`,
         reason, "",
-        `First, check you sent the right number. Your MT5 ID is shown at ${DERIV_PROFILE} — reply here with it:`,
-        "",
-        `(It looks like ${EXAMPLE_CLIENT_ID})`,
+        "First, check that the name and email you sent are exactly the ones registered at Headway — if they differ, reply here with the right ones:",
       ].filter((line, i) => i !== 1 || line !== "").join("\n"));
       second = await recordSupportReply(reqst.visitorId, [
-        "If that login was already the right one, then your account is not under us yet — and only Headway can move it.",
+        "If they were already right, then your account is not under us yet — and only Headway can move it.",
         "",
         "Ask Headway support to attach your account to our Partner ID:",
         PARTNER_ID, "",

@@ -175,7 +175,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 
     <div class="ea-body">
       <section id="eaForm">
-        <p class="ea-lede">The EA is free for Shalobot&rsquo;s own Headway community. Paste your MT5 ID with the <b>exact name and email you registered with at Headway</b> — that is how we match you against our partner list, approve fast, and send your download code. <b>The EA works only on the account we approve.</b></p>
+        <p class="ea-lede">The EA is free for Shalobot&rsquo;s own Headway community. Give the <b>exact full name and email you registered with at Headway</b> — that is how we match you against our partner list and send your download code — and a number we can guide you on after the download.</p>
 
         <div class="ea-acct ea-acct--hw">
           <div class="ea-acct-l">
@@ -186,7 +186,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
               <span>Create account</span>
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
             </a>
-            <small>Opening it through this link places the account under our partner group — that is what we check. Then come back here with your new MT5 ID.</small>
+            <small>Opening it through this link places the account under our partner group — that is what we check. Then come back here with the name and email you registered.</small>
           </div>
           <a class="ea-qr" href="https://headway.partners/user/signup?hwp=8abf6d" target="_blank" rel="noopener noreferrer sponsored" aria-label="Scan to open a Headway account">
             <img src="/logos/headway-signup-qr.svg" alt="QR code — open a Headway MT5 account through the Shalobot link" width="84" height="84" />
@@ -195,14 +195,39 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
         </div>
 
         <div id="eaFields">
-          <label class="ea-f">
-            <span>MT5 ID</span>
-            <input class="field" id="eaId" placeholder="1234567" autocomplete="off" inputmode="numeric" spellcheck="false" />
-            <small>The account number MetaTrader 5 shows at the top of the terminal, before the server name. It is also in your Headway personal area.</small>
-          </label>
           <div class="ea-two">
-            <label class="ea-f"><span>Name — as registered at Headway</span><input class="field" id="eaName" placeholder="Your name" autocomplete="name" /></label>
+            <label class="ea-f"><span>Name — as registered at Headway</span><input class="field" id="eaName" placeholder="Full name" autocomplete="name" /></label>
             <label class="ea-f"><span>Email — as registered at Headway</span><input class="field" id="eaMail" type="email" placeholder="you@email.com" autocomplete="email" /></label>
+          </div>
+          <div class="ea-f">
+            <span>Phone number</span>
+            <div class="phone" id="phoneWrap">
+              <button type="button" class="cc" id="ccBtn" aria-haspopup="listbox" aria-expanded="false" aria-label="Country code">
+                <span class="cc-flag" id="ccFlag"></span>
+                <span class="cc-code" id="ccCode">+</span>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <input class="field" id="eaPhone" type="tel" inputmode="tel" placeholder="712 345 678" autocomplete="tel-national" />
+              <div class="cc-pop" id="ccPop" hidden>
+                <input class="cc-search" id="ccSearch" placeholder="Search country or code" autocomplete="off" spellcheck="false" />
+                <ul class="cc-list" id="ccList" role="listbox"></ul>
+              </div>
+            </div>
+            <small>The number we reach you on after the download, to guide you through setting the EA up and using it the right way.</small>
+          </div>
+          <div class="ea-f">
+            <span>Where should we contact you?</span>
+            <div class="chan" role="radiogroup" aria-label="Contact channel">
+              <button type="button" class="chan-b" data-chan="whatsapp" role="radio" aria-checked="false">
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2z"/><path fill="#fff" d="M9.2 7.4c-.2-.5-.4-.5-.6-.5h-.5c-.2 0-.5.1-.7.3-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.2 5 4.4 2.5 1 3 .8 3.5.7.5-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3l-2-1c-.3-.1-.5-.1-.7.1-.2.3-.8 1-1 1.2-.2.2-.3.2-.6.1-.3-.2-1.2-.5-2.3-1.5-.9-.8-1.5-1.7-1.6-2-.2-.3 0-.5.1-.6l.4-.5.3-.5c.1-.2 0-.4 0-.5l-1-2.2z"/></svg>
+                <span>WhatsApp</span>
+              </button>
+              <button type="button" class="chan-b" data-chan="telegram" role="radio" aria-checked="false">
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#2AABEE"/><path fill="#fff" d="M6.1 11.7l9.3-3.6c.4-.2.8.1.7.7l-1.6 7.4c-.1.5-.4.6-.8.4l-2.3-1.7-1.1 1.1c-.1.1-.2.2-.5.2l.2-2.4 4.3-3.9c.2-.2 0-.3-.3-.1l-5.3 3.3-2.3-.7c-.5-.2-.5-.5.1-.7z"/></svg>
+                <span>Telegram</span>
+              </button>
+            </div>
+            <small>On that number. We show you exactly how to use the EA so you start the right way.</small>
           </div>
           <p class="ea-limit" id="eaLimit" hidden>You have sent this three times. Wait for our reply in the support window — it unlocks sending again.</p>
           <button type="button" class="btn btn-blue ea-send" id="eaSend" disabled>
@@ -219,7 +244,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
         <div class="ea-sent" id="eaSent" hidden>
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
           <div class="ea-sent-b">
-            <span><b>Sent.</b> We are checking your ID now. Your code arrives in the <b>support window</b> at the corner of this page — keep it open, the reply lands there.</span>
+            <span><b>Sent.</b> We are checking your details against our Headway partner list now. Your code arrives in the <b>support window</b> at the corner of this page — keep it open, the reply lands there.</span>
             <button type="button" class="ea-link" id="eaWaitOpen">While you wait: the bonus and the community →</button>
           </div>
         </div>
@@ -242,7 +267,6 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
         </div>
 
         <p class="ea-err" id="eaErr" hidden></p>
-        <p class="ea-foot">Use the exact name and email on your Headway account — a mismatch is the usual reason a check takes longer. If your account is not under us we say so, and tell you how to ask Headway to attach it to our Partner ID <code>6078336</code> — reply in the support window once it is done and we check again.</p>
       </section>
 
       <section class="ea-done" id="eaDone" hidden>
@@ -286,6 +310,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
   window.SHALO_SUPPORT_GREETING = "ask us anything about the Shalobot EA or your Headway account. Tell us what happened and what you expected.";
 </script>
 <script src="/mt5/mt5.js"></script>
+<script src="/countries-dial.js" defer></script>
 <script src="/mt5/access.js" defer></script>
 <script src="/i18n/i18n.js"></script>
 <script src="/theme.js"></script>
