@@ -244,5 +244,16 @@
 "The EA is free for Shalobot’s own Headway community. Give the <b>exact full name and email you registered with at Headway</b> — that is how we match you against our partner list and send your download code — and a number we can guide you on after the download.":"L’EA est gratuit pour la communauté Headway de Shalobot. Donnez le <b>nom complet et l’e-mail exacts enregistrés chez Headway</b> — c’est ainsi que nous vous retrouvons dans notre liste partenaire et vous envoyons votre code — et un numéro sur lequel vous guider après le téléchargement.",
 "<b>Sent.</b> We are checking your details against our Headway partner list now. Your code arrives in the <b>support window</b> at the corner of this page — keep it open, the reply lands there.":"<b>Envoyé.</b> Nous vérifions vos informations dans notre liste partenaire Headway. Votre code arrive dans la <b>fenêtre de support</b> dans le coin de cette page — laissez-la ouverte, la réponse y arrive.",
 "Requested the Shalobot EA — {email}, {phone} on {channel}.":"Demande de l’EA Shalobot — {email}, {phone} sur {channel}.",
-"Asked for the Shalobot EA again — {email}, {phone} on {channel}.":"Nouvelle demande de l’EA Shalobot — {email}, {phone} sur {channel}."
+"Asked for the Shalobot EA again — {email}, {phone} on {channel}.":"Nouvelle demande de l’EA Shalobot — {email}, {phone} sur {channel}.",
+"We checked again and your Headway account — {name} ({email}) — is still not showing under our partner group.":"Nous avons vérifié à nouveau et votre compte Headway — {name} ({email}) — n’apparaît toujours pas dans notre groupe partenaire.",
+"Requested the General MT5 EA — {email}.":"Demande de l’EA General MT5 — {email}.",
+"Asked for the General MT5 EA again — {email}.":"Nouvelle demande de l’EA General MT5 — {email}.",
+"Requested the Shalobot EA — {email}.":"Demande de l’EA Shalobot — {email}.",
+"Asked for the Shalobot EA again — {email}.":"Nouvelle demande de l’EA Shalobot — {email}.",
+"<b>Downloaded the EA?</b> Tell support and we guide you through setting it up and using it the right way.":"<b>EA téléchargé ?</b> Prévenez le support et nous vous guidons pour l’installer et l’utiliser correctement.",
+"Downloaded the EA?":"EA téléchargé ?",
+"Tell support and we guide you through setting it up and using it the right way.":"Prévenez le support et nous vous guidons pour l’installer et l’utiliser correctement.",
+"I have downloaded the EA":"J’ai téléchargé l’EA",
+"I have downloaded the EA — please guide me on how to set it up and use it the right way.":"J’ai téléchargé l’EA — merci de me guider pour l’installer et l’utiliser correctement.",
+"No phone given":"Aucun numéro indiqué"
 }

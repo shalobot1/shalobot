@@ -206,6 +206,21 @@
   };
   window.SHALO_SUPPORT_ID = id;
 
+  /** Send a line on the page's behalf, as if typed: the bubble opens, the words
+   *  go out with the thread attached, and `kind` tells our side what this is
+   *  (the EA "I have downloaded" button uses it, so the reply can say whether
+   *  this browser was ever approved). Missing name or email: the bubble opens
+   *  with the words waiting, and asks for them. */
+  window.SHALO_SUPPORT_SEND = function (d) {
+    d = d || {};
+    state.draft = d.text || "";
+    state.kind = d.kind || null;
+    toggle(true);
+    var box = panel.querySelector("#supText");
+    if (box) box.value = state.draft;
+    send();
+  };
+
   /** Details the page already knows beat anything cached here. */
   window.SHALO_SUPPORT_IDENTITY = function (name, email) {
     if (name) { state.name = name; set(NAME_KEY, name); }
@@ -458,8 +473,8 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: state.name, email: state.email, message: message,
-          source: window.SHALO_SUPPORT_SOURCE || "Shalobot",
+          name: state.name, email: state.email, message: message, kind: state.kind || undefined,
+          source: state.kind === "ea-downloaded" ? "MT5 EA — downloaded, wants setup guidance" : (window.SHALO_SUPPORT_SOURCE || "Shalobot"),
           visitorId: id, page: location.pathname,
           file: file ? { name: file.name, type: file.type, data: data } : undefined
         })
@@ -471,7 +486,7 @@
       if (!r.ok) { state.err = r.d.error || "We could not send that just now."; draw(); return; }
       remember({ text: message || "(attachment)", from: "them", sent: true, shot: shot });
       state.draft = "";
-      state.file = null;
+      state.file = null; state.kind = null;
       state.editWho = false;
       draw();
       schedule();

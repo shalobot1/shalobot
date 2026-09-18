@@ -14,6 +14,21 @@
  */
 
 const { readBody, json, recordSupportInbound, supportHistory, isBanned } = require("./_lib/db");
+const { accessStatusFor } = require("./_lib/ea");
+
+/** One line the owner can act on: was this browser approved, and did it download? */
+function eaStatusLine(s) {
+  const when = (iso) => (iso ? String(iso).replace("T", " ").slice(0, 16) + " UTC" : "?");
+  if (!s || s.state === "unknown") return "";
+  if (s.state === "approved") {
+    return s.uses > 0
+      ? `<b>🤖 EA access:</b> ✅ approved ${when(s.at)} · code <code>${s.code}</code> used ${s.uses}/3 (downloaded ${when(s.usedAt)})`
+      : `<b>🤖 EA access:</b> 🟡 approved ${when(s.at)} · code <code>${s.code}</code> NOT used yet — nothing downloaded on this browser`;
+  }
+  if (s.state === "pending") return `<b>🤖 EA access:</b> ⚠️ NOT approved — request still waiting since ${when(s.at)}. Pressed too early?`;
+  if (s.state === "declined") return `<b>🤖 EA access:</b> ⛔ declined ${when(s.at)} — no code was issued`;
+  return "<b>🤖 EA access:</b> ⚠️ no request from this browser — not approved";
+}
 
 /* Screenshots AND documents. A picture is what "it looks wrong" needs; a set
    file, a log or a statement is what people get asked for and then have
@@ -148,6 +163,7 @@ module.exports = async (req, res) => {
   // recorded, so it is the conversation up to now and never includes itself.
   // A failure here costs context, not delivery - the message still goes.
   const history = await supportHistory(str(body.visitorId, 16));
+  const eaLine = str(body.kind, 24) === "ea-downloaded" ? eaStatusLine(await accessStatusFor(str(body.visitorId, 16))) : "";
 
   // Three blocks, blank line between each. filter(Boolean) drops the absent
   // optional fields, which is what it was for - but it was also eating the ""
@@ -159,6 +175,7 @@ module.exports = async (req, res) => {
     str(body.country, 80) ? `<b>Country:</b> ${esc(str(body.country, 80))}` : "",
     str(body.page, 200) ? `<b>Page:</b> ${esc(str(body.page, 200))}` : "",
     str(body.visitorId, 16) ? `<b>Person:</b> <code>${esc(str(body.visitorId, 16))}</code>` : "",
+    eaLine,
   ].filter(Boolean).join("\n");
 
   const lines = [header, renderHistory(history), esc(message || (file ? `(${file.name})` : ""))].filter(Boolean);

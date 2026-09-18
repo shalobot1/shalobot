@@ -54,8 +54,12 @@ module.exports = async (req, res) => {
   if (!visitorId) return json(res, 400, { error: "Reload the page and try again." });
   if (name.length < 2) return json(res, 422, { error: "Please give us your full name as registered at Headway." });
   if (!isEmail(email)) return json(res, 422, { error: "That email does not look right." });
-  if (!/^\+[1-9]\d{6,14}$/.test(phone)) return json(res, 422, { error: "That phone number does not look right — choose the country and type the number." });
-  if (!CHANNELS[contact]) return json(res, 422, { error: "Choose WhatsApp or Telegram so we know where to reach you." });
+  // The name and email are what gets checked; the phone and the channel are how
+  // we guide them afterwards, welcome but not required.
+  if (phone && !/^\+[1-9]\d{6,14}$/.test(phone)) return json(res, 422, { error: "That phone number does not look right — choose the country and type the number." });
+  if (contact && !CHANNELS[contact]) return json(res, 422, { error: "Choose WhatsApp or Telegram so we know where to reach you." });
+  const via = CHANNELS[contact] || "";
+  const reach = phone ? `${phone}${via ? ` on ${via}` : ""}` : "no phone given";
 
   /* Barred people are turned away before anything is recorded or sent, so a
      ban is quiet: nothing reaches Telegram and no row accumulates. */
@@ -93,13 +97,13 @@ module.exports = async (req, res) => {
      time are checked again, by machine, and a fresh code is issued to THIS
      browser at once. The owner is told, with everything needed to /ban if it
      looks wrong, but is not asked. */
-  const match = await approvedMatch(email, phone);
+  const match = await approvedMatch(email, phone, name);
   if (match) {
     const newId = await createRequest({ visitorId, mt5Login, name, email, page, phone, contact, country });
     const code = newId ? await approveRequest(newId) : null;
     if (code) {
       const why = already ? "your previous code was used up" : "you are on a new browser";
-      await recordSupportInbound({ visitorId, body: `Asked for the Shalobot EA again — ${email}, ${phone} on ${CHANNELS[contact]}`, email, name, source: "MT5 EA access", page });
+      await recordSupportInbound({ visitorId, body: `Asked for the Shalobot EA again — ${email}, ${reach}`, email, name, source: "MT5 EA access", page });
       await recordSupportReply(visitorId, codeMessage(code, mt5Login,
         `Approved again automatically — same email and phone as before, and ${why}. Here is your new code:`));
       await fetch(`${API}/bot${token}/sendMessage`, {
@@ -110,7 +114,7 @@ module.exports = async (req, res) => {
           text: [
             "<b>MT5 EA access · Shalobot — approved automatically</b>",
             `<b>Name:</b> ${esc(name)} · <b>Email:</b> <a href="mailto:${esc(email)}">${esc(email)}</a>`,
-            `<b>Phone:</b> <code>${esc(prettyPhone(phone))}</code> · <b>${CHANNELS[contact]}:</b> <a href="${chatLink(phone, contact)}">open chat</a>`,
+            phone ? `<b>Phone:</b> <code>${esc(prettyPhone(phone))}</code>${via ? ` · <b>${via}:</b> <a href="${chatLink(phone, contact)}">open chat</a>` : ""}` : "<b>Phone:</b> not given",
             `<b>Person:</b> <code>${esc(visitorId)}</code>`,
             "",
             `Same email and phone as an earlier approval (${why}), so code <code>${code}</code> was issued without asking.`,
@@ -135,8 +139,8 @@ module.exports = async (req, res) => {
     "",
     `<b>👤 Name:</b> ${esc(name)}`,
     `<b>✉️ Email:</b> <a href="mailto:${esc(email)}">${esc(email)}</a>`,
-    `<b>📱 Phone:</b> <code>${esc(prettyPhone(phone))}</code>`,
-    `<b>💬 Contact on:</b> ${CHANNELS[contact]} — <a href="${chatLink(phone, contact)}">open chat</a>`,
+    phone ? `<b>📱 Phone:</b> <code>${esc(prettyPhone(phone))}</code>` : "<b>📱 Phone:</b> not given",
+    phone && via ? `<b>💬 Contact on:</b> ${via} — <a href="${chatLink(phone, contact)}">open chat</a>` : (phone ? "<b>💬 Contact on:</b> not chosen" : ""),
     country ? `<b>🌍 Country:</b> ${esc(countryName(country))} (${esc(country)})${lang ? ` · <b>Language:</b> ${esc(lang)}` : ""}` : (lang ? `<b>🌍 Language:</b> ${esc(lang)}` : ""),
     `<b>🕒 Sent:</b> ${when}`,
     page ? `<b>🔗 Page:</b> ${esc(page)}` : "",
@@ -178,7 +182,7 @@ module.exports = async (req, res) => {
      about anything the whole exchange is attached. */
   await recordSupportInbound({
     visitorId,
-    body: `Asked for the Shalobot EA — ${email}, ${phone} on ${CHANNELS[contact]}`,
+    body: `Asked for the Shalobot EA — ${email}, ${reach}`,
     tgMessageId: tgId,
     email,
     name,

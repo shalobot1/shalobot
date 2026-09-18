@@ -209,9 +209,11 @@
   paintChan();
   detectCountry();
 
+  // The name and email are what gets checked, so they are what unlocks the
+  // button. A phone, if typed, has to be a phone; the channel is optional.
   function formOk() {
     return $("eaName").value.trim().length > 1 && isEmail($("eaMail").value)
-      && phoneE164() !== "" && (chan === "whatsapp" || chan === "telegram");
+      && ($("eaPhone").value.replace(/\D/g, "") === "" || phoneE164() !== "");
   }
 
   function paint() {
@@ -228,7 +230,8 @@
     $("eaLimit").hidden = left > 0;
     $("eaRedeem").disabled = !$("eaCode").value.trim() || busy;
     if (sent) {
-      $("eaSumId").textContent = (phoneE164() || get(SENT_KEY)) + " · " + (chan === "telegram" ? "Telegram" : "WhatsApp");
+      var ph = phoneE164() || get(SENT_KEY);
+      $("eaSumId").textContent = ph ? ph + (chan === "telegram" ? " · Telegram" : (chan === "whatsapp" ? " · WhatsApp" : "")) : T("No phone given");
       $("eaSumWho").textContent = $("eaName").value.trim() + " · " + $("eaMail").value.trim();
     }
     Array.prototype.forEach.call($("eaTrack").children, function (li) {
@@ -246,7 +249,7 @@
     // A request already sent from this browser stays sent across a reload —
     // the code is on its way and the form has nothing to add.
     var sentFor = get(SENT_KEY);
-    if (sentFor && phase === "form") phase = "sent";
+    if (sentFor && phase === "form") phase = "sent";   // "-" when it went out without a phone
     root.hidden = false;
     document.body.classList.add("ea-open");
     paint();
@@ -273,7 +276,7 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (x) {
         if (!x.ok) throw new Error(x.j.error || T("Could not send that. Try again in a moment."));
-        set(NAME_KEY, name); set(MAIL_KEY, email); set(SENT_KEY, id); set(PHONE_KEY, $("eaPhone").value.trim());
+        set(NAME_KEY, name); set(MAIL_KEY, email); set(SENT_KEY, id || "-"); set(PHONE_KEY, $("eaPhone").value.trim());
         countSend();
         phase = "sent";
         openWait();
@@ -282,7 +285,9 @@
         if (window.SHALO_SUPPORT_ASK) {
           window.SHALO_SUPPORT_ASK({
             name: name, email: email,
-            text: T(x.j.already ? "Asked for the Shalobot EA again — {email}, {phone} on {channel}." : "Requested the Shalobot EA — {email}, {phone} on {channel}.", { email: email, phone: id, channel: chan === "telegram" ? "Telegram" : "WhatsApp" }),
+            text: id
+              ? T(x.j.already ? "Asked for the Shalobot EA again — {email}, {phone} on {channel}." : "Requested the Shalobot EA — {email}, {phone} on {channel}.", { email: email, phone: id, channel: chan === "telegram" ? "Telegram" : (chan === "whatsapp" ? "WhatsApp" : "—") })
+              : T(x.j.already ? "Asked for the Shalobot EA again — {email}." : "Requested the Shalobot EA — {email}.", { email: email }),
           });
         }
       })
@@ -340,6 +345,18 @@
   $("eaMail").addEventListener("keydown", function (e) { if (e.key === "Enter") send(); });
   $("eaHaveCode").addEventListener("click", function () { codeOpen = true; paint(); $("eaCode").focus(); });
   $("eaEdit").addEventListener("click", function () { phase = "form"; set(SENT_KEY, ""); paint(); $("eaName").focus(); });
+
+  /* "I have downloaded the EA": one tap sends the words to support, with the
+     whole thread and our record of whether this browser was ever approved. */
+  var dl = $("downloadedBtn");
+  if (dl) dl.addEventListener("click", function () {
+    if (window.SHALO_SUPPORT_SEND) {
+      window.SHALO_SUPPORT_SEND({
+        text: T("I have downloaded the EA — please guide me on how to set it up and use it the right way."),
+        kind: "ea-downloaded",
+      });
+    }
+  });
 
   // Our reply landing in the bubble is what unlocks sending again.
   window.addEventListener("shalo:support-reply", function () { if (!root.hidden) paint(); });

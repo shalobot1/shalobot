@@ -166,7 +166,7 @@ module.exports = async (req, res) => {
     let first, second = true;
     if (times > 1) {
       first = await recordSupportReply(reqst.visitorId, [
-        `We checked again and your Headway account (${reqst.email}) is still not showing under our partner group.`,
+        `We checked again and your Headway account — ${reqst.name} (${reqst.email}) — is still not showing under our partner group.`,
         reason, "",
         "Headway has to attach it — we cannot do it from our side. Ask Headway support to move your account under our Partner ID, or open a new account through our link, which places it under us automatically:",
         "",

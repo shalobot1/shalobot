@@ -157,9 +157,11 @@ async function approvedCodeFor(visitorId) {
  * approved with, and gets a fresh code without waiting. The ID is compared
  * exactly; the email without regard to case.
  */
-async function approvedMatch(email, phone) {
-  if (!configured() || !email || !phone) return null;
-  const res = await select(TABLE, `select=id,visitor_id,name&status=eq.approved&code=not.is.null&email=ilike.${encodeURIComponent(email)}&phone=eq.${encodeURIComponent(phone)}&order=decided_at.desc&limit=1`);
+async function approvedMatch(email, phone, name) {
+  if (!configured() || !email || (!phone && !name)) return null;
+  // With a phone, email + phone must both match; without one, email + the exact name.
+  const second = phone ? `phone=eq.${encodeURIComponent(phone)}` : `name=ilike.${encodeURIComponent(name)}`;
+  const res = await select(TABLE, `select=id,visitor_id,name&status=eq.approved&code=not.is.null&email=ilike.${encodeURIComponent(email)}&${second}&order=decided_at.desc&limit=1`);
   if (!res.ok) { console.error("[ea] match lookup failed:", res.error); return null; }
   const d = res.data && res.data[0];
   return d ? { id: d.id, visitorId: d.visitor_id, name: d.name } : null;
@@ -254,6 +256,24 @@ async function checkCode(code, visitorId) {
   return { ok: true, name: hit.name || "", usesLeft: MAX_CODE_USES - used - 1 };
 }
 
+/**
+ * Where this browser stands with the EA — for the moment somebody says "I have
+ * downloaded it": approved (and when, and whether the code was actually used),
+ * still waiting, declined, or never asked. Read from the rows, not from what
+ * the person claims, because the button is easy to press by mistake.
+ */
+async function accessStatusFor(visitorId) {
+  if (!configured() || !visitorId) return { state: "unknown" };
+  const v = encodeURIComponent(visitorId);
+  const ok = await select(TABLE, `select=code,code_uses,code_used_at,decided_at,name,email&visitor_id=eq.${v}&status=eq.approved&code=not.is.null&order=decided_at.desc&limit=1`);
+  const a = ok.ok && ok.data && ok.data[0];
+  if (a) return { state: "approved", code: a.code, uses: a.code_uses || 0, usedAt: a.code_used_at, at: a.decided_at, name: a.name, email: a.email };
+  const last = await select(TABLE, `select=status,created_at,decided_at,name,email&visitor_id=eq.${v}&order=created_at.desc&limit=1`);
+  const d = last.ok && last.data && last.data[0];
+  if (!d) return { state: "none" };
+  return { state: d.status === "declined" ? "declined" : "pending", at: d.decided_at || d.created_at, name: d.name, email: d.email };
+}
+
 /** How many times this browser has asked recently — a spam brake, not a rule. */
 async function recentRequestCount(visitorId, withinMinutes) {
   if (!configured()) return 0;
@@ -266,5 +286,5 @@ module.exports = {
   PARTNER_ID, DERIV_SIGNUP, DERIV_PROFILE, EXAMPLE_CLIENT_ID, EA_FILE, MAX_CODE_USES, codeMessage,
   createRequest, attachTelegramMessage, requestForTelegramMessage, requestForVisitor,
   pendingRequests, approvedCodeFor, approvedMatch, markAnswered, markAnsweredByEmail, approveRequest, declineRequest,
-  declineCount, checkCode, recentRequestCount, normaliseCode,
+  declineCount, checkCode, recentRequestCount, normaliseCode, accessStatusFor,
 };

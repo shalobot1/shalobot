@@ -707,6 +707,9 @@ body.ea-open { overflow: hidden; }
   cursor: pointer; transition: color .15s, border-color .15s, background .15s;
 }
 .mt5-copy:hover { color: var(--blue); border-color: var(--blue); }
+/* The "I have downloaded" button: the copy button's shape, the accent's colour. */
+.mt5-copy.mt5-downloaded { color: var(--blue); border-color: var(--blue); font-weight: 700; }
+.mt5-copy.mt5-downloaded:hover { background: var(--surface-2); }
 .mt5-copy.is-copied { color: var(--on-accent); background: var(--ok); border-color: var(--ok); }
 
 .algo {
