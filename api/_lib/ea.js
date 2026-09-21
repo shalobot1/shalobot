@@ -78,10 +78,10 @@ const normaliseCode = (raw) => String(raw || "").toUpperCase().replace(/[^A-Z0-9
 const row = (d) => d ? ({
   id: d.id, visitorId: d.visitor_id, mt5Login: d.mt5_login, name: d.name, email: d.email,
   phone: d.phone || "", contact: d.contact || "", country: d.country || "",
-  status: d.status, code: d.code || null,
+  status: d.status, code: d.code || null, createdAt: d.created_at || null,
 }) : null;
 
-const FIELDS = "id,visitor_id,mt5_login,name,email,phone,contact,country,status,code";
+const FIELDS = "id,visitor_id,mt5_login,name,email,phone,contact,country,status,code,created_at";
 
 /** Record a new request. Returns its id, or null if it could not be stored. */
 async function createRequest(r) {
@@ -153,6 +153,60 @@ async function pendingRequests(limit) {
     for (const d of (done.ok && done.data) || []) settled.add(d.visitor_id);
   }
   return rows.filter((d) => !settled.has(d.visitor_id)).slice(0, limit || 20).map(row);
+}
+
+/**
+ * The waiting list, one entry per PERSON.
+ *
+ * A decision settles every open row of a person, so listing their rows one by
+ * one would show the same decision several times. Each entry is their newest
+ * request, with how many are open and any other email they sent under —
+ * a typo they corrected is still the same person. Longest waiting first,
+ * so the person at the back of the queue is the one at the top.
+ */
+async function waitingPeople() {
+  const rows = await pendingRequests(200);
+  const people = [];
+  const byVisitor = new Map();
+  for (const r of rows) {
+    const key = r.visitorId || r.id;
+    let p = byVisitor.get(key);
+    if (!p) {
+      p = Object.assign({}, r, { requests: 1, otherEmails: [], firstAt: r.createdAt });
+      byVisitor.set(key, p); people.push(p);
+      continue;
+    }
+    p.requests += 1;
+    p.firstAt = r.createdAt || p.firstAt;
+    const e = String(r.email || "").toLowerCase();
+    if (e && e !== String(p.email || "").toLowerCase() && !p.otherEmails.includes(r.email)) p.otherEmails.push(r.email);
+    if (!p.phone && r.phone) { p.phone = r.phone; p.contact = r.contact; }
+  }
+  return people.sort((a, b) => String(a.firstAt || "").localeCompare(String(b.firstAt || "")));
+}
+
+/**
+ * The request a typed ID points at: a visitor ID first — the one shown in
+ * the request and in the waiting list — then an email, a phone or a login,
+ * matched against what is waiting. A visitor ID that is not on the waiting
+ * list still finds that person's request (asked to deposit, say), because
+ * /approve on it is exactly how they get their code when they come back.
+ */
+async function requestForKey(key, waiting) {
+  const k = String(key || "").trim();
+  if (!k) return null;
+  const low = k.toLowerCase();
+  const list = waiting || await waitingPeople();
+  const hit = list.find((w) => String(w.visitorId || "").toLowerCase() === low)
+    || list.find((w) => (w.email && w.email.toLowerCase() === low) || (w.phone && w.phone === k) || w.mt5Login === k);
+  if (hit) return hit;
+  if (!k.includes("@") && /^[A-Za-z0-9-]{6,64}$/.test(k)) {
+    // Case is whatever they typed; the stored id is what the site made.
+    const exact = await requestForVisitor(k);
+    if (exact) return exact;
+    if (k !== k.toUpperCase()) return requestForVisitor(k.toUpperCase());
+  }
+  return null;
 }
 
 /** The live code this browser already holds, if any, and what is left of it. */
@@ -301,6 +355,6 @@ async function recentRequestCount(visitorId, withinMinutes) {
 module.exports = {
   PARTNER_ID, DERIV_SIGNUP, DERIV_PROFILE, EXAMPLE_CLIENT_ID, EA_FILE, MAX_CODE_USES, codeMessage, depositMessage, MISTAKE_LINE,
   createRequest, attachTelegramMessage, requestForTelegramMessage, requestForVisitor,
-  pendingRequests, approvedCodeFor, approvedMatch, markAnswered, markAnsweredByEmail, approveRequest, declineRequest,
+  pendingRequests, waitingPeople, requestForKey, approvedCodeFor, approvedMatch, markAnswered, markAnsweredByEmail, approveRequest, declineRequest,
   declineCount, checkCode, recentRequestCount, normaliseCode, accessStatusFor,
 };
