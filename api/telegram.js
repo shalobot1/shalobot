@@ -20,7 +20,7 @@ const {
 const { saveTelegramFile } = require("./_lib/files");
 const {
   requestForTelegramMessage, requestForVisitor, pendingRequests, approveRequest, declineRequest,
-  markAnswered, markAnsweredByEmail, declineCount, codeMessage, PARTNER_ID, DERIV_PROFILE, DERIV_SIGNUP, EXAMPLE_CLIENT_ID,
+  markAnswered, markAnsweredByEmail, declineCount, codeMessage, depositMessage, MISTAKE_LINE, PARTNER_ID, DERIV_PROFILE, DERIV_SIGNUP, EXAMPLE_CLIENT_ID,
 } = require("./_lib/ea");
 
 const API = "https://api.telegram.org";
@@ -81,9 +81,10 @@ module.exports = async (req, res) => {
   // as its own message with nothing attached. With one request waiting the
   // bare command needs no disambiguation; with several it asks rather than
   // guessing, because approving the wrong person cannot be taken back.
-  const cmd = /^\/(approve|decline)(?:@[A-Za-z0-9_]+)?\b/i.exec(text);
+  const cmd = /^\/(approve|decline|deposit)(?:@[A-Za-z0-9_]+)?\b/i.exec(text);
   if (cmd) {
     const isApprove = /^approve$/i.test(cmd[1]);
+    const isDeposit = /^deposit$/i.test(cmd[1]);
     let reason = text.slice(cmd[0].length).trim();
     let reqst = null;
 
@@ -142,6 +143,19 @@ module.exports = async (req, res) => {
     // A decision is about the person, so it settles every open row of theirs.
     const alsoSettled = await markAnswered(reqst.visitorId);
 
+    /* Under us, but not funded: neither approved nor declined. They are told
+       to deposit — any amount, with the bonus — and the request leaves the
+       waiting list until they reply; a swipe-reply /approve on that reply
+       still finds it, because its status is untouched. */
+    if (isDeposit) {
+      const told = await recordSupportReply(reqst.visitorId, depositMessage(reqst.email));
+      await say(chatId, told
+        ? `💳 ${reqst.name} (${reqst.email}) has been asked to deposit first. Their request waits — swipe-reply /approve when they come back funded.`
+        : `⚠️ Could not deliver the deposit message — tell ${reqst.email} yourself.`,
+        msg.message_id);
+      return json(res, 200, { ok: true });
+    }
+
     if (isApprove) {
       const code = await approveRequest(reqst.id);
       if (!code) {
@@ -174,6 +188,8 @@ module.exports = async (req, res) => {
         `Sign-up link: ${DERIV_SIGNUP}`,
         "",
         "Reply here once it is done and we will check again.",
+        "",
+        MISTAKE_LINE,
       ].filter((line, i) => i !== 1 || line !== "").join("\n"));
     } else {
       first = await recordSupportReply(reqst.visitorId, [
@@ -191,6 +207,8 @@ module.exports = async (req, res) => {
         `Or open a new Headway account through our link, which places it under us automatically: ${DERIV_SIGNUP}`,
         "",
         "Reply here once it is done and we will check again.",
+        "",
+        MISTAKE_LINE,
       ].join("\n"));
     }
 

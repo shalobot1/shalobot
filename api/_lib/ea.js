@@ -47,6 +47,22 @@ function codeMessage(code, mt5Login, lead) {
   ].join("\n");
 }
 
+/** Every UNSUCCESSFUL answer — a decline, a deposit asked for — ends with this:
+ *  a wrong decision is a screenshot away from being fixed. A code is not an
+ *  answer that can be wrong, so it never carries it. */
+const MISTAKE_LINE = "If we made a mistake, reply here with a screenshot of your Headway account and we will fix it right away.";
+
+/** What somebody is told when their account is under us but not funded yet. */
+function depositMessage(email) {
+  return [
+    `Your Headway account (${email}) is under our community — but it has no deposit yet, and the EA is for accounts ready to trade.`,
+    "",
+    "Deposit any amount you want to start with in your Headway personal area — Headway adds a 50% bonus — then reply here and we send your code right away.",
+    "",
+    MISTAKE_LINE,
+  ].join("\n");
+}
+
 /* No I, O, 1 or 0 — the alphabet for anything a human copies by eye. */
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function mintCode() {
@@ -283,7 +299,7 @@ async function recentRequestCount(visitorId, withinMinutes) {
 }
 
 module.exports = {
-  PARTNER_ID, DERIV_SIGNUP, DERIV_PROFILE, EXAMPLE_CLIENT_ID, EA_FILE, MAX_CODE_USES, codeMessage,
+  PARTNER_ID, DERIV_SIGNUP, DERIV_PROFILE, EXAMPLE_CLIENT_ID, EA_FILE, MAX_CODE_USES, codeMessage, depositMessage, MISTAKE_LINE,
   createRequest, attachTelegramMessage, requestForTelegramMessage, requestForVisitor,
   pendingRequests, approvedCodeFor, approvedMatch, markAnswered, markAnsweredByEmail, approveRequest, declineRequest,
   declineCount, checkCode, recentRequestCount, normaliseCode, accessStatusFor,

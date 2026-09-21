@@ -148,10 +148,10 @@ module.exports = async (req, res) => {
   ].filter(Boolean).join("\n");
 
   const request = [
-    `<b>✅ To check:</b> the name and email above under Headway Partner ID <code>${PARTNER_ID}</code>.`,
+    `<b>✅ To check:</b> the name and email above under Headway Partner ID <code>${PARTNER_ID}</code>, and that the account has a <b>deposit</b>.`,
     "",
     id
-      ? "Swipe-reply /approve to send them a code, or /decline &lt;reason&gt; to say no."
+      ? "Swipe-reply /approve to send the code · /decline &lt;reason&gt; to say no · /deposit if the account is under us but not funded yet."
       : "⚠️ This one could NOT be recorded, so /approve has nothing to issue a code against — the shalo_ea_requests table is missing. Apply the migration, then ask them to send the form again.",
   ].join("\n");
 
