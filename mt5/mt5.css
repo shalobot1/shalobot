@@ -716,6 +716,12 @@ body.ea-open { overflow: hidden; }
 .click-here { color: var(--blue); font-weight: 800; white-space: nowrap; }
 .mt5-copy.mt5-downloaded { color: var(--blue); border-color: var(--blue); font-weight: 700; }
 .mt5-copy.mt5-downloaded:hover { background: var(--surface-2); }
+/* Sent: green, the tick draws itself, and it stays that way until we answer. */
+.mt5-copy.mt5-downloaded.is-sent, .mt5-copy.mt5-downloaded.is-sent:hover { color: var(--on-accent); background: var(--ok); border-color: var(--ok); cursor: default; }
+.mt5-copy.mt5-downloaded.just-sent { animation: sent-pop .5s cubic-bezier(.2,.9,.3,1.3); }
+.mt5-copy.mt5-downloaded.just-sent svg path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: sent-draw .4s .12s ease forwards; }
+@keyframes sent-pop { 0% { transform: scale(.94); } 55% { transform: scale(1.07); } 100% { transform: scale(1); } }
+@keyframes sent-draw { to { stroke-dashoffset: 0; } }
 .mt5-copy.is-copied { color: var(--on-accent); background: var(--ok); border-color: var(--ok); }
 
 .algo {

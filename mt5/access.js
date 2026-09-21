@@ -347,9 +347,39 @@
   $("eaEdit").addEventListener("click", function () { phase = "form"; set(SENT_KEY, ""); paint(); $("eaName").focus(); });
 
   /* "I have downloaded the EA": one tap sends the words to support, with the
-     whole thread and our record of whether this browser was ever approved. */
+     whole thread and our record of whether this browser was ever approved.
+     Then the button says Sent, in green, and stays that way until we answer:
+     one tap is one message, and ten taps are not ten. The lock survives a
+     reload — it keeps the ids of the replies it had already seen, and a reply
+     it has not seen is what opens the button again. */
+  var DL_LOCK = "shalo_ea_downloaded_lock";
   var dl = $("downloadedBtn");
+  /* Our replies: the ones this page holds, plus whatever is stored — another
+     tab of this browser may have been the one that received the answer. */
+  function replyIds() {
+    var ids = window.SHALO_SUPPORT_REPLY_IDS ? window.SHALO_SUPPORT_REPLY_IDS() : [];
+    try {
+      JSON.parse(get("shalo_support_thread") || "[]").forEach(function (l) {
+        if (l && l.from === "us" && !l.system && l.id && ids.indexOf(l.id) < 0) ids.push(l.id);
+      });
+    } catch (e) {}
+    return ids;
+  }
+  function dlLock() { try { return JSON.parse(get(DL_LOCK) || "null"); } catch (e) { return null; } }
+  function paintDownloaded(justNow) {
+    if (!dl) return;
+    var lock = dlLock(), seen = (lock && lock.seen) || [];
+    var waiting = !!lock && !replyIds().some(function (id) { return seen.indexOf(id) < 0; });
+    if (lock && !waiting) { try { localStorage.removeItem(DL_LOCK); } catch (e) {} }
+    var was = dl.classList.contains("is-sent");
+    dl.disabled = waiting;
+    dl.classList.toggle("is-sent", waiting);
+    if (justNow) { dl.classList.add("just-sent"); setTimeout(function () { dl.classList.remove("just-sent"); }, 900); }
+    // English goes in; the language layer translates whatever is written here.
+    if (waiting !== was) dl.querySelector("span").textContent = waiting ? "Sent" : "I have downloaded the EA";
+  }
   if (dl) dl.addEventListener("click", function () {
+    if (dl.disabled) return;
     if (window.SHALO_SUPPORT_SEND) {
       window.SHALO_SUPPORT_SEND({
         text: T("I have downloaded the EA — please guide me on how to set it up and use it the right way."),
@@ -357,9 +387,18 @@
       });
     }
   });
+  // The words actually went out: lock the button on what we have said so far.
+  window.addEventListener("shalo:support-sent", function (e) {
+    if (!e.detail || e.detail.kind !== "ea-downloaded") return;
+    set(DL_LOCK, JSON.stringify({ at: new Date().toISOString(), seen: replyIds() }));
+    paintDownloaded(true);
+  });
 
   // Our reply landing in the bubble is what unlocks sending again.
-  window.addEventListener("shalo:support-reply", function () { if (!root.hidden) paint(); });
+  window.addEventListener("shalo:support-reply", function () { paintDownloaded(); if (!root.hidden) paint(); });
+  // The same thread in another tab of this browser may be the one that receives our answer.
+  window.addEventListener("storage", function (e) { if (e.key === "shalo_support_thread" || e.key === DL_LOCK) paintDownloaded(); });
+  paintDownloaded();
 
   // /mt5.html#get opens straight onto the sheet, for links that promise the file.
   if (location.hash === "#get") open();

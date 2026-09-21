@@ -221,6 +221,12 @@
     send();
   };
 
+  /** The ids of every answer of ours in the thread — what the page compares
+   *  against to know whether we have replied SINCE something was sent. */
+  window.SHALO_SUPPORT_REPLY_IDS = function () {
+    return state.thread.filter(function (l) { return l.from === "us" && !l.system && l.id; }).map(function (l) { return l.id; });
+  };
+
   /** Details the page already knows beat anything cached here. */
   window.SHALO_SUPPORT_IDENTITY = function (name, email) {
     if (name) { state.name = name; set(NAME_KEY, name); }
@@ -485,11 +491,14 @@
       state.busy = false;
       if (!r.ok) { state.err = r.d.error || "We could not send that just now."; draw(); return; }
       remember({ text: message || "(attachment)", from: "them", sent: true, shot: shot });
+      var kindSent = state.kind;
       state.draft = "";
       state.file = null; state.kind = null;
       state.editWho = false;
       draw();
       schedule();
+      // The page may be waiting to hear that its words actually went out.
+      try { window.dispatchEvent(new CustomEvent("shalo:support-sent", { detail: { kind: kindSent } })); } catch (e) {}
     }).catch(function () {
       state.busy = false;
       state.err = "We could not reach you just now. Try again in a minute.";
