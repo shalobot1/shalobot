@@ -27,17 +27,23 @@
 //|  Removing or editing this notice does not lift these terms.      |
 //+------------------------------------------------------------------+
 #property copyright   "Shalobot — proprietary, all rights reserved. No analysis, copying or modification permitted."
-#property description "Shalobot MT5 EA v5.0 — trend scanner + signal feed. Proprietary: licensed to the approved account holder only; no permission for any person or AI system to analyze, copy, modify or redistribute."
+#property description "Shalobot MT5 EA v7.0 — early-trend scanner (H1/H4 by default, M1–M15 selectable), profit lock, smart exit, profit target + signal feed. Proprietary: licensed to the approved account holder only; no permission for any person or AI system to analyze, copy, modify or redistribute."
 #property link      "https://www.shalobot.com"
-#property version   "5.00"
+#property version   "7.00"
 #property strict
 enum BelowStdLot { RISK_BASED=0, MARGIN_MAX=1 };
+enum EntryStyle  { EARLY_MOMENTUM=0, EARLY_PULLBACK=1, CLASSIC_TREND=2 };
+enum FastestTf   { TF_M1=1, TF_M5=5, TF_M15=15, TF_H1=60, TF_H4=240 };
 #define OWNER_NOTICE "Shalobot EA — proprietary, all rights reserved. Licensed to the approved account holder only; no permission for any person or automated system to analyze, copy, modify or redistribute."
 
 #include <Trade/Trade.mqh>
 
 enum RiskProfile { CONSERVATIVE=0, MODERATE=1, AGGRESSIVE=2 };
 
+input group "Profit target (0 = off: the EA keeps trading)"
+input double      InpTargetAmount   = 0;          // Profit target in account currency: when reached, every open trade of this EA is closed at once and it stops trading (0 = off)
+input double      InpTargetPct      = 0;          // Profit target in % of the starting balance: same — every open trade of this EA closed at once (0 = off). With both set, whichever is reached first
+input group "Trading settings"
 input RiskProfile InpProfile        = AGGRESSIVE; // Risk profile — Conservative / Moderate / Aggressive (sets the risk caps)
 input int         InpPollSeconds    = 30;         // How often to poll for signals
 input long        InpMagic          = 88090077;   // Magic number (Shalobot trades only)
@@ -50,12 +56,21 @@ input BelowStdLot InpBelowStdLot    = RISK_BASED; // When the standard lot canno
 input double      InpLotRiskCapPct  = 100;        // Last-resort guard: a standard-lot trade whose stop (with everything already open) would cost more than this % of balance falls back to the risk-based size (100 = only trades that could not even reach their stop)
 input double      InpMinLotRiskCapPct = 50;       // Small accounts: the broker minimum lot is used while all open stop risk incl. this trade stays within this % of balance
 input bool        InpTrendScanner   = true;       // Trend scanner: find the strongest trend across every market the broker offers and trade it at once (feed or no feed)
-input int         InpTrendMaxOpen   = 6;          // Trend-scanner trades open at once — the six best trends (one per market)
+input int         InpTrendMaxOpen   = 6;          // Maximum trades open at once — you choose (default 6). Every trade of this EA counts: trend scanner, signal feed and adds
 input string      InpScanFilter     = "";         // Scan only markets whose Market Watch path or name contains one of these comma-separated terms, e.g. Forex,Crypto,Indices (blank = every market)
 input bool        InpEnableTrailing = true;       // Trail the stop as price advances
 input bool        InpEnablePartials = true;       // Bank partial profits at the ladder
 input bool        InpEnablePyramid  = true;       // Add to winners (needs a hedging account)
 input bool        InpTradingEnabled = true;       // Master on/off switch
+input EntryStyle  InpEntryStyle     = EARLY_PULLBACK; // Entry: EARLY_PULLBACK = a young trend on its first dip back to the trend line (tested best) · EARLY_MOMENTUM = young trends as they break out · CLASSIC_TREND = the v5 rule (M15+H1)
+input FastestTf   InpFastestTf      = TF_H1;      // Fastest timeframe the EA may trade on: it trades that one and the next ones up (to H4), reading them itself whatever the chart's timeframe. H1 tested best; M1/M5/M15 can be chosen
+input double      InpStopAtr        = 3.5;        // Stop distance in ATRs of the trade's own timeframe
+input double      InpMaxTradeRiskPct = 5;         // One trade's stop may cost at most this % of the balance: the standard lot is used when it fits, otherwise the biggest lot that does (100 = no cap)
+input bool        InpProfitLock     = true;       // Profit lock: once a trade is genuinely in profit it can no longer turn into a loss, and it is closed near its best
+input double      InpLockStartR     = 2.0;        // The lock starts once a trade has made this many stop distances (2.0 = twice its stop): it then can no longer lose
+input double      InpGivebackPct    = 50;         // A locked winner is closed once it gives back this % of its best profit
+input bool        InpSmartExit      = true;       // Smart exit: close a trade before its stop or target when its trend turns or fades
+input int         InpMaxPerCurrency = 3;          // Diversify: at most this many open trend trades leaning on one currency (0 = no limit)
 
 // One parsed signal line from the feed.
 struct Sig
@@ -83,15 +98,49 @@ int OnInit()
    g_maxOpenRisk = GVget("ev_capmax"+AcctSuffix(), 0);
    g_corrCap     = GVget("ev_capcorr"+AcctSuffix(), 0);
 
-   EventSetTimer(MathMax(5, InpPollSeconds));
+   EventSetTimer(1);                               // v7: trades are watched every second; the market scan runs every InpPollSeconds
    Print(OWNER_NOTICE);
-   PrintFormat("Shalobot MT5 EA v5.0 started — profile=%s · preferred lot %.2f (risk-based when the account cannot carry it) · trend scanner %s · signal feed: forex, metals and crypto (needs https://www.shalobot.com in Tools > Options > Expert Advisors > WebRequest; without it the trend scanner trades on its own).", ProfileStr(), InpStandardLot, InpTrendScanner ? "ON" : "off");
-   Poll();
+   PrintFormat("Shalobot MT5 EA v7.0 started — profile=%s · preferred lot %.2f (risk-based when the account cannot carry it) · trend scanner %s · signal feed: forex, metals and crypto (needs https://www.shalobot.com in Tools > Options > Expert Advisors > WebRequest; without it the trend scanner trades on its own).", ProfileStr(), InpStandardLot, InpTrendScanner ? "ON" : "off");
+   PrintFormat("v7: every market read on its own bars from %s up (whatever the chart timeframe) · %s entries · up to %d trend trades · one stop at most %.0f%% of the balance · profit lock %s (from %.1fR, max give-back %.0f%%) · smart exit %s · profit target %s",
+               InpFastestTf == TF_M1 ? "M1" : InpFastestTf == TF_M5 ? "M5" : InpFastestTf == TF_M15 ? "M15" : InpFastestTf == TF_H1 ? "H1" : "H4",
+               InpEntryStyle == EARLY_PULLBACK ? "early-pullback" : InpEntryStyle == EARLY_MOMENTUM ? "early-momentum" : "classic",
+               InpTrendMaxOpen, InpMaxTradeRiskPct, InpProfitLock ? "ON" : "off", InpLockStartR, InpGivebackPct, InpSmartExit ? "ON" : "off",
+               (InpTargetAmount > 0 || InpTargetPct > 0) ? "ON" : "off (trades without stopping)");
+   g_isLeader = InstanceLead();                    // one copy per account: a copy on a second chart stays idle
+   if(g_isLeader) { TargetInit(); Poll(); }
+   else SayIdle();
+   g_lastPoll = TimeCurrent();
    return(INIT_SUCCEEDED);
   }
 
-void OnDeinit(const int reason) { EventKillTimer(); }
-void OnTimer() { Poll(); }
+void OnDeinit(const int reason)
+  {
+   EventKillTimer();
+   if(!g_isLeader) { Comment(""); return; }           // an idle copy owns nothing
+   // removed from the chart (or its chart closed): the next attach starts a new profit target
+   if(reason == REASON_REMOVE || reason == REASON_CHARTCLOSE) TargetClear();
+   // leaving for good: another copy may take over at once (new settings or a recompile keep the lead on this chart)
+   if(reason != REASON_PARAMETERS && reason != REASON_CHARTCHANGE && reason != REASON_RECOMPILE) InstanceRelease();
+  }
+void OnTimer()
+  {
+   if(!InpTradingEnabled) return;
+   // one copy per account: a copy on a second chart stays idle (it would open and manage every trade twice)
+   if(!InstanceLead()) { g_isLeader = false; SayIdle(); return; }
+   if(!g_isLeader)                                    // the other copy went away: this one takes over
+     {
+      g_isLeader = true; g_saidIdle = false;
+      PrintFormat("Shalobot: this copy now runs the account (the other copy stopped).");
+      TargetInit(); g_lastPoll = 0;
+     }
+   TargetCheck();                                     // the profit target, every second
+   if(!g_targetDone)
+     {
+      ManageFast();                                   // the profit lock, every second
+      if(InpSmartExit && TimeCurrent() - g_lastSmart >= 10) { g_lastSmart = TimeCurrent(); SmartExits(); }
+     }
+   if(TimeCurrent() - g_lastPoll >= MathMax(5, InpPollSeconds)) { g_lastPoll = TimeCurrent(); Poll(); }
+  }
 
 //+------------------------------------------------------------------+
 //| Strategy-Tester optimization criterion (for "Custom max").       |
@@ -118,6 +167,7 @@ void OnTradeTransaction(const MqlTradeTransaction &trans, const MqlTradeRequest 
    if(trans.type!=TRADE_TRANSACTION_DEAL_ADD) return;
    if(trans.deal==0 || !HistoryDealSelect(trans.deal)) return;
    if(HistoryDealGetInteger(trans.deal, DEAL_MAGIC)!=InpMagic) return;
+   TargetOnDeal(trans.deal);                          // v7: every closed deal counts toward the profit target
    if(HistoryDealGetInteger(trans.deal, DEAL_ENTRY)!=DEAL_ENTRY_OUT) return;
    StampCooldown(HistoryDealGetString(trans.deal, DEAL_SYMBOL));
   }
@@ -174,15 +224,18 @@ void Poll()
    bool stale = (g_feedTs > 0 && (TimeGMT() - (datetime)g_feedTs) > 180);
 
    AttachMissingPlans(sigs, nSigs);            // heal any position that missed its plan
+   AdoptOrphans();                             // v7: a trend trade whose order answer never came back is counted and managed
+   g_uncertain = false;
    ManagePositions();                          // trail + partials (always)
-   TrendScan(g_firstPoll); g_firstPoll = false;            // the strongest trend on the broker, traded at once
-   if(!stale) DoPyramiding(sigs, nSigs);   // add to winners (hedging only)
-   if(!stale) for(int i=0;i<nSigs;i++) OpenBase(sigs[i]);
+   if(!g_targetDone) TrendScan(g_firstPoll); g_firstPoll = false;            // the strongest trend on the broker, traded at once
+   if(!stale && !g_targetDone) DoPyramiding(sigs, nSigs);   // add to winners (hedging only)
+   if(!stale && !g_targetDone) for(int i=0;i<nSigs;i++) OpenBase(sigs[i]);
    CleanupPlans();                             // drop plans for closed tickets
+   CleanupLockGVs();                           // v7: and their lock bookkeeping
 
    string feedFlag = (body=="") ? " · feed off (WebRequest) — trend scanner only" : (g_maxOpenRisk<=0 ? " · CAPS PENDING (feed entries wait)" : "");
-   Comment(StringFormat("Shalobot MT5 v5.0 · %s · %d signals · %s%s%s · %s",
-           ProfileStr(), nSigs, TimeToString(TimeCurrent(), TIME_SECONDS), feedFlag, stale?" · STALE FEED":"", g_trendNote));
+   Comment(StringFormat("Shalobot MT5 v7.0 · %s · %d signals · %s%s%s · %s",
+           ProfileStr(), nSigs, TimeToString(TimeCurrent(), TIME_SECONDS), feedFlag, stale?" · STALE FEED":"", g_trendNote + g_targetNote));
   }
 
 //+------------------------------------------------------------------+
@@ -237,6 +290,9 @@ void OpenBase(Sig &s)
    if(!SymbolSelect(sym, true)) return;
    if(HasOpenPosition(sym)) return;
    if(OnCooldown(sym)) return;
+   if(g_uncertain || IsReserved(sym)) return;                      // v7: an order here may still be filled
+   if(CountOurOpen() >= InpTrendMaxOpen) return;                   // v7: the maximum counts every trade of this EA
+   if(!InstanceLead()) return;
    if(!OpenRiskOk(s.clu, s.risk)) return;
 
    double ask=SymbolInfoDouble(sym,SYMBOL_ASK), bid=SymbolInfoDouble(sym,SYMBOL_BID);
@@ -265,12 +321,17 @@ void OpenBase(Sig &s)
       PrintFormat("Shalobot %s %s %.2f lots @ %s SL %s TP %s", s.side, sym, lots,
                   DoubleToString(price,d), DoubleToString(s.sl,d), DoubleToString(s.tp,d));
      }
-   else PrintFormat("Shalobot order failed %s %s: %d", s.side, sym, g_trade.ResultRetcode());
+   else
+     {
+      PrintFormat("Shalobot order failed %s %s: %d", s.side, sym, g_trade.ResultRetcode());
+      if(UncertainRc(g_trade.ResultRetcode())) { Reserve(sym, 1); StampCooldown(sym); g_uncertain = true; }   // v7: no clear answer — held, never sent twice
+     }
   }
 
 void DoPyramiding(Sig &sigs[], int n)
   {
    if(!InpEnablePyramid) return;
+   if(g_uncertain || !InstanceLead()) return;
    if((ENUM_ACCOUNT_MARGIN_MODE)AccountInfoInteger(ACCOUNT_MARGIN_MODE) != ACCOUNT_MARGIN_MODE_RETAIL_HEDGING) return;
 
    for(int k=0;k<n;k++)
@@ -301,6 +362,8 @@ void DoPyramiding(Sig &sigs[], int n)
       double stopsLvl=(double)SymbolInfoInteger(sym,SYMBOL_TRADE_STOPS_LEVEL)*point;
       if(MathAbs(price-sigs[k].sl) < MathMax(InpMinStopPoints*point, stopsLvl)) continue;
 
+      if(CountOurOpen() >= InpTrendMaxOpen) return;                // v7: the maximum counts every trade of this EA
+      int had = OurPositionsOn(sym);
       double lots=LotsForRisk(sym, price, sigs[k].sl, apct);
       if(lots<=0) continue;
 
@@ -313,6 +376,8 @@ void DoPyramiding(Sig &sigs[], int n)
          BindPlan(sigs[k], lots, MathMax(apct, RiskPctOf(sym, price, sigs[k].sl, lots)));
          PrintFormat("Shalobot ADD #%d %s %s %.2f lots", done+1, sigs[k].side, sym, lots);
         }
+      else if(UncertainRc(g_trade.ResultRetcode()))                // v7: no clear answer — counted as sent (never sent twice), its slot held
+        { GVset("ev_add_"+sym, done+1); Reserve(sym, had+1); g_uncertain = true; return; }
      }
   }
 
@@ -460,6 +525,7 @@ void DeleteTicketGVs(ulong tk)
    string T=(string)tk;
    GlobalVariableDel("ev_trail_"+T); GlobalVariableDel("ev_ov_"+T); GlobalVariableDel("ev_np_"+T);
    GlobalVariableDel("ev_pf_"+T);    GlobalVariableDel("ev_risk_"+T); GlobalVariableDel("ev_clu_"+T); GlobalVariableDel("ev_tr_"+T);
+   GlobalVariableDel("ev_pk_"+T); GlobalVariableDel("ev_r0_"+T); GlobalVariableDel("ev_tf_"+T); GlobalVariableDel("ev_cm_"+T); GlobalVariableDel("ev_lk_"+T); GlobalVariableDel("ev_lf_"+T);
    for(int i=0;i<8;i++) { GlobalVariableDel("ev_pp_"+T+"_"+(string)i); GlobalVariableDel("ev_pc_"+T+"_"+(string)i); }
   }
 
@@ -559,21 +625,23 @@ void StampCooldown(string sym) { GlobalVariableSet(GVKey(sym), (double)TimeCurre
 //+------------------------------------------------------------------+
 //| Trend scanner — the strongest trend on the whole broker, at once |
 //|                                                                   |
-//| Scores every market the broker offers (forex, metals, stocks,    |
-//| crypto, indices, energies, ...) on M15 + H1: the EMA 8/21/55     |
-//| stacks must agree, ADX14 measures strength, the efficiency ratio |
-//| rewards clean trends and fresh alignments rank ahead of old ones |
-//| (catch it early). The best market is traded in the trend's       |
-//| direction straight away — no signal, no feed, no wait — with the |
-//| preferred standard lot when the account can carry it. The usual  |
-//| management (stop, target, trailing, partials) runs on it.         |
+//| Reads every market the broker offers (forex, metals, stocks,     |
+//| crypto, indices, energies, synthetics ...) on M1, M5 and M15,     |
+//| with H1 as the bigger picture — whatever chart the EA is on. The  |
+//| strongest YOUNG trends win the slots, one per market, and are     |
+//| traded straight away in the trend's direction — no signal, no     |
+//| feed, no wait — with the preferred standard lot when the account  |
+//| can carry it. Every trade is then watched every second: profit    |
+//| lock, smart exit, trailing and partials.                          |
 //+------------------------------------------------------------------+
-struct TrendCand { string sym; int dir; double score, atr, adx15, adx60; };
+struct TrendCand { string sym; int dir; double score, atr, adx15, adx60; int tf; double r2; };
 
 string   g_scan[];            // the universe: every tradable symbol the broker offers
 double   g_scanScore[];       // cached score per symbol (0 = not trending / not scored yet)
 int      g_scanDir[];
 double   g_scanAtr[], g_scanAdx15[], g_scanAdx60[];
+int      g_scanTf[];            // v7: the timeframe each market is best read on
+double   g_scanR2[];
 datetime g_scanWhen[];
 int      g_scanN = 0, g_scanPos = 0, g_scanScored = 0;
 datetime g_universeAt = 0;
@@ -617,8 +685,10 @@ void BuildUniverse()
    g_scanN = ArraySize(g_scan);
    ArrayResize(g_scanScore, g_scanN); ArrayResize(g_scanDir, g_scanN); ArrayResize(g_scanAtr, g_scanN);
    ArrayResize(g_scanAdx15, g_scanN); ArrayResize(g_scanAdx60, g_scanN); ArrayResize(g_scanWhen, g_scanN);
+   ArrayResize(g_scanTf, g_scanN); ArrayResize(g_scanR2, g_scanN);
    ArrayInitialize(g_scanScore, 0); ArrayInitialize(g_scanDir, 0); ArrayInitialize(g_scanAtr, 0);
    ArrayInitialize(g_scanAdx15, 0); ArrayInitialize(g_scanAdx60, 0); ArrayInitialize(g_scanWhen, 0);
+   ArrayInitialize(g_scanTf, 0); ArrayInitialize(g_scanR2, 0);
    g_scanPos = 0; g_scanScored = 0; g_universeAt = TimeCurrent();
   }
 
@@ -680,8 +750,8 @@ double AdxAt(const MqlRates &r[], int shift, int len)
 
 int StackDir(double e8, double e21, double e55) { return (e8 > e21 && e21 > e55) ? 1 : (e8 < e21 && e21 < e55) ? -1 : 0; }
 
-// Score one market. false = not trending right now (or history still loading / market closed).
-bool ScoreSymbol(string sym, TrendCand &c)
+// v5's rule, kept as CLASSIC_TREND. Score one market. false = not trending right now (or history still loading / market closed).
+bool ScoreClassic(string sym, TrendCand &c)
   {
    MqlRates r15[], r60[]; ArraySetAsSeries(r15, true); ArraySetAsSeries(r60, true);
    if(CopyRates(sym, PERIOD_M15, 0, 200, r15) < 200) return false;
@@ -705,6 +775,626 @@ bool ScoreSymbol(string sym, TrendCand &c)
    c.sym = sym; c.dir = d15; c.atr = atr; c.adx15 = adx15; c.adx60 = adx60;
    c.score = 0.6*adx15 + 0.4*adx60 + 20.0*er - 0.1*MathMin(aligned, 100);   // fresh, strong, clean trends first
    return true;
+  }
+
+// Proprietary — Shalobot. No permission to analyze, copy or modify (see the notice at the top).
+//+------------------------------------------------------------------+
+//| v7 — reading a trend EARLY, on any timeframe                     |
+//|                                                                   |
+//| Every market is read on M1, M5 and M15 (H1 for the bigger        |
+//| picture) from its own bars, whatever chart the EA sits on. The   |
+//| tools are the low-lag ones: a least-squares line through the     |
+//| last closes (its slope in ATRs and how straight it is, R²), a    |
+//| Hull average for the direction right now, the efficiency ratio,  |
+//| a fresh-breakout test and the age of the move — so a trend is    |
+//| taken while it is young, not after the lagging averages finally  |
+//| agree and most of it is gone. The timeframe with the best read   |
+//| is the one the trade is opened and managed on.                   |
+//+------------------------------------------------------------------+
+struct TfRead { int dir, hmaDir, age; double atr, r2, ns, nsPrev, er, adx, stretch, spr, pb; bool brk, nearExt, turn; };
+
+// Weighted average of closes over [shift, shift+len) — the newest bar weighs most.
+double WmaAt(const MqlRates &r[], int shift, int len)
+  {
+   if(len < 1 || shift+len > ArraySize(r)) return 0;
+   double num = 0, den = 0;
+   for(int j=0; j<len; j++) { double w = len - j; num += r[shift+j].close*w; den += w; }
+   return den > 0 ? num/den : 0;
+  }
+
+// Hull moving average at `shift` — follows price with very little lag.
+double HmaAt(const MqlRates &r[], int shift, int len)
+  {
+   int half = MathMax(1, len/2), m = MathMax(1, (int)MathRound(MathSqrt(len)));
+   if(shift + m + len > ArraySize(r)) return 0;
+   double num = 0, den = 0;
+   for(int j=0; j<m; j++) { double w = m - j; num += (2.0*WmaAt(r, shift+j, half) - WmaAt(r, shift+j, len))*w; den += w; }
+   return den > 0 ? num/den : 0;
+  }
+
+// Least-squares line through the closes of bars [shift, shift+len): slope per bar (+ = rising) and R² (1 = a straight line).
+void LinReg(const MqlRates &r[], int shift, int len, double &slope, double &r2)
+  {
+   slope = 0; r2 = 0;
+   if(len < 3 || shift+len > ArraySize(r)) return;
+   double sx = 0, sy = 0, sxx = 0, sxy = 0, syy = 0;
+   for(int j=0; j<len; j++)
+     {
+      double x = len-1-j, y = r[shift+j].close;                    // x grows toward the newest bar
+      sx += x; sy += y; sxx += x*x; sxy += x*y; syy += y*y;
+     }
+   double n = len, vx = n*sxx - sx*sx, vy = n*syy - sy*sy, cov = n*sxy - sx*sy;
+   if(vx <= 0) return;
+   slope = cov/vx;
+   r2 = (vy > 0) ? (cov*cov)/(vx*vy) : 0;
+  }
+
+string TfName(int tf) { return tf==PERIOD_M1 ? "M1" : tf==PERIOD_M5 ? "M5" : tf==PERIOD_M15 ? "M15" : tf==PERIOD_H1 ? "H1" : tf==PERIOD_H4 ? "H4" : tf==PERIOD_D1 ? "D1" : "TF"+(string)tf; }
+
+// Read one market on one timeframe, from its CLOSED bars (the live price only for costs).
+bool ReadTf(string sym, ENUM_TIMEFRAMES tf, TfRead &o)
+  {
+   ZeroMemory(o);
+   MqlRates r[]; ArraySetAsSeries(r, true);
+   if(CopyRates(sym, tf, 0, 130, r) < 130) return false;
+   if(TimeCurrent() - r[0].time > 2*PeriodSeconds(tf) + 600) return false;   // not quoting on this timeframe right now
+   o.atr = AtrAt(r, 1, 14);
+   if(o.atr <= 0) return false;
+   double slope = 0, r2 = 0, sp = 0, r2p = 0;
+   LinReg(r, 1, 20, slope, r2);
+   LinReg(r, 11, 20, sp, r2p);
+   o.r2 = r2;
+   o.ns = slope*19.0/o.atr;                                        // how many ATRs the fitted line climbed over 20 bars
+   o.nsPrev = sp*19.0/o.atr;                                       // the same, ten bars earlier: is the move speeding up?
+   o.dir = (o.ns > 0) ? 1 : (o.ns < 0 ? -1 : 0);
+   double h1 = HmaAt(r, 1, 16), h3 = HmaAt(r, 3, 16);
+   o.hmaDir = (MathAbs(h1 - h3) < 0.05*o.atr) ? 0 : (h1 > h3 ? 1 : -1);
+   double net = MathAbs(r[1].close - r[21].close), path = 0;
+   for(int i=1; i<=20; i++) path += MathAbs(r[i].close - r[i+1].close);
+   o.er = (path > 0) ? net/path : 0;
+   o.adx = AdxAt(r, 1, 14);
+   double e8[], e21[]; EmaSeries(r, 8, e8); EmaSeries(r, 21, e21);
+   o.age = 0;                                                      // bars since the fast average crossed into this direction
+   if(o.dir != 0) for(int k=1; k<100; k++) { if((e8[k] - e21[k])*o.dir <= 0) break; o.age++; }
+   o.stretch = (r[1].close - e21[1])/o.atr*o.dir;                  // how far price already ran from its trend line
+   // the pullback: how close the last three bars came back to the trend line (0 = touched it)
+   o.pb = 9.9;
+   if(o.dir != 0) for(int k=1; k<=3; k++) o.pb = MathMin(o.pb, (o.dir > 0 ? r[k].low - e21[k] : e21[k] - r[k].high)/o.atr);
+   o.turn = (o.dir > 0) ? (r[1].close > r[2].close && r[1].close > r[1].open) : (o.dir < 0 ? (r[1].close < r[2].close && r[1].close < r[1].open) : false);
+   double hi = r[2].high, lo = r[2].low;
+   for(int i=3; i<=21; i++) { hi = MathMax(hi, r[i].high); lo = MathMin(lo, r[i].low); }
+   o.brk = (o.dir > 0) ? (r[1].close > hi) : (o.dir < 0 ? (r[1].close < lo) : false);
+   int hiAt = 1, loAt = 1; double h30 = r[1].high, l30 = r[1].low;
+   for(int i=2; i<=30; i++) { if(r[i].high > h30) { h30 = r[i].high; hiAt = i; } if(r[i].low < l30) { l30 = r[i].low; loAt = i; } }
+   o.nearExt = (o.dir > 0) ? (hiAt <= 3) : (o.dir < 0 ? (loAt <= 3) : false);
+   double ask = SymbolInfoDouble(sym, SYMBOL_ASK), bid = SymbolInfoDouble(sym, SYMBOL_BID), pt = SymbolInfoDouble(sym, SYMBOL_POINT);
+   double spd = (ask > 0 && bid > 0) ? ask - bid : 0;
+   // a market not shown in Market Watch has no live quote here: its bars carry its spread, so it is read too
+   // (the entry selects it and re-checks the live price before any order)
+   if(spd <= 0 && pt > 0) spd = MathMax(r[0].spread, r[1].spread)*pt;
+   o.spr = (spd > 0) ? spd/o.atr : 9.9;
+   return true;
+  }
+
+// How good a trade this read is (0 = not one). Deliberately lenient: it asks for a real, young,
+// payable trend and then RANKS — the best markets on the broker win the slots, nothing waits.
+double TfScore(const TfRead &o)
+  {
+   if(o.dir == 0 || o.hmaDir != o.dir) return 0;                   // the fast line must lean the same way
+   if(o.r2 < 0.25 || MathAbs(o.ns) < 0.6) return 0;                // a trend, not noise
+   if(o.stretch > 4.5 || o.spr > 0.6 || o.adx < 12) return 0;      // not a spike already spent; costs payable
+   double s = 35.0*o.r2 + 10.0*MathMin(MathAbs(o.ns), 5.0) + 15.0*o.er + 0.25*o.adx;
+   if(o.brk) s += 8;
+   if(o.nearExt) s += 4;
+   if(o.age <= 2) s += 4; else if(o.age <= 15) s += 10; else if(o.age <= 40) s += 5;
+   double acc = (o.ns - o.nsPrev)*o.dir;                           // speeding up in its own direction
+   s += (acc > 0) ? MathMin(acc, 2.0)*3.0 : MathMax(acc, -2.0)*2.0;
+   if(o.stretch > 2.5) s -= (o.stretch - 2.5)*6.0;
+   s -= 25.0*o.spr;
+   return s > 0 ? s : 0;
+  }
+
+// The pullback entry: a young, clean trend whose price has just come back to its trend line
+// and closed the last bar turning with it again — in early, with the stop behind the dip.
+double TfScorePullback(const TfRead &o)
+  {
+   if(o.dir == 0) return 0;
+   if(o.r2 < 0.3 || MathAbs(o.ns) < 0.8 || o.adx < 15 || o.spr > 0.5) return 0;   // a real trend, payable costs
+   if(o.pb > 0.35 || o.stretch > 1.5 || o.stretch < -0.8) return 0;               // back at the trend line, not broken through it
+   if(!o.turn) return 0;                                                          // and turning with the trend again
+   double s = 35.0*o.r2 + 8.0*MathMin(MathAbs(o.ns), 5.0) + 12.0*o.er + 0.25*o.adx + 5.0*(1.5 - MathMax(o.stretch, 0.0));
+   if(o.age <= 40) s += 8; else if(o.age <= 80) s += 3;
+   if(o.hmaDir == o.dir) s += 5;
+   s -= 25.0*o.spr;
+   return s > 0 ? s : 0;
+  }
+
+// Score one market: its best timeframe of M1, M5 and M15. false = nothing worth trading there now.
+bool ScoreSymbol(string sym, TrendCand &c)
+  {
+   if(InpEntryStyle == CLASSIC_TREND)                              // the v5 rule, kept: M15 + H1 averages agree, ADX 21+
+     {
+      bool okc = ScoreClassic(sym, c);
+      c.tf = PERIOD_M15; c.r2 = 0;
+      return okc;
+     }
+   c.sym = sym; c.dir = 0; c.score = 0; c.atr = 0; c.adx15 = 0; c.adx60 = 0; c.tf = 0; c.r2 = 0;
+   ENUM_TIMEFRAMES L[6] = {PERIOD_M1, PERIOD_M5, PERIOD_M15, PERIOD_H1, PERIOD_H4, PERIOD_D1};
+   int first = 0;
+   while(first < 4 && PeriodSeconds(L[first])/60 < (int)InpFastestTf) first++;   // nothing faster than the fastest allowed
+   int last = MathMin(first + 2, 4);                               // three execution timeframes at most; the slowest is H4
+   TfRead rd[6]; bool ok[6];
+   for(int i=0; i<6; i++) { ok[i] = false; ZeroMemory(rd[i]); }
+   bool any = false;
+   for(int i=first; i<=MathMin(last + 2, 5); i++) { ok[i] = ReadTf(sym, L[i], rd[i]); if(i <= last && ok[i]) any = true; }
+   if(!any) return false;
+   for(int t=first; t<=last; t++)
+     {
+      if(!ok[t]) continue;
+      double s = (InpEntryStyle == EARLY_PULLBACK) ? TfScorePullback(rd[t]) : TfScore(rd[t]);
+      if(s <= 0) continue;
+      int dir = rd[t].dir, u = t + 1, b = t + 2;
+      // the next timeframe up clearly against it: that is a pullback, not a trend
+      if(u <= 5 && ok[u] && rd[u].dir == -dir && rd[u].r2 >= 0.4 && MathAbs(rd[u].ns) >= 1.0) continue;
+      if(u <= 5 && ok[u] && rd[u].dir == dir && rd[u].hmaDir == dir) s += 6;
+      // the bigger picture, two timeframes up, behind it (or clearly against it)
+      if(b <= 5 && ok[b] && rd[b].dir == dir && rd[b].r2 >= 0.3) s += 6;
+      else if(b <= 5 && ok[b] && rd[b].dir == -dir && rd[b].r2 >= 0.5 && MathAbs(rd[b].ns) >= 1.5) s -= 10;
+      if(L[t] == PERIOD_M1) s -= 4;                                // a one-minute trend has to earn the slot (noise, costs)
+      if(s > c.score)
+        {
+         c.score = s; c.dir = dir; c.atr = rd[t].atr; c.adx15 = rd[t].adx; c.adx60 = (b <= 5 && ok[b]) ? rd[b].adx : 0;
+         c.tf = (int)L[t]; c.r2 = rd[t].r2;
+        }
+     }
+   return c.score > 0;
+  }
+
+// Diversify: no more than InpMaxPerCurrency open trend trades leaning on one currency.
+bool CurrencyRoomOk(string sym, int dir)
+  {
+   if(InpMaxPerCurrency <= 0) return true;
+   string b = SymbolInfoString(sym, SYMBOL_CURRENCY_BASE), q = SymbolInfoString(sym, SYMBOL_CURRENCY_PROFIT);
+   if(b == "" || q == "" || b == q) return true;
+   int eb = 0, eq = 0;
+   for(int i=PositionsTotal()-1; i>=0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk==0 || PositionGetInteger(POSITION_MAGIC)!=InpMagic || !IsTrendTicket(tk)) continue;
+      string s = PositionGetString(POSITION_SYMBOL);
+      string pb = SymbolInfoString(s, SYMBOL_CURRENCY_BASE), pq = SymbolInfoString(s, SYMBOL_CURRENCY_PROFIT);
+      if(pb == "" || pb == pq) continue;
+      int d = (PositionGetInteger(POSITION_TYPE)==POSITION_TYPE_BUY) ? 1 : -1;
+      if(pb == b) eb += d;
+      if(pq == b) eb -= d;
+      if(pb == q) eq += d;
+      if(pq == q) eq -= d;
+     }
+   if(MathAbs(eb + dir) > InpMaxPerCurrency || MathAbs(eq - dir) > InpMaxPerCurrency)
+     {
+      NoteSkip(sym, StringFormat("already %d trades lean on %s / %d on %s — diversifying into another market", MathAbs(eb), b, MathAbs(eq), q));
+      return false;
+     }
+   return true;
+  }
+
+// Proprietary — Shalobot. No permission to analyze, copy or modify (see the notice at the top).
+//+------------------------------------------------------------------+
+//| v7 — profit lock: a winner is never allowed to become a loser    |
+//|                                                                   |
+//| Every second each open trade is checked against its best profit  |
+//| so far. Once it is genuinely in profit its stop goes to entry    |
+//| plus costs (it can no longer lose), and as the profit grows a    |
+//| growing share of the best profit is locked. If price comes back  |
+//| to that line the EA closes at once; the same line is set as the  |
+//| broker stop so it holds with the terminal off.                   |
+//+------------------------------------------------------------------+
+double NormTick(string sym, double p)
+  {
+   double ts = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_SIZE);
+   int d = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+   if(ts > 0) p = MathRound(p/ts)*ts;
+   return NormalizeDouble(p, d);
+  }
+
+// The round-trip commission of the selected position, as a price distance (0 when there is none).
+double CommissionDist(ulong tk, string sym)
+  {
+   string k = "ev_cm_"+(string)tk;
+   if(GlobalVariableCheck(k)) return GlobalVariableGet(k);
+   double comm = 0, inVol = 0;
+   long posId = PositionGetInteger(POSITION_IDENTIFIER);
+   if(HistorySelectByPosition(posId))
+      for(int i=0; i<HistoryDealsTotal(); i++)
+        {
+         ulong d = HistoryDealGetTicket(i);
+         if(d == 0 || HistoryDealGetInteger(d, DEAL_ENTRY) != DEAL_ENTRY_IN) continue;
+         comm += MathAbs(HistoryDealGetDouble(d, DEAL_COMMISSION)); inVol += HistoryDealGetDouble(d, DEAL_VOLUME);
+        }
+   double tv = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_VALUE), ts = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_SIZE);
+   double dist = (comm > 0 && inVol > 0 && tv > 0 && ts > 0) ? 2.0*comm/(inVol*tv/ts) : 0;
+   GlobalVariableSet(k, dist);
+   return dist;
+  }
+
+void LockProfit(ulong tk)
+  {
+   if(!PositionSelectByTicket(tk)) return;
+   string T = (string)tk, sym = PositionGetString(POSITION_SYMBOL);
+   bool buy = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY);
+   double entry = PositionGetDouble(POSITION_PRICE_OPEN), sl = PositionGetDouble(POSITION_SL), tp = PositionGetDouble(POSITION_TP);
+   double bid = SymbolInfoDouble(sym, SYMBOL_BID), ask = SymbolInfoDouble(sym, SYMBOL_ASK), point = SymbolInfoDouble(sym, SYMBOL_POINT);
+   if(bid <= 0 || ask <= 0 || point <= 0) return;
+   // R — the trade's own first stop distance
+   double r0 = GVget("ev_r0_"+T, 0);
+   if(r0 <= 0)
+     {
+      if(sl > 0 && (buy ? sl < entry : sl > entry)) r0 = MathAbs(entry - sl);
+      else { MqlRates r[]; ArraySetAsSeries(r, true); r0 = (CopyRates(sym, PERIOD_M15, 0, 60, r) >= 60) ? 2.0*AtrAt(r, 1, 14) : 0; }
+      if(r0 <= 0) return;
+      GVset("ev_r0_"+T, r0);
+     }
+   double p = buy ? bid - entry : entry - ask;                     // open profit as a price distance, after the spread
+   double pk = GVget("ev_pk_"+T, 0);
+   if(p > pk) { pk = p; GVset("ev_pk_"+T, pk); }
+   double spread = ask - bid;
+   if(pk < InpLockStartR*r0 || pk < 2.0*spread) return;            // not genuinely in profit yet
+   double keepBE = CommissionDist(tk, sym) + 0.1*spread + 2.0*point;   // entry + costs: the trade can no longer lose
+   if(!PositionSelectByTicket(tk)) return;                         // re-select after the history lookup
+   if(keepBE >= 0.8*pk) return;                                    // not enough profit yet to lock anything real
+   double g = MathMin(MathMax(InpGivebackPct, 5.0), 90.0)/100.0;
+   double pkR = pk/r0, frac = 0;
+   if(pkR >= 3.0)      frac = 1.0 - 0.8*g;
+   else if(pkR >= 2.0) frac = 1.0 - g;
+   else if(pkR >= 1.2) frac = MathMin(0.55, 1.0 - g);
+   else if(pkR >= 0.8) frac = MathMin(0.35, 1.0 - g);
+   double lock = MathMax(keepBE, frac*pk);
+   int stage = (frac <= 0) ? 1 : (int)MathRound(frac*100.0);
+   if((int)GVget("ev_lk_"+T, 0) != stage)
+     {
+      GVset("ev_lk_"+T, stage);
+      PrintFormat("Shalobot LOCK %s %s: best +%.2fR, now locking %s (+%.2fR)", buy ? "buy" : "sell", sym, pkR,
+                  frac <= 0 ? "entry + costs — it can no longer lose" : StringFormat("%.0f%% of the best profit", frac*100.0), lock/r0);
+     }
+   if(TimeCurrent() - (datetime)GVget("ev_lf_"+T, 0) < 10) return;  // the broker just refused: try again in 10 s, never every second
+   if(!MarketOpenNow(sym)) return;                                 // a closed market takes no orders
+   if(p <= lock)                                                   // back at the line: bank it now, do not wait for the stop
+     {
+      if(g_trade.PositionClose(tk))
+         PrintFormat("Shalobot EXIT %s %s at +%.2fR — profit lock (best +%.2fR); a winner stays a winner", buy ? "buy" : "sell", sym, p/r0, pkR);
+      else GVset("ev_lf_"+T, (double)TimeCurrent());
+      return;
+     }
+   // hold the same line at the broker, so it stands even with the terminal off
+   double target = NormTick(sym, buy ? entry + lock : entry - lock);
+   bool better = buy ? (sl <= 0 || target > sl + 0.05*r0) : (sl <= 0 || target < sl - 0.05*r0);
+   if(!better) return;
+   double stopsLvl = (double)SymbolInfoInteger(sym, SYMBOL_TRADE_STOPS_LEVEL)*point;
+   double freeze   = (double)SymbolInfoInteger(sym, SYMBOL_TRADE_FREEZE_LEVEL)*point;
+   double px = buy ? bid : ask;
+   if(MathAbs(px - target) <= MathMax(stopsLvl, freeze) + point) return;   // too close for the broker; the EA-side line covers it
+   if(sl > 0 && MathAbs(px - sl) <= freeze) return;
+   if(tp > 0 && MathAbs(tp - px) <= freeze) return;
+   if(!g_trade.PositionModify(tk, target, tp)) GVset("ev_lf_"+T, (double)TimeCurrent());
+  }
+
+void ManageFast()
+  {
+   if(!InpProfitLock) return;
+   for(int i=PositionsTotal()-1; i>=0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk==0 || PositionGetInteger(POSITION_MAGIC)!=InpMagic) continue;
+      LockProfit(tk);
+     }
+  }
+
+// Close a trend trade before its stop or target when the trend it was opened for is over.
+void SmartExits()
+  {
+   for(int i=PositionsTotal()-1; i>=0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk==0 || PositionGetInteger(POSITION_MAGIC)!=InpMagic || !IsTrendTicket(tk)) continue;
+      if(!PositionSelectByTicket(tk)) continue;
+      string T = (string)tk, sym = PositionGetString(POSITION_SYMBOL);
+      int dir = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? 1 : -1;
+      int tf = (int)GVget("ev_tf_"+T, (double)PERIOD_M15);
+      if(tf <= 0) tf = PERIOD_M15;
+      long ageBars = (long)(TimeCurrent() - (datetime)PositionGetInteger(POSITION_TIME)) / MathMax(60, PeriodSeconds((ENUM_TIMEFRAMES)tf));
+      if(ageBars < 3) continue;                                    // a fresh trade gets room to breathe
+      double entry = PositionGetDouble(POSITION_PRICE_OPEN);
+      double bid = SymbolInfoDouble(sym, SYMBOL_BID), ask = SymbolInfoDouble(sym, SYMBOL_ASK);
+      if(bid <= 0 || ask <= 0) continue;
+      TfRead o;
+      if(!ReadTf(sym, (ENUM_TIMEFRAMES)tf, o)) continue;
+      double p = (dir > 0) ? bid - entry : entry - ask;
+      double r0 = GVget("ev_r0_"+T, 0); if(r0 <= 0) r0 = 1.8*o.atr;
+      string why = "";
+      // the trend it was opened for has turned: the fast line, the fitted line and the price all point the other way
+      if(o.hmaDir == -dir && o.dir == -dir && o.r2 >= 0.3 && MathAbs(o.ns) >= 0.8) why = "the trend turned against it";
+      // it went nowhere and the trend behind it is gone: the slot goes to a stronger market
+      else if(ageBars >= 20 && GVget("ev_pk_"+T, 0) < 0.3*r0 && (o.dir != dir || TfScore(o) <= 0)) why = "the trend faded; the slot goes to a stronger market";
+      if(why == "") continue;
+      if(!PositionSelectByTicket(tk)) continue;
+      if(g_trade.PositionClose(tk))
+         PrintFormat("Shalobot EXIT %s %s at %+.2fR — %s (%s, before its stop or target)", dir > 0 ? "buy" : "sell", sym, p/r0, why, TfName(tf));
+     }
+  }
+
+// Lock / exit bookkeeping of closed tickets.
+void CleanupLockGVs()
+  {
+   string pre[6] = {"ev_pk_", "ev_r0_", "ev_tf_", "ev_cm_", "ev_lk_", "ev_lf_"};
+   for(int i=GlobalVariablesTotal()-1; i>=0; i--)
+     {
+      string name = GlobalVariableName(i);
+      for(int k=0; k<6; k++)
+        {
+         int L = StringLen(pre[k]);
+         if(StringSubstr(name, 0, L) != pre[k]) continue;
+         ulong tk = (ulong)StringToInteger(StringSubstr(name, L));
+         if(tk > 0 && !PositionSelectByTicket(tk)) GlobalVariableDel(name);
+         break;
+        }
+     }
+  }
+
+// Proprietary — Shalobot. No permission to analyze, copy or modify (see the notice at the top).
+//+------------------------------------------------------------------+
+//| v7 — the maximum open trades is a hard limit                      |
+//|                                                                   |
+//| A slow broker can answer "request timeout" and still fill the     |
+//| order minutes later. So the limit counts every open position of   |
+//| this EA (scanner, signal feed and adds) plus every order still    |
+//| waiting for its answer; such an order's market is never sent      |
+//| twice; and a position that turns up without its plan is adopted:  |
+//| counted, planned and managed like any trend trade.                |
+//| Only one copy per account works: a copy on a second chart idles.  |
+//+------------------------------------------------------------------+
+bool g_uncertain = false;          // an order this poll got no clear answer: nothing more is sent until the next poll
+
+bool UncertainRc(uint rc) { return rc == 0 || rc == TRADE_RETCODE_TIMEOUT || rc == TRADE_RETCODE_PLACED || rc == TRADE_RETCODE_CONNECTION; }
+
+int OurPositionsOn(string sym)
+  {
+   int n = 0;
+   for(int i=PositionsTotal()-1; i>=0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk > 0 && PositionGetInteger(POSITION_MAGIC) == InpMagic && PositionGetString(POSITION_SYMBOL) == sym) n++;
+     }
+   return n;
+  }
+
+// An order sent without a clear answer holds a slot until `want` positions of ours show on its market (10 minutes at most).
+string RsvPrefix() { return "ev_rsv"+(string)InpMagic+"_"; }
+void Reserve(string sym, int want) { GlobalVariableSet(RsvPrefix()+sym+"~"+(string)want, (double)TimeLocal()); }
+
+// Orders still waiting for their answer (only = one market, "" = all); settled or expired ones are cleared.
+int ReservedCount(string only)
+  {
+   int n = 0; string pre = RsvPrefix(); int L = StringLen(pre);
+   for(int i=GlobalVariablesTotal()-1; i>=0; i--)
+     {
+      string name = GlobalVariableName(i);
+      if(StringSubstr(name, 0, L) != pre) continue;
+      string rest = StringSubstr(name, L);
+      int cut = -1;
+      for(int j=StringLen(rest)-1; j>=0; j--) if(StringGetCharacter(rest, j) == '~') { cut = j; break; }
+      if(cut <= 0) { GlobalVariableDel(name); continue; }
+      string sym = StringSubstr(rest, 0, cut);
+      if(only != "" && sym != only) continue;
+      int want = (int)StringToInteger(StringSubstr(rest, cut+1));
+      if(TimeLocal() - (datetime)GlobalVariableGet(name) > 600 || OurPositionsOn(sym) >= want) { GlobalVariableDel(name); continue; }
+      n++;
+     }
+   return n;
+  }
+bool IsReserved(string sym) { return ReservedCount(sym) > 0; }
+
+// Every open position of this EA, plus every order still waiting for its answer.
+int CountOurOpen()
+  {
+   int n = 0;
+   for(int i=PositionsTotal()-1; i>=0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk > 0 && PositionGetInteger(POSITION_MAGIC) == InpMagic) n++;
+     }
+   return n + ReservedCount("");
+  }
+
+ENUM_TIMEFRAMES FastestPeriod()
+  {
+   if(InpEntryStyle == CLASSIC_TREND) return PERIOD_M15;
+   int m = (int)InpFastestTf;
+   return m <= 1 ? PERIOD_M1 : m <= 5 ? PERIOD_M5 : m <= 15 ? PERIOD_M15 : m <= 60 ? PERIOD_H1 : PERIOD_H4;
+  }
+
+// A trend position of ours with no plan (its order's answer was lost): adopt it — counted, planned, managed.
+void AdoptOrphans()
+  {
+   for(int i=PositionsTotal()-1; i>=0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk==0 || PositionGetInteger(POSITION_MAGIC)!=InpMagic) continue;
+      string T = (string)tk;
+      if(GlobalVariableCheck("ev_trail_"+T)) continue;                                  // it has its plan
+      string cmt = PositionGetString(POSITION_COMMENT);
+      if(StringFind(cmt, "shalo-trend") < 0 && cmt != "") continue;                    // a signal-feed trade: the feed heals its own plan
+      string sym = PositionGetString(POSITION_SYMBOL);
+      bool buy = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY);
+      double entry = PositionGetDouble(POSITION_PRICE_OPEN), sl = PositionGetDouble(POSITION_SL), tp = PositionGetDouble(POSITION_TP);
+      double vol = PositionGetDouble(POSITION_VOLUME);
+      long posId = PositionGetInteger(POSITION_IDENTIFIER);
+      ENUM_TIMEFRAMES tf = FastestPeriod();
+      double dist = (sl > 0 && (buy ? sl < entry : sl > entry)) ? MathAbs(entry - sl) : 0;
+      if(dist <= 0) { MqlRates r[]; ArraySetAsSeries(r, true); dist = (CopyRates(sym, tf, 0, 60, r) >= 60) ? InpStopAtr*AtrAt(r, 1, 14) : 0; }
+      if(dist <= 0) continue;
+      double ov = OpeningVolume(posId); if(ov <= 0) ov = vol;
+      int digits = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
+      Sig s; s.sym = sym; s.side = buy ? "buy" : "sell"; s.entry = entry; s.sl = sl; s.tp = tp; s.risk = ProfileRiskPct();
+      s.trail = dist; s.nP = 1; s.pPrice[0] = NormalizeDouble(buy ? entry + 1.5*dist : entry - 1.5*dist, digits); s.pPct[0] = 25;
+      s.nA = 0; s.clu = "trend";
+      StorePlan(tk, s, ov, (sl > 0) ? MathMax(s.risk, RiskPctOf(sym, entry, sl, ov)) : s.risk);
+      GVset("ev_tr_"+T, 1); GVset("ev_r0_"+T, dist); GVset("ev_tf_"+T, (double)tf);
+      PrintFormat("Shalobot: adopted %s %s %.2f lots (ticket %s) — its order's answer never came back; it is now counted and managed", s.side, sym, vol, T);
+     }
+  }
+
+// One copy per account: the EA on two charts would scan, open and manage every trade twice.
+bool   g_isLeader = false, g_saidIdle = false;
+string InstKey() { return "ev_inst"+(string)InpMagic+AcctSuffix(); }
+double InstTok() { return (double)(ChartID() % 4000000000000000) + 1.0; }
+bool InstanceLead()
+  {
+   string k = InstKey(), kt = k+"t";
+   if(!GlobalVariableCheck(k))  GlobalVariableTemp(k);
+   if(!GlobalVariableCheck(kt)) GlobalVariableTemp(kt);
+   double me = InstTok(), owner = GlobalVariableGet(k), hb = GlobalVariableGet(kt);
+   datetime now = TimeLocal();
+   if(owner != me)
+     {
+      if(owner != 0 && (hb <= 0 || now - (datetime)hb <= 300)) return false;   // another copy runs (a silent one is replaced after 5 minutes)
+      if(!GlobalVariableSetOnCondition(k, me, owner)) return false;            // another copy got there first
+     }
+   GlobalVariableSet(kt, (double)now);
+   return true;
+  }
+void InstanceRelease()
+  {
+   string k = InstKey();
+   if(GlobalVariableCheck(k) && GlobalVariableGet(k) == InstTok()) GlobalVariableSet(k, 0);
+  }
+void SayIdle()
+  {
+   if(g_saidIdle) return;
+   g_saidIdle = true;
+   string m = "Shalobot: this copy is IDLE — the EA already runs on another chart of this account, and one copy trades every market. Remove this copy.";
+   Print(m); Comment(m);
+  }
+
+// Proprietary — Shalobot. No permission to analyze, copy or modify (see the notice at the top).
+//+------------------------------------------------------------------+
+//| v7 — profit target: an amount, or a % of the starting balance    |
+//|                                                                   |
+//| Counts what THIS EA made since the target was set: closed deals  |
+//| (stops hit while the terminal was off included) plus the open    |
+//| trades. When it is reached every trade is closed and the EA stops|
+//| — until the target is changed or the EA is attached again.       |
+//+------------------------------------------------------------------+
+datetime g_tgT0 = 0;
+double   g_tgBal = 0, g_tgClosed = 0;
+ulong    g_tgLastDeal = 0;
+bool     g_targetDone = false;
+string   g_targetNote = "";
+datetime g_lastPoll = 0, g_lastSmart = 0;
+
+string TgKey() { return "ev_tg"+(string)InpMagic+AcctSuffix()+"_"; }
+double DealNet(ulong d) { return HistoryDealGetDouble(d, DEAL_PROFIT) + HistoryDealGetDouble(d, DEAL_COMMISSION) + HistoryDealGetDouble(d, DEAL_SWAP) + HistoryDealGetDouble(d, DEAL_FEE); }
+
+double TargetMoney()
+  {
+   double a = (InpTargetAmount > 0) ? InpTargetAmount : 0;
+   double b = (InpTargetPct > 0 && g_tgBal > 0) ? g_tgBal*InpTargetPct/100.0 : 0;
+   if(a > 0 && b > 0) return MathMin(a, b);                        // both set: whichever is reached first
+   return MathMax(a, b);
+  }
+
+string TargetText()
+  {
+   string cur = AccountInfoString(ACCOUNT_CURRENCY);
+   if(InpTargetAmount > 0 && InpTargetPct > 0) return StringFormat("%.2f %s or %.2f%% of %.2f (= %.2f %s), whichever comes first", InpTargetAmount, cur, InpTargetPct, g_tgBal, g_tgBal*InpTargetPct/100.0, cur);
+   if(InpTargetAmount > 0) return StringFormat("%.2f %s", InpTargetAmount, cur);
+   return StringFormat("%.2f%% of %.2f (= %.2f %s)", InpTargetPct, g_tgBal, g_tgBal*InpTargetPct/100.0, cur);
+  }
+
+void TargetInit()
+  {
+   g_targetDone = false; g_targetNote = "";
+   if(InpTargetAmount <= 0 && InpTargetPct <= 0) { g_tgT0 = 0; return; }
+   string k = TgKey();
+   double sig = NormalizeDouble(InpTargetAmount, 2)*1000.0 + NormalizeDouble(InpTargetPct, 2);
+   // the same target survives a restart; a new target starts counting now
+   if(GlobalVariableCheck(k+"t0") && MathAbs(GVget(k+"sig", -1) - sig) < 1e-6)
+     {
+      g_tgT0 = (datetime)GVget(k+"t0", 0); g_tgBal = GVget(k+"bal", 0); g_targetDone = GVget(k+"done", 0) > 0;
+     }
+   else
+     {
+      g_tgT0 = TimeCurrent(); g_tgBal = AccountInfoDouble(ACCOUNT_BALANCE);
+      GVset(k+"t0", (double)g_tgT0); GVset(k+"bal", g_tgBal); GVset(k+"sig", sig); GVset(k+"done", 0);
+     }
+   g_tgClosed = 0; g_tgLastDeal = 0;
+   if(HistorySelect(g_tgT0, TimeCurrent() + 86400))
+      for(int i=0; i<HistoryDealsTotal(); i++)
+        {
+         ulong d = HistoryDealGetTicket(i);
+         if(d == 0 || HistoryDealGetInteger(d, DEAL_MAGIC) != InpMagic) continue;
+         g_tgClosed += DealNet(d);
+         if(d > g_tgLastDeal) g_tgLastDeal = d;
+        }
+   PrintFormat("Shalobot profit target: %s — counting from %s (starting balance %.2f)%s", TargetText(), TimeToString(g_tgT0), g_tgBal,
+               g_targetDone ? " · ALREADY REACHED: trading stays stopped — change the target, or remove and re-attach the EA, to trade again" : "");
+  }
+
+void TargetClear()
+  {
+   string k = TgKey();
+   GlobalVariableDel(k+"t0"); GlobalVariableDel(k+"bal"); GlobalVariableDel(k+"sig"); GlobalVariableDel(k+"done");
+  }
+
+// Every deal of ours since the target started counts once (deal tickets only grow).
+void TargetOnDeal(ulong d)
+  {
+   if(g_tgT0 == 0 || d <= g_tgLastDeal) return;
+   if((datetime)HistoryDealGetInteger(d, DEAL_TIME) < g_tgT0) return;
+   g_tgClosed += DealNet(d);
+   g_tgLastDeal = d;
+  }
+
+void CloseAllOurs()
+  {
+   static datetime lastTry = 0, lastShut = 0;
+   if(TimeCurrent() - lastTry < 10) return;                        // a refused close is retried every 10 s, not hammered
+   lastTry = TimeCurrent();
+   bool tryShut = (TimeCurrent() - lastShut >= 1800);              // a market that looks closed is still tried every 30 minutes
+   if(tryShut) lastShut = TimeCurrent();
+   for(int i=PositionsTotal()-1; i>=0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk==0 || PositionGetInteger(POSITION_MAGIC)!=InpMagic) continue;
+      if(!tryShut && !MarketOpenNow(PositionGetString(POSITION_SYMBOL))) continue;   // closed now (weekend, session break): closed the moment it reopens
+      g_trade.PositionClose(tk);
+     }
+  }
+
+void TargetCheck()
+  {
+   if(g_tgT0 == 0) { g_targetNote = ""; return; }
+   double goal = TargetMoney(), open = 0;
+   int ours = 0;
+   for(int i=PositionsTotal()-1; i>=0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk==0 || PositionGetInteger(POSITION_MAGIC)!=InpMagic) continue;
+      open += PositionGetDouble(POSITION_PROFIT) + PositionGetDouble(POSITION_SWAP); ours++;
+     }
+   double made = g_tgClosed + open;
+   string cur = AccountInfoString(ACCOUNT_CURRENCY);
+   if(!g_targetDone && goal > 0 && made >= goal)
+     {
+      g_targetDone = true; GVset(TgKey()+"done", 1);
+      string m = StringFormat("Shalobot: PROFIT TARGET REACHED — %.2f %s made since %s (target %s). Closing every trade and stopping.", made, cur, TimeToString(g_tgT0), TargetText());
+      Print(m); Alert(m);
+     }
+   if(g_targetDone)
+     {
+      if(ours > 0) CloseAllOurs();
+      g_targetNote = StringFormat(" · TARGET REACHED (%s) — trading stopped", TargetText());
+     }
+   else g_targetNote = StringFormat(" · target %.2f / %.2f %s", made, goal, cur);
   }
 
 // A sizing note for a market, at most once per 30 minutes (the trade still goes out).
@@ -750,7 +1440,7 @@ bool IsTrendTicket(ulong tk) { return GVget("ev_tr_"+(string)tk, 0) > 0; }
 // Refresh scores within a time budget (round-robin so a big broker list never stalls the terminal).
 void RefreshScores(int budgetMs)
   {
-   uint t0 = GetTickCount();
+   uint t0 = GetTickCount(), nextMgmt = 1000;
    for(int n=0; n<g_scanN; n++)
      {
       if((int)(GetTickCount()-t0) > budgetMs) break;
@@ -759,7 +1449,9 @@ void RefreshScores(int budgetMs)
       bool ok = ScoreSymbol(g_scan[i], c);
       g_scanScore[i] = ok ? c.score : 0; g_scanDir[i] = ok ? c.dir : 0; g_scanAtr[i] = ok ? c.atr : 0;
       g_scanAdx15[i] = ok ? c.adx15 : 0; g_scanAdx60[i] = ok ? c.adx60 : 0; g_scanWhen[i] = TimeCurrent();
+      g_scanTf[i] = ok ? c.tf : 0; g_scanR2[i] = ok ? c.r2 : 0;
       if(g_scanScored < g_scanN) g_scanScored++;
+      if(GetTickCount() - t0 >= nextMgmt) { nextMgmt += 1000; TargetCheck(); if(!g_targetDone) ManageFast(); }   // a slow read never pauses the per-second management
      }
   }
 
@@ -770,15 +1462,16 @@ bool BestCandidate(TrendCand &best, string &tried[])
    for(int i=0; i<g_scanN; i++)
      {
       if(g_scanScore[i] <= 0 || g_scanDir[i] == 0) continue;
-      if(TimeCurrent() - g_scanWhen[i] > 900) continue;           // score older than 15 min: wait for a refresh
+      int maxAge = (g_scanTf[i] > 0) ? (int)MathMax(150, MathMin(3600, PeriodSeconds((ENUM_TIMEFRAMES)g_scanTf[i])/2)) : 900;
+      if(TimeCurrent() - g_scanWhen[i] > maxAge) continue;        // v7: a score is only as fresh as its timeframe
       if(g_scanScore[i] <= best.score) continue;
       string sym = g_scan[i];
-      if(HasOpenPosition(sym) || OnCooldown(sym)) continue;
+      if(HasOpenPosition(sym) || OnCooldown(sym) || IsReserved(sym)) continue;
       bool skip = false;
       for(int t=0; t<ArraySize(tried); t++) if(tried[t] == sym) { skip = true; break; }
       if(skip) continue;
       best.sym = sym; best.dir = g_scanDir[i]; best.score = g_scanScore[i]; best.atr = g_scanAtr[i];
-      best.adx15 = g_scanAdx15[i]; best.adx60 = g_scanAdx60[i];
+      best.adx15 = g_scanAdx15[i]; best.adx60 = g_scanAdx60[i]; best.tf = g_scanTf[i]; best.r2 = g_scanR2[i];
      }
    return best.sym != "";
   }
@@ -788,29 +1481,46 @@ bool TrendEnter(TrendCand &c)
    string sym = c.sym;
    if(!SymbolSelect(sym, true)) return false;
    if(!MarketOpenNow(sym)) return false;                          // never send an order into a closed session
+   TrendCand f;                                                    // v7: re-read on the latest bars right before sending
+   if(!ScoreSymbol(sym, f) || f.dir != c.dir) return false;
+   if(!CurrencyRoomOk(sym, f.dir)) return false;
    double ask = SymbolInfoDouble(sym, SYMBOL_ASK), bid = SymbolInfoDouble(sym, SYMBOL_BID), point = SymbolInfoDouble(sym, SYMBOL_POINT);
    if(ask <= 0 || bid <= 0 || point <= 0) return false;
    int digits = (int)SymbolInfoInteger(sym, SYMBOL_DIGITS);
-   bool buy = (c.dir > 0);
+   bool buy = (f.dir > 0);
    double price = buy ? ask : bid, spread = ask - bid;
-   double stopDist = 2.0*c.atr;                                    // the aggressive profile's stop: 2 x ATR
    double stopsLvl = (double)SymbolInfoInteger(sym, SYMBOL_TRADE_STOPS_LEVEL)*point;
    double freeze   = (double)SymbolInfoInteger(sym, SYMBOL_TRADE_FREEZE_LEVEL)*point;
-   if(stopDist < MathMax(MathMax(stopsLvl, freeze)*1.5, 3.0*spread)) { NoteSkip(sym, "trend stop would sit inside the spread / broker minimum right now"); return false; }
-   if(stopDist < InpMinStopPoints*point) return false;
+   double floorDist = MathMax(MathMax(MathMax(stopsLvl, freeze)*1.5, 4.0*spread), InpMinStopPoints*point);
+   if(floorDist > 2.0*MathMax(InpStopAtr, 1.0)*f.atr) { NoteSkip(sym, "its spread / the broker's minimum stop is too wide for how far it moves right now"); return false; }
+   double stopDist = MathMax(InpStopAtr*f.atr, floorDist);         // beyond the noise of the trade's own timeframe
    double sl = NormalizeDouble(buy ? price - stopDist : price + stopDist, digits);
-   double tp = NormalizeDouble(buy ? price + 2.0*stopDist : price - 2.0*stopDist, digits);   // let the trend run; the trail does the rest
+   double tp = NormalizeDouble(buy ? price + 4.0*stopDist : price - 4.0*stopDist, digits);   // room to run; the lock and the exits bank it
    Sig s; s.sym = sym; s.side = buy ? "buy" : "sell"; s.entry = price; s.sl = sl; s.tp = tp; s.risk = ProfileRiskPct();
    s.trail = stopDist; s.nP = 1; s.pPrice[0] = NormalizeDouble(buy ? price + 1.5*stopDist : price - 1.5*stopDist, digits); s.pPct[0] = 25; s.nA = 0; s.clu = "trend";
    double lots = LotsForRisk(sym, price, sl, s.risk);
    if(lots <= 0) return false;
+   if(!InstanceLead()) return false;                               // another copy took over this account: this one sends nothing
    g_trade.SetTypeFillingBySymbol(sym);
    bool ok = buy ? g_trade.Buy(lots, sym, price, sl, tp, "shalo-trend") : g_trade.Sell(lots, sym, price, sl, tp, "shalo-trend");
-   if(!ok) { PrintFormat("Shalobot trend order failed %s %s: %d %s", s.side, sym, g_trade.ResultRetcode(), g_trade.ResultRetcodeDescription()); StampCooldown(sym); return false; }
+   if(!ok)
+     {
+      uint rc = g_trade.ResultRetcode();
+      PrintFormat("Shalobot trend order failed %s %s: %d %s", s.side, sym, rc, g_trade.ResultRetcodeDescription());
+      StampCooldown(sym);
+      // no clear answer (a timeout, a lost connection): the broker may still fill it — its slot stays held, nothing more is sent now
+      if(UncertainRc(rc))
+        {
+         Reserve(sym, 1); g_uncertain = true;
+         PrintFormat("Shalobot: %s got no clear answer from the broker — its slot stays held until it shows up (10 minutes at most)", sym);
+        }
+      return false;
+     }
    ulong tk = BindPlanTo(sym, s, lots, MathMax(s.risk, RiskPctOf(sym, price, sl, lots)));
-   if(tk > 0) GVset("ev_tr_"+(string)tk, 1);
-   PrintFormat("Shalobot TREND %s %s %s lots @ %s SL %s TP %s (score %.0f · ADX M15 %.0f / H1 %.0f · risk %.1f%% of balance)", s.side, sym, DoubleToString(lots, 2),
-               DoubleToString(price, digits), DoubleToString(sl, digits), DoubleToString(tp, digits), c.score, c.adx15, c.adx60, RiskPctOf(sym, price, sl, lots));
+   if(tk == 0) Reserve(sym, 1);                                    // sent but not visible yet: its slot stays held; it is adopted when it shows up
+   if(tk > 0) { GVset("ev_tr_"+(string)tk, 1); GVset("ev_tf_"+(string)tk, (double)f.tf); GVset("ev_r0_"+(string)tk, stopDist); }
+   PrintFormat("Shalobot TREND %s %s %s lots @ %s SL %s TP %s (%s · score %.0f · fit %.2f · ADX %.0f · risk %.1f%% of balance)", s.side, sym, DoubleToString(lots, 2),
+               DoubleToString(price, digits), DoubleToString(sl, digits), DoubleToString(tp, digits), TfName(f.tf), f.score, f.r2, f.adx15, RiskPctOf(sym, price, sl, lots));
    return true;
   }
 
@@ -822,8 +1532,9 @@ void TrendScan(bool startup)
    if(g_scanN == 0 || TimeCurrent() - g_universeAt > 3600) BuildUniverse();
    if(g_scanN == 0) { g_trendNote = "trend: no tradable markets"; return; }
    RefreshScores(startup ? 15000 : 3000);
+   if(g_targetDone) return;                                        // the profit target was reached during the scan
    int trending = 0; for(int i=0; i<g_scanN; i++) if(g_scanScore[i] > 0) trending++;
-   int open = CountTrendOpen();
+   int open = CountOurOpen();                                      // v7: every trade of this EA counts, and every order still unanswered
    string tried[]; ArrayResize(tried, 0);
    TrendCand best; string bestNote = "";
    while(open < InpTrendMaxOpen)
@@ -832,6 +1543,7 @@ void TrendScan(bool startup)
       if(bestNote == "") bestNote = StringFormat(" · best %s %s (%.0f)", best.sym, best.dir > 0 ? "up" : "down", best.score);
       int n = ArraySize(tried); ArrayResize(tried, n+1); tried[n] = best.sym;
       if(TrendEnter(best)) open++;
+      else if(g_uncertain) break;                                   // an order got no clear answer: count again next poll
      }
    g_trendNote = StringFormat("trend: %d/%d markets scored · %d trending · %d/%d open%s", g_scanScored, g_scanN, trending, open, InpTrendMaxOpen, bestNote);
   }
@@ -850,9 +1562,13 @@ double LossPerLot(string sym, double price, double sl)
    double tickVal   = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_VALUE_LOSS);
    if(tickVal<=0) tickVal = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_VALUE);
    double tickSize  = SymbolInfoDouble(sym, SYMBOL_TRADE_TICK_SIZE);
-   if(tickVal<=0 || tickSize<=0) return 0;
-   double ticks = MathAbs(price - sl) / tickSize;
-   return ticks * tickVal;
+   double byTicks = (tickVal>0 && tickSize>0) ? MathAbs(price - sl) / tickSize * tickVal : 0;
+   // v7: the terminal's own calculation of what 1 lot loses from price to the stop. Some brokers publish a
+   // wrong tick value (Deriv's Volatility 75: 0.0001 instead of 0.01, a 100x understatement), so the
+   // larger of the two is used — sizing can only ever err toward a smaller lot, never a bigger one.
+   double pr = 0, byCalc = 0;
+   if(OrderCalcProfit(sl < price ? ORDER_TYPE_BUY : ORDER_TYPE_SELL, sym, 1.0, price, sl, pr)) byCalc = MathAbs(pr);
+   return MathMax(byTicks, byCalc);
   }
 
 // The real % of balance a position of `lots` risks between `price` and `sl`.
@@ -926,7 +1642,19 @@ double LotsForRisk(string sym, double price, double sl, double riskPct)
       pref = MathMin(MathMax(pref, vmin), vmax);
       double capLots = (InpLotRiskCapPct - openRisk)/100.0*balance/lossPerLot;   // the size the guard still allows
       capLots = MathFloor(capLots/vstep + 1e-9)*vstep;
-      if(pref > lots)
+      if(InpMaxTradeRiskPct > 0 && InpMaxTradeRiskPct < 100)
+        {
+         double tradeCap = MathFloor(InpMaxTradeRiskPct/100.0*balance/lossPerLot/vstep + 1e-9)*vstep;
+         if(pref > tradeCap)
+           {
+            NoteSized(sym, StringFormat("standard lot %s would put %.1f%% of the balance at this one stop (cap %.0f%%): %s instead",
+                      DoubleToString(pref, 2), pref*lossPerLot/balance*100.0, InpMaxTradeRiskPct,
+                      tradeCap >= vmin ? DoubleToString(MathMax(tradeCap, lots), 2)+" lots" : "the risk-based size"));
+            pref = tradeCap;                               // below the smallest lot there is no standard-lot upgrade: the small-account rule decides
+           }
+         if(tradeCap >= vmin && lots > tradeCap) lots = tradeCap;   // the cap holds for the risk-based size too
+        }
+      if(pref >= vmin && pref > lots)
         {
          if(MarginHolds(sym, ot, pref, price))
            {
