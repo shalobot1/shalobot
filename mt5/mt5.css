@@ -680,6 +680,13 @@ body.ea-open { overflow: hidden; }
 .ea-row .field { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .04em; text-transform: uppercase; }
 .ea-row .btn { flex: none; gap: 7px; padding: 0 16px; }
 
+/* Why the sheet opened instead of the support message: not approved yet. */
+.ea-gate {
+  margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; font-size: 12.5px; line-height: 1.45; color: var(--ink);
+  border: 1px solid var(--amber); background: transparent;
+  background: color-mix(in srgb, var(--amber) 9%, transparent);
+}
+.ea-gate b { display: block; margin-bottom: 3px; font-size: 13px; color: var(--amber); }
 .ea-err {
   margin: 12px 0 0; padding: 9px 12px;
   border: 1px solid var(--danger); border-radius: var(--radius-sm);

@@ -270,5 +270,13 @@
 "If we made a mistake, reply here with a screenshot of your Headway account and we will fix it right away.":"Si nous avons fait une erreur, répondez ici avec une capture d’écran de votre compte Headway et nous corrigeons tout de suite.",
 "Your Headway account ({email}) is under our community — but it has no deposit yet, and the EA is for accounts ready to trade.":"Votre compte Headway ({email}) est bien chez nous — mais il n’a pas encore de dépôt, et l’EA est réservé aux comptes prêts à trader.",
 "Deposit any amount you want to start with in your Headway personal area — Headway adds a 50% bonus — then reply here and we send your code right away.":"Déposez le montant de votre choix dans votre espace personnel Headway — Headway ajoute un bonus de 50 % — puis répondez ici et nous envoyons votre code tout de suite.",
-"Sent":"Envoyé"
+"Sent":"Envoyé",
+"Not approved yet.":"Pas encore approuvé.",
+"Your request was not approved.":"Votre demande n’a pas été approuvée.",
+"We could not check your approval.":"Nous n’avons pas pu vérifier votre approbation.",
+"Request your download code below. Once we approve you, it arrives in the support window.":"Demandez votre code de téléchargement ci-dessous. Une fois approuvé, il arrive dans la fenêtre de support.",
+"Check that your full name and email match your Headway account exactly, then send again.":"Vérifiez que votre nom complet et votre e-mail correspondent exactement à votre compte Headway, puis renvoyez.",
+"Checking…":"Vérification…",
+"Your request is still being checked. Your code arrives in the support window as soon as you are approved — then enter it below.":"Votre demande est encore en cours de vérification. Votre code arrive dans la fenêtre de support dès que vous êtes approuvé — saisissez-le ensuite ci-dessous.",
+"Try again in a moment. If you already have a code, enter it below.":"Réessayez dans un instant. Si vous avez déjà un code, saisissez-le ci-dessous."
 }

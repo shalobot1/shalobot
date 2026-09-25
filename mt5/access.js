@@ -242,7 +242,7 @@
     });
   }
 
-  function open() {
+  function open(atTop) {
     if (!$("eaName").value) $("eaName").value = get(NAME_KEY);
     if (!$("eaMail").value) $("eaMail").value = get(MAIL_KEY);
     if (!$("eaPhone").value) $("eaPhone").value = get(PHONE_KEY);
@@ -253,7 +253,25 @@
     root.hidden = false;
     document.body.classList.add("ea-open");
     paint();
+    // Opened to explain something: the note at the top is what they read first.
+    if (atTop === true) { var body = root.querySelector(".ea-body"); if (body) body.scrollTop = 0; return; }
     setTimeout(function () { (phase === "sent" ? $("eaCode") : $("eaName")).focus(); }, 80);
+  }
+
+  /* Why the sheet opened when "I have downloaded the EA" was pressed. English
+     goes in; the language layer translates whatever is written here. */
+  var GATE = {
+    none: ["Not approved yet.", "Request your download code below. Once we approve you, it arrives in the support window."],
+    pending: ["Not approved yet.", "Your request is still being checked. Your code arrives in the support window as soon as you are approved — then enter it below."],
+    declined: ["Your request was not approved.", "Check that your full name and email match your Headway account exactly, then send again."],
+    unknown: ["We could not check your approval.", "Try again in a moment. If you already have a code, enter it below."],
+  };
+  function showGate(state) {
+    var g = GATE[state];
+    $("eaGate").hidden = !g;
+    if (!g) return;
+    $("eaGateTitle").textContent = g[0];
+    $("eaGateText").textContent = g[1];
   }
   function close() {
     root.hidden = true;
@@ -279,6 +297,7 @@
         set(NAME_KEY, name); set(MAIL_KEY, email); set(SENT_KEY, id || "-"); set(PHONE_KEY, $("eaPhone").value.trim());
         countSend();
         phase = "sent";
+        showGate(null);
         openWait();
         /* The bubble opens onto THIS conversation, with the request already in
            it, rather than onto an empty window. The answer lands there. */
@@ -322,7 +341,7 @@
   }
 
   /* ── wiring ─────────────────────────────────────────────────────────── */
-  $("get-ea").addEventListener("click", open);
+  $("get-ea").addEventListener("click", function () { showGate(null); open(); });
   $("eaClose").addEventListener("click", close);
 
   /* The wait card: opened by a successful send, and again from the note. */
@@ -378,14 +397,49 @@
     // English goes in; the language layer translates whatever is written here.
     if (waiting !== was) dl.querySelector("span").textContent = waiting ? "Sent" : "I have downloaded the EA";
   }
+  /* Only somebody approved has an EA to set up. Everyone else — never asked,
+     still waiting, or declined — is shown the request instead, with a note
+     saying why, and nothing is sent to support. The server answers from our
+     own record of this browser; if it cannot be asked in time, the sheet
+     opens too, because it is also where a code already received is entered. */
+  var checking = false;
+  var CHECK_TIMEOUT_MS = 15000;
   if (dl) dl.addEventListener("click", function () {
-    if (dl.disabled) return;
-    if (window.SHALO_SUPPORT_SEND) {
-      window.SHALO_SUPPORT_SEND({
-        text: T("I have downloaded the EA — please guide me on how to set it up and use it the right way."),
-        kind: "ea-downloaded",
+    if (dl.disabled || checking) return;
+    checking = true; dl.disabled = true;
+    // The check is usually under a second; the button says it is working anyway.
+    var label = dl.querySelector("span");
+    label.textContent = "Checking…";
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, CHECK_TIMEOUT_MS);
+    fetch("/api/mt5/ea-request?visitorId=" + encodeURIComponent(visitorId()), { cache: "no-store", signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (j) {
+        clearTimeout(timer);
+        checking = false;
+        label.textContent = "I have downloaded the EA";
+        paintDownloaded();
+        var state = j && j.state;
+        if (state === "approved") {
+          showGate(null);
+          if (window.SHALO_SUPPORT_SEND) {
+            window.SHALO_SUPPORT_SEND({
+              text: T("I have downloaded the EA — please guide me on how to set it up and use it the right way."),
+              kind: "ea-downloaded",
+            });
+          }
+          return;
+        }
+        if (!GATE[state]) state = "unknown";
+        /* Never asked, or declined: the form is what they need, so a request
+           remembered as sent on this browser does not hide it. Waiting, or
+           unknown: the code box is shown, since a code may be on its way. */
+        if (state === "none" || state === "declined") { phase = "form"; set(SENT_KEY, ""); }
+        else codeOpen = true;
+        showGate(state);
+        open(true);
       });
-    }
   });
   // The words actually went out: lock the button on what we have said so far.
   window.addEventListener("shalo:support-sent", function (e) {

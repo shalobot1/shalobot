@@ -344,6 +344,23 @@ async function accessStatusFor(visitorId) {
   return { state: d.status === "declined" ? "declined" : "pending", at: d.decided_at || d.created_at, name: d.name, email: d.email };
 }
 
+/**
+ * Just the state, in ONE query — what the "I have downloaded" button asks
+ * before it writes to support, so it has to answer quickly. Same rule as
+ * accessStatusFor: any approved row with a code is approved; otherwise the
+ * newest row says declined or waiting; no rows is never asked. A failed
+ * lookup is "unknown", never a guess.
+ */
+async function accessState(visitorId) {
+  if (!configured() || !visitorId) return "unknown";
+  const res = await select(TABLE, `select=status,code&visitor_id=eq.${encodeURIComponent(visitorId)}&order=created_at.desc&limit=100`);
+  if (!res.ok) return "unknown";
+  const rows = res.data || [];
+  if (!rows.length) return "none";
+  if (rows.some((r) => r.status === "approved" && r.code)) return "approved";
+  return rows[0].status === "declined" ? "declined" : "pending";
+}
+
 /** How many times this browser has asked recently — a spam brake, not a rule. */
 async function recentRequestCount(visitorId, withinMinutes) {
   if (!configured()) return 0;
@@ -356,5 +373,5 @@ module.exports = {
   PARTNER_ID, DERIV_SIGNUP, DERIV_PROFILE, EXAMPLE_CLIENT_ID, EA_FILE, MAX_CODE_USES, codeMessage, depositMessage, MISTAKE_LINE,
   createRequest, attachTelegramMessage, requestForTelegramMessage, requestForVisitor,
   pendingRequests, waitingPeople, requestForKey, approvedCodeFor, approvedMatch, markAnswered, markAnsweredByEmail, approveRequest, declineRequest,
-  declineCount, checkCode, recentRequestCount, normaliseCode, accessStatusFor,
+  declineCount, checkCode, recentRequestCount, normaliseCode, accessStatusFor, accessState,
 };

@@ -176,6 +176,9 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 
     <div class="ea-body">
       <section id="eaForm">
+        <!-- Shown when "I have downloaded the EA" was pressed by somebody who
+             is not approved yet: why the request opened instead. -->
+        <div class="ea-gate" id="eaGate" role="alert" hidden><b id="eaGateTitle"></b><span id="eaGateText"></span></div>
         <p class="ea-lede">Built on <b>Shalobot technology</b>. A few quick steps:</p>
 
         <div class="ea-acct ea-acct--hw">
