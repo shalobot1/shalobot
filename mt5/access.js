@@ -264,6 +264,7 @@
     none: ["Not approved yet.", "Request your download code below. Once we approve you, it arrives in the support window."],
     pending: ["Not approved yet.", "Your request is still being checked. Your code arrives in the support window as soon as you are approved — then enter it below."],
     declined: ["Your request was not approved.", "Check that your full name and email match your Headway account exactly, then send again."],
+    deposit: ["Your old code no longer works.", "Make a deposit on your Headway account, then send the request below. Your new code arrives in the support window."],
     unknown: ["We could not check your approval.", "Try again in a moment. If you already have a code, enter it below."],
   };
   function showGate(state) {
@@ -435,7 +436,7 @@
         /* Never asked, or declined: the form is what they need, so a request
            remembered as sent on this browser does not hide it. Waiting, or
            unknown: the code box is shown, since a code may be on its way. */
-        if (state === "none" || state === "declined") { phase = "form"; set(SENT_KEY, ""); }
+        if (state === "none" || state === "declined" || state === "deposit") { phase = "form"; set(SENT_KEY, ""); }
         else codeOpen = true;
         showGate(state);
         open(true);

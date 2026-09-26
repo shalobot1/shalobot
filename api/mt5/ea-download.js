@@ -38,6 +38,9 @@ module.exports = async (req, res) => {
     if (check.why === "exhausted") {
       return json(res, 403, { error: "That code has been used three times. Send the request again with the same email and ID and a new one is issued straight away." });
     }
+    if (check.why === "deposit") {
+      return json(res, 403, { error: "That code no longer works. Make a deposit on your Headway account, then send the request again — your new code arrives in the support window." });
+    }
     return json(res, 403, { error: "That code was not recognised. Check it and try again." });
   }
 

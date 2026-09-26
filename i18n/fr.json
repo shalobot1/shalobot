@@ -278,5 +278,8 @@
 "Check that your full name and email match your Headway account exactly, then send again.":"Vérifiez que votre nom complet et votre e-mail correspondent exactement à votre compte Headway, puis renvoyez.",
 "Checking…":"Vérification…",
 "Your request is still being checked. Your code arrives in the support window as soon as you are approved — then enter it below.":"Votre demande est encore en cours de vérification. Votre code arrive dans la fenêtre de support dès que vous êtes approuvé — saisissez-le ensuite ci-dessous.",
-"Try again in a moment. If you already have a code, enter it below.":"Réessayez dans un instant. Si vous avez déjà un code, saisissez-le ci-dessous."
+"Try again in a moment. If you already have a code, enter it below.":"Réessayez dans un instant. Si vous avez déjà un code, saisissez-le ci-dessous.",
+"That code no longer works. Make a deposit on your Headway account, then send the request again — your new code arrives in the support window.":"Ce code ne fonctionne plus. Faites un dépôt sur votre compte Headway, puis renvoyez la demande — votre nouveau code arrive dans la fenêtre d'assistance.",
+"Your old code no longer works.":"Votre ancien code ne fonctionne plus.",
+"Make a deposit on your Headway account, then send the request below. Your new code arrives in the support window.":"Faites un dépôt sur votre compte Headway, puis envoyez la demande ci-dessous. Votre nouveau code arrive dans la fenêtre d'assistance."
 }

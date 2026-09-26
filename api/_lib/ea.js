@@ -310,7 +310,14 @@ async function checkCode(code, visitorId) {
   if (!res.ok) { console.error("[ea] code check failed:", res.error); return { ok: false, why: "unavailable" }; }
 
   const hit = (res.data || []).find((r) => normaliseCode(r.code) === wanted);
-  if (!hit) return { ok: false, why: "unknown" };
+  if (!hit) {
+    /* A code that was approved once and then withdrawn — the row is declined
+       but still carries its code. Its owner is told what brings a new one, a
+       deposit and a fresh request, rather than "not recognised". */
+    const gone = await select(TABLE, `select=code&status=eq.declined&code=not.is.null&limit=500`);
+    if (gone.ok && (gone.data || []).some((r) => normaliseCode(r.code) === wanted)) return { ok: false, why: "deposit" };
+    return { ok: false, why: "unknown" };
+  }
   if (hit.visitor_id !== visitorId) return { ok: false, why: "not-yours" };
 
   /* Three downloads, counted on the row. The increment is conditional on the
@@ -358,7 +365,10 @@ async function accessState(visitorId) {
   const rows = res.data || [];
   if (!rows.length) return "none";
   if (rows.some((r) => r.status === "approved" && r.code)) return "approved";
-  return rows[0].status === "declined" ? "declined" : "pending";
+  if (rows[0].status !== "declined") return "pending";
+  // A code that was withdrawn: the way back is a deposit and a fresh request.
+  if (rows.some((r) => r.status === "declined" && r.code)) return "deposit";
+  return "declined";
 }
 
 /** How many times this browser has asked recently — a spam brake, not a rule. */
