@@ -25,7 +25,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 <link rel="stylesheet" href="/styles.css" />
 <link rel="stylesheet" href="/deriv/trading.css" />
 </head>
-<body class="trade">
+<body class="tpage">
 
 <header class="nav tnav">
   <div class="bleed nav-inner">
@@ -38,18 +38,18 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 
     <!-- The account in use, and the way to the other one. Real is green, demo
          is black, both on the same white chip so each reads on either theme. -->
-    <div class="acct" id="acct" hidden>
-      <button class="acct-chip" id="acctBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="acctMenu">
-        <span class="acct-live" id="acctLive" aria-hidden="true"></span>
-        <span class="acct-kind" id="acctKind">Real</span>
-        <span class="acct-amt" id="acctAmt" data-i18n-skip>—</span>
-        <svg class="acct-caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    <div class="tbal" id="acct" hidden>
+      <button class="tbal-chip" id="acctBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="acctMenu">
+        <span class="tbal-live" id="acctLive" aria-hidden="true"></span>
+        <span class="tbal-kind" id="acctKind">Real</span>
+        <span class="tbal-amt" id="acctAmt" data-i18n-skip>—</span>
+        <svg class="tbal-caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
       </button>
-      <div class="acct-menu" id="acctMenu" role="menu" hidden>
-        <div class="acct-list" id="acctList"></div>
-        <div class="acct-foot">
-          <div class="acct-lang" data-lang-switch></div>
-          <button class="acct-out" id="acctOut" type="button" role="menuitem">Disconnect</button>
+      <div class="tbal-menu" id="acctMenu" role="menu" hidden>
+        <div class="tbal-list" id="acctList"></div>
+        <div class="tbal-foot">
+          <div class="tbal-lang" data-lang-switch></div>
+          <button class="tbal-out" id="acctOut" type="button" role="menuitem">Disconnect</button>
         </div>
       </div>
     </div>

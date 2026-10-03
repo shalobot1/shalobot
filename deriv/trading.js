@@ -252,7 +252,7 @@
 
   /* ── painting ──────────────────────────────────────────────────────── */
 
-  var CHECK = '<svg class="acct-row-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+  var CHECK = '<svg class="tbal-row-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
 
   var savedAt = 0, saveLater = 0;
@@ -310,15 +310,15 @@
     });
     var html = order.map(function (a) {
       var real = a.type === "real";
-      return '<button type="button" role="menuitemradio" class="acct-row ' + (real ? "is-real" : "is-demo") + '" data-id="' + esc(a.id) + '"' +
+      return '<button type="button" role="menuitemradio" class="tbal-row ' + (real ? "is-real" : "is-demo") + '" data-id="' + esc(a.id) + '"' +
         ' aria-checked="' + (a.id === picked) + '"' + (a.status !== "active" ? " disabled" : "") + ">" +
         CHECK +
-        '<span class="acct-row-t"><span class="acct-row-k">' + esc(real ? T("Real account") : T("Demo account")) + "</span>" +
-        '<span class="acct-row-id" translate="no">' + esc(a.id) + (a.status !== "active" ? " · " + esc(T("inactive")) : "") + "</span></span>" +
-        '<span class="acct-row-v" translate="no">' + esc(money(a.balance, a.currency)) + "</span></button>";
+        '<span class="tbal-row-t"><span class="tbal-row-k">' + esc(real ? T("Real account") : T("Demo account")) + "</span>" +
+        '<span class="tbal-row-id" translate="no">' + esc(a.id) + (a.status !== "active" ? " · " + esc(T("inactive")) : "") + "</span></span>" +
+        '<span class="tbal-row-v" translate="no">' + esc(money(a.balance, a.currency)) + "</span></button>";
     }).join("");
     if (!order.some(function (a) { return a.type === "real"; })) {
-      html += '<p class="acct-empty">' + esc(T("No real account on this Deriv login yet.")) + "</p>";
+      html += '<p class="tbal-empty">' + esc(T("No real account on this Deriv login yet.")) + "</p>";
     }
     $("acctList").innerHTML = html;
   }
@@ -343,7 +343,7 @@
     });
     $("acctMenu").addEventListener("click", function (e) {
       e.stopPropagation();
-      var row = e.target.closest(".acct-row");
+      var row = e.target.closest(".tbal-row");
       if (row && !row.disabled) {
         picked = row.getAttribute("data-id");
         store.set(PICK, picked);

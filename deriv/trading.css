@@ -10,7 +10,7 @@
  * not shuffle its own width.
  */
 
-.trade { min-height: 100vh; }
+.tpage { min-height: 100vh; }
 .tnav { border-bottom-color: var(--line); }
 .tnav .nav-inner { gap: 14px; }
 
@@ -22,10 +22,10 @@
 
 /* ── the account chip ─────────────────────────────────────────────────── */
 
-.acct { position: relative; margin-left: auto; font-family: Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; }
-.acct[hidden] { display: none; }
+.tbal { position: relative; margin-left: auto; font-family: Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; }
+.tbal[hidden] { display: none; }
 
-.acct-chip {
+.tbal-chip {
   display: inline-flex; align-items: center; gap: 8px;
   height: 38px; padding: 0 10px 0 12px;
   border: 1px solid rgba(15, 23, 42, 0.10); border-radius: 999px;
@@ -35,77 +35,77 @@
   transition: box-shadow .15s ease, transform .15s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.acct-chip:hover { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(0, 0, 0, 0.16); }
-.acct-chip:active { transform: scale(0.98); }
-.acct-chip:focus-visible { outline: 2px solid #0a8f5b; outline-offset: 2px; }
+.tbal-chip:hover { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(0, 0, 0, 0.16); }
+.tbal-chip:active { transform: scale(0.98); }
+.tbal-chip:focus-visible { outline: 2px solid #0a8f5b; outline-offset: 2px; }
 
-.acct-kind {
+.tbal-kind {
   font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
   color: #64748b;
 }
-.acct-amt {
+.tbal-amt {
   font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "cv11" 1;
   white-space: nowrap;
 }
-.acct.is-real .acct-amt { color: #0a8f5b; }   /* real money: green */
-.acct.is-demo .acct-amt { color: #0b0f17; }   /* demo: black */
-.acct-caret { color: #94a3b8; flex: none; transition: transform .15s ease; }
-.acct-chip[aria-expanded="true"] .acct-caret { transform: rotate(180deg); }
+.tbal.is-real .tbal-amt { color: #0a8f5b; }   /* real money: green */
+.tbal.is-demo .tbal-amt { color: #0b0f17; }   /* demo: black */
+.tbal-caret { color: #94a3b8; flex: none; transition: transform .15s ease; }
+.tbal-chip[aria-expanded="true"] .tbal-caret { transform: rotate(180deg); }
 
 /* The heartbeat of the feed: green and breathing while the socket is live,
    amber while it reopens, grey before the first word from Deriv. */
-.acct-live { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #cbd5e1; }
-.acct.is-live .acct-live { background: #16a34a; animation: acct-beat 2.4s ease-in-out infinite; }
-.acct.is-wait .acct-live { background: #f59e0b; }
-@keyframes acct-beat {
+.tbal-live { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #cbd5e1; }
+.tbal.is-live .tbal-live { background: #16a34a; animation: tbal-beat 2.4s ease-in-out infinite; }
+.tbal.is-wait .tbal-live { background: #f59e0b; }
+@keyframes tbal-beat {
   0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45); }
   50%      { box-shadow: 0 0 0 4px rgba(22, 163, 74, 0); }
 }
-@media (prefers-reduced-motion: reduce) { .acct.is-live .acct-live { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .tbal.is-live .tbal-live { animation: none; } }
 
 /* ── the switcher ─────────────────────────────────────────────────────── */
 
-.acct-menu {
+.tbal-menu {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 60;
   min-width: 280px; padding: 6px;
   border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 16px;
   background: #ffffff; color: #0b0f17;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
 }
-.acct-menu[hidden] { display: none; }
+.tbal-menu[hidden] { display: none; }
 
-.acct-row {
+.tbal-row {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 11px 12px; border: 0; border-radius: 11px;
   background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
-.acct-row:hover, .acct-row:focus-visible { background: #f1f5f9; outline: none; }
-.acct-row[disabled] { cursor: default; opacity: .55; }
-.acct-row-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.acct-row-k { font-size: 12.5px; font-weight: 700; }
-.acct-row-id { font-size: 11.5px; color: #64748b; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
-.acct-row-v {
+.tbal-row:hover, .tbal-row:focus-visible { background: #f1f5f9; outline: none; }
+.tbal-row[disabled] { cursor: default; opacity: .55; }
+.tbal-row-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tbal-row-k { font-size: 12.5px; font-weight: 700; }
+.tbal-row-id { font-size: 11.5px; color: #64748b; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.tbal-row-v {
   margin-left: auto; font-size: 14.5px; font-weight: 700;
   font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; white-space: nowrap;
 }
-.acct-row.is-real .acct-row-v { color: #0a8f5b; }
-.acct-row.is-demo .acct-row-v { color: #0b0f17; }
-.acct-row-on { width: 16px; height: 16px; flex: none; color: #0a8f5b; visibility: hidden; }
-.acct-row[aria-checked="true"] .acct-row-on { visibility: visible; }
-.acct-empty { margin: 6px 12px 8px; font-size: 12.5px; color: #64748b; }
+.tbal-row.is-real .tbal-row-v { color: #0a8f5b; }
+.tbal-row.is-demo .tbal-row-v { color: #0b0f17; }
+.tbal-row-on { width: 16px; height: 16px; flex: none; color: #0a8f5b; visibility: hidden; }
+.tbal-row[aria-checked="true"] .tbal-row-on { visibility: visible; }
+.tbal-empty { margin: 6px 12px 8px; font-size: 12.5px; color: #64748b; }
 
-.acct-foot {
+.tbal-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   margin-top: 4px; padding: 8px 6px 2px; border-top: 1px solid #eef2f6;
 }
-.acct-lang:empty { display: none; }
-.acct-lang .lang-btn { background: #f8fafc; border-color: #e2e8f0; color: #0b0f17; }
-.acct-out {
+.tbal-lang:empty { display: none; }
+.tbal-lang .lang-btn { background: #f8fafc; border-color: #e2e8f0; color: #0b0f17; }
+.tbal-out {
   margin-left: auto; padding: 8px 12px; border: 0; border-radius: 10px;
   background: transparent; color: #d92d20; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
 }
-.acct-out:hover { background: #fef2f2; }
+.tbal-out:hover { background: #fef2f2; }
 
 /* ── the states the page can be in before the balances arrive ────────── */
 
@@ -138,7 +138,7 @@
 
 @media (max-width: 560px) {
   .tnav .brand-name { display: none; }
-  .acct-chip { height: 36px; gap: 7px; padding: 0 9px 0 11px; }
-  .acct-amt { font-size: 14px; }
-  .acct-menu { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; }
+  .tbal-chip { height: 36px; gap: 7px; padding: 0 9px 0 11px; }
+  .tbal-amt { font-size: 14px; }
+  .tbal-menu { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; }
 }
