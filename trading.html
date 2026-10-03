@@ -36,20 +36,26 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
       <span class="brand-name">Shalobot</span>
     </a>
 
-    <!-- The account in use, and the way to the other one. Real is green, demo
-         is black, both on the same white chip so each reads on either theme. -->
-    <div class="tbal" id="acct" hidden>
-      <button class="tbal-chip" id="acctBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="acctMenu">
-        <span class="tbal-live" id="acctLive" aria-hidden="true"></span>
-        <span class="tbal-kind" id="acctKind">Real</span>
-        <span class="tbal-amt" id="acctAmt" data-i18n-skip>—</span>
-        <svg class="tbal-caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-      </button>
-      <div class="tbal-menu" id="acctMenu" role="menu" hidden>
-        <div class="tbal-list" id="acctList"></div>
-        <div class="tbal-foot">
-          <div class="tbal-lang" data-lang-switch></div>
-          <button class="tbal-out" id="acctOut" type="button" role="menuitem">Disconnect</button>
+    <div class="tnav-end">
+      <!-- The language, on its own — there before an account is, and the same
+           switch every other page carries. -->
+      <div class="tnav-lang" data-lang-switch></div>
+
+      <!-- The account in use, and the way to the other one, on the page's own
+           surfaces. Real is green; demo is black on light and white on
+           charcoal, so it reads on either. -->
+      <div class="tbal" id="acct" hidden>
+        <button class="tbal-chip" id="acctBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="acctMenu">
+          <span class="tbal-live" id="acctLive" aria-hidden="true"></span>
+          <span class="tbal-kind" id="acctKind">Real</span>
+          <span class="tbal-amt" id="acctAmt" data-i18n-skip>—</span>
+          <svg class="tbal-caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="tbal-menu" id="acctMenu" role="menu" hidden>
+          <div class="tbal-list" id="acctList"></div>
+          <div class="tbal-foot">
+            <button class="tbal-out" id="acctOut" type="button" role="menuitem">Disconnect</button>
+          </div>
         </div>
       </div>
     </div>

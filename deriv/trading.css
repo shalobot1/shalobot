@@ -1,18 +1,36 @@
 /*
  * SHALOBOT — /trading.
  *
- * The page is the site's own dotted ground and one thing in the header: the
- * balance of the account in use. That figure sits on a white chip on every
- * theme, which is what lets the two colours asked for hold anywhere — real in
- * green, demo in black — instead of the black vanishing into charcoal.
+ * The page is the site's own dotted ground, and the header carries two things
+ * on its right: the language switch, on its own, and the balance of the
+ * account in use. Both are drawn in the page's own surfaces and hairlines, so
+ * they belong to the background rather than sitting on top of it.
  *
- * Inter for the figures, with tabular numbers so a balance that changes does
- * not shuffle its own width.
+ * The figures: real money in the site's green on every theme; demo in the
+ * page's ink — black on the light theme, near-white on charcoal — because a
+ * black figure on charcoal cannot be read.
+ *
+ * Inter, with tabular numbers, so a balance that changes does not shuffle its
+ * own width.
  */
 
 .tpage { min-height: 100vh; }
 .tnav { border-bottom-color: var(--line); }
 .tnav .nav-inner { gap: 14px; }
+
+.tnav-end { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+/* The language switch, matched to the chip beside it. */
+.tnav-lang:empty { display: none; }
+.tnav-lang .lang-btn {
+  height: 38px; padding: 0 11px 0 10px;
+  border-color: var(--line-hi); background: var(--raise); color: var(--ink);
+}
+.tnav-lang .lang-btn:hover { border-color: var(--blue); }
+.tnav-lang .lang-menu { border-color: var(--line-hi); background: var(--raise); color: var(--ink); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.40); }
+.tnav-lang .lang-opt { color: var(--ink); }
+.tnav-lang .lang-opt:hover { background: var(--surface-2); }
+.tnav-lang .lang-opt.is-on { color: var(--blue); }
 
 .tmain {
   min-height: 100vh;
@@ -22,45 +40,45 @@
 
 /* ── the account chip ─────────────────────────────────────────────────── */
 
-.tbal { position: relative; margin-left: auto; font-family: Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; }
+.tbal { position: relative; font-family: Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; }
 .tbal[hidden] { display: none; }
 
 .tbal-chip {
-  display: inline-flex; align-items: center; gap: 8px;
-  height: 38px; padding: 0 10px 0 12px;
-  border: 1px solid rgba(15, 23, 42, 0.10); border-radius: 999px;
-  background: #ffffff; color: #0b0f17;
+  display: inline-flex; align-items: center; gap: 9px;
+  height: 38px; padding: 0 11px 0 13px;
+  border: 1px solid var(--line-hi); border-radius: 999px;
+  background: var(--raise); color: var(--ink);
   font: inherit; cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 18px rgba(0, 0, 0, 0.10);
-  transition: box-shadow .15s ease, transform .15s ease;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  transition: border-color .15s ease, transform .15s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.tbal-chip:hover { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(0, 0, 0, 0.16); }
+.tbal-chip:hover { border-color: var(--blue); }
 .tbal-chip:active { transform: scale(0.98); }
-.tbal-chip:focus-visible { outline: 2px solid #0a8f5b; outline-offset: 2px; }
+.tbal-chip:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .tbal-kind {
-  font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
-  color: #64748b;
+  font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--ink-muted);
 }
 .tbal-amt {
   font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "cv11" 1;
   white-space: nowrap;
 }
-.tbal.is-real .tbal-amt { color: #0a8f5b; }   /* real money: green */
-.tbal.is-demo .tbal-amt { color: #0b0f17; }   /* demo: black */
-.tbal-caret { color: #94a3b8; flex: none; transition: transform .15s ease; }
+.tbal.is-real .tbal-amt { color: var(--real); }   /* real money: green */
+.tbal.is-demo .tbal-amt { color: var(--ink); }    /* demo: black on light, near-white on charcoal */
+.tbal-caret { color: var(--ink-muted); flex: none; transition: transform .15s ease; }
 .tbal-chip[aria-expanded="true"] .tbal-caret { transform: rotate(180deg); }
 
 /* The heartbeat of the feed: green and breathing while the socket is live,
    amber while it reopens, grey before the first word from Deriv. */
-.tbal-live { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #cbd5e1; }
-.tbal.is-live .tbal-live { background: #16a34a; animation: tbal-beat 2.4s ease-in-out infinite; }
-.tbal.is-wait .tbal-live { background: #f59e0b; }
+.tbal-live { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--ink-faint); }
+.tbal.is-live .tbal-live { background: var(--ok); animation: tbal-beat 2.4s ease-in-out infinite; }
+.tbal.is-wait .tbal-live { background: var(--amber); }
 @keyframes tbal-beat {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45); }
-  50%      { box-shadow: 0 0 0 4px rgba(22, 163, 74, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 var(--real-tint); }
+  50%      { box-shadow: 0 0 0 5px rgba(0, 0, 0, 0); }
 }
 @media (prefers-reduced-motion: reduce) { .tbal.is-live .tbal-live { animation: none; } }
 
@@ -68,44 +86,42 @@
 
 .tbal-menu {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 60;
-  min-width: 280px; padding: 6px;
-  border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 16px;
-  background: #ffffff; color: #0b0f17;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  min-width: 290px; padding: 6px;
+  border: 1px solid var(--line-hi); border-radius: 16px;
+  background: var(--raise); color: var(--ink);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.40);
 }
 .tbal-menu[hidden] { display: none; }
 
 .tbal-row {
   display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 11px 12px; border: 0; border-radius: 11px;
-  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  padding: 12px; border: 0; border-radius: 11px;
+  background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
 }
-.tbal-row:hover, .tbal-row:focus-visible { background: #f1f5f9; outline: none; }
+.tbal-row:hover, .tbal-row:focus-visible { background: var(--surface-2); outline: none; }
 .tbal-row[disabled] { cursor: default; opacity: .55; }
-.tbal-row-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.tbal-row-k { font-size: 12.5px; font-weight: 700; }
-.tbal-row-id { font-size: 11.5px; color: #64748b; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.tbal-row-t { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tbal-row-k { font-size: 13px; font-weight: 700; color: var(--ink); }
+.tbal-row-id { font-size: 12px; color: var(--ink-muted); font-variant-numeric: tabular-nums; letter-spacing: .02em; }
 .tbal-row-v {
-  margin-left: auto; font-size: 14.5px; font-weight: 700;
+  margin-left: auto; font-size: 15px; font-weight: 700;
   font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; white-space: nowrap;
 }
-.tbal-row.is-real .tbal-row-v { color: #0a8f5b; }
-.tbal-row.is-demo .tbal-row-v { color: #0b0f17; }
-.tbal-row-on { width: 16px; height: 16px; flex: none; color: #0a8f5b; visibility: hidden; }
+.tbal-row.is-real .tbal-row-v { color: var(--real); }
+.tbal-row.is-demo .tbal-row-v { color: var(--ink); }
+.tbal-row-on { width: 16px; height: 16px; flex: none; color: var(--real); visibility: hidden; }
 .tbal-row[aria-checked="true"] .tbal-row-on { visibility: visible; }
-.tbal-empty { margin: 6px 12px 8px; font-size: 12.5px; color: #64748b; }
+.tbal-empty { margin: 6px 12px 8px; font-size: 12.5px; color: var(--ink-muted); }
 
 .tbal-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  margin-top: 4px; padding: 8px 6px 2px; border-top: 1px solid #eef2f6;
+  display: flex; align-items: center; justify-content: flex-end;
+  margin-top: 4px; padding: 6px 2px 0; border-top: 1px solid var(--line);
 }
-.tbal-lang:empty { display: none; }
-.tbal-lang .lang-btn { background: #f8fafc; border-color: #e2e8f0; color: #0b0f17; }
 .tbal-out {
-  margin-left: auto; padding: 8px 12px; border: 0; border-radius: 10px;
-  background: transparent; color: #d92d20; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  padding: 9px 12px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--danger); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
 }
-.tbal-out:hover { background: #fef2f2; }
+.tbal-out:hover, .tbal-out:focus-visible { background: rgba(217, 45, 32, 0.10); outline: none; }
 
 /* ── the states the page can be in before the balances arrive ────────── */
 
@@ -138,6 +154,8 @@
 
 @media (max-width: 560px) {
   .tnav .brand-name { display: none; }
+  .tnav-end { gap: 8px; }
+  .tnav-lang .lang-btn { height: 36px; }
   .tbal-chip { height: 36px; gap: 7px; padding: 0 9px 0 11px; }
   .tbal-amt { font-size: 14px; }
   .tbal-menu { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; }

@@ -337,12 +337,16 @@
   }
 
   function bindSwitcher() {
-    $("acctBtn").addEventListener("click", function (e) {
-      e.stopPropagation();
+    /* The chip's click is left to bubble, so the language list beside it hears
+       it and closes; any click outside the chip and its list closes the list,
+       seen in the capture phase because the language button stops its own. */
+    $("acctBtn").addEventListener("click", function () {
       openMenu($("acctMenu").hidden);
     });
+    document.addEventListener("click", function (e) {
+      if (!$("acctMenu").hidden && !e.target.closest("#acct")) openMenu(false);
+    }, true);
     $("acctMenu").addEventListener("click", function (e) {
-      e.stopPropagation();
       var row = e.target.closest(".tbal-row");
       if (row && !row.disabled) {
         picked = row.getAttribute("data-id");
@@ -352,7 +356,6 @@
         $("acctBtn").focus();
       }
     });
-    document.addEventListener("click", function () { if (!$("acctMenu").hidden) openMenu(false); });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && !$("acctMenu").hidden) { openMenu(false); $("acctBtn").focus(); }
     });
