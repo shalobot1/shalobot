@@ -627,5 +627,26 @@
     whenOpen: function (ms) {
       try { return feedOfCurrent().whenOpen(ms); } catch (e) { return Promise.reject(e); }
     },
+
+    /* The same, pinned to one account — what a running bot uses, so switching
+       the chip mid-run never moves its trades to the other account. */
+    accountOf: function (id) {
+      var a = account(id), f = a && feeds[a.id];
+      return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live) } : null;
+    },
+    askOn: function (id, req, ms) {
+      var f = feeds[id];
+      return f ? f.ask(req, ms) : Promise.reject(new Error("No live connection for this account yet."));
+    },
+    streamOn: function (id, req, onMsg) {
+      var f = feeds[id];
+      if (!f) return null;
+      var sid = f.stream(req, onMsg);
+      return sid ? { end: function () { f.endStream(sid); } } : null;
+    },
+    whenOpenOn: function (id, ms) {
+      var f = feeds[id];
+      return f ? f.whenOpen(ms) : Promise.reject(new Error("No live connection for this account yet."));
+    },
   };
 })(window);
