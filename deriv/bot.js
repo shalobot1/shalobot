@@ -249,8 +249,8 @@
 
   var nowTimer = 0;
   function scheduleNow() {
-    if (nowTimer || !(run && run.active)) return;
-    nowTimer = setTimeout(function () { nowTimer = 0; paintNow(); }, 500);
+    if (nowTimer || !((run && run.active) || (modal.view === "bmDone" && pending))) return;
+    nowTimer = setTimeout(function () { nowTimer = 0; paintNow(); paintPick(); }, 500);
   }
   function paintNow() {
     var on = !!(run && run.active);
@@ -368,12 +368,8 @@
       await sleep(350);
       if (token !== scanToken) return;
 
-      pending = { account: c.id, settings: s, pick: { sym: pick.m.sym, side: pick.side, at: Date.now() } };
-      $("bmMarket").textContent = pick.m.name;
-      $("bmSide").textContent = sideName(pick.side);
-      $("bmSide").className = "bm-pick-side bm-pick-side--" + pick.side;
-      $("bmShare").textContent = fill(T("{p}% of the last {n} ticks"), { p: Math.round(pick.share * 100), n: WINDOW });
-      dots($("bmDots"), pick.digits);
+      pending = { account: c.id, settings: s, pick: null };
+      showPick(pick);
       $("bmStake").textContent = money(s.stake, hub.currency);
       $("bmMult").textContent = "×" + s.mult;
       $("bmTp").textContent = money(s.tp, hub.currency);
@@ -385,6 +381,22 @@
       $("bmErrText").textContent = e.message || T("The scan did not finish. Try again.");
       openModal("bmErr");
     }
+  }
+
+  /** The popup's result, and what Start will trade. While the popup is open
+   *  it follows the ticks, so the first trade is always what is on screen. */
+  function showPick(p) {
+    pending.pick = { sym: p.m.sym, side: p.side, at: Date.now() };
+    $("bmMarket").textContent = p.m.name;
+    $("bmSide").textContent = sideName(p.side);
+    $("bmSide").className = "bm-pick-side bm-pick-side--" + p.side;
+    $("bmShare").textContent = fill(T("{p}% of the last {n} ticks"), { p: Math.round(p.share * 100), n: WINDOW });
+    dots($("bmDots"), p.digits);
+  }
+  function paintPick() {
+    if (modal.view !== "bmDone" || !pending || hub.account !== pending.account) return;
+    var p = choose();
+    if (p) showPick(p);
   }
 
   /* ── the run ───────────────────────────────────────────────────────── */
