@@ -1,31 +1,38 @@
 /**
- * SHALOBOT — the Smart Scan bot, Even/Odd.
+ * SHALOBOT — the Smart Scan bot, Even/Odd. A full automation:
  *
- * LIVE SCAN. On the account's own socket (no extra connection; Deriv allows
- * five per person): which markets offer Even/Odd right now, what a win pays
- * on each at this account's stake (app markup and rounding included), and a
- * tick stream per market keeping its last WINDOW last digits. Each digit is
- * written with the decimals Deriv gives, so a trailing zero is a real 0.
+ *   Scan & start → a popup scans every Even/Odd market live (progress bar),
+ *   settles on the ONE best market and side (animated tick), and Start trading
+ *   hands it to the bot. The bot then trades one 1-tick contract at a time —
+ *   re-scanning before every trade — until take profit, stop loss, Stop, or a
+ *   balance that cannot cover the next stake. Take profit ends in a
+ *   congratulations popup.
  *
- * THE PICK, before every trade: among the markets that pay the most, the
- * market and side whose last WINDOW ticks come closest to 100% of one side;
- * a tie goes to the faster market. That is the rule the owner asked for. It
- * was backtested on 400,000 real ticks before it was written: the chosen side
- * averaged an 82% "pattern" over 10 ticks and won 49.4% — the digits are
- * random, so a pattern is history, not a forecast. The page shows it as what
- * it is.
+ * THE SCAN, on the account's own socket (no extra connection; Deriv allows
+ * five per person): which markets offer Even/Odd now; what a win pays on each
+ * at this account's stake (app markup and rounding included); and a tick
+ * stream per market keeping its last WINDOW last digits, each written with
+ * the decimals Deriv gives so a trailing zero is a real 0.
  *
- * THE RUN. One contract at a time, always 1 tick. Martingale: after a loss
- * the stake is multiplied (default x3.1), after a win it goes back to the
- * starting stake. The run stops on take profit, on stop loss, on Stop, or
- * when the account cannot cover the next stake — and a stake that would carry
- * the loss past the stop loss is never placed, so the loss never overshoots it.
- * Every new run starts from nothing: its log and its figures are cleared.
+ * THE PICK: among the markets that pay the most, the market and side whose
+ * last WINDOW ticks come closest to 100% of one side; a tie goes to the
+ * faster market. This is the owner's rule. Backtested on 400,000 real ticks
+ * it won ~50% — the digits are random — so it is shown as a recent pattern,
+ * never as odds.
  *
- * Each buy is one `buy` with its parameters and subscribe (no separate quote
- * round trip), settled from the contract stream on that same request. A line
- * that drops with a trade in flight is reconciled from the profit table and
- * the portfolio before the bot moves on — it never buys blind.
+ * THE RUN. Martingale: after a loss the stake is multiplied (default x3.1),
+ * after a win it returns to the starting stake. Stop loss stops the run once
+ * the loss has reached it — the next stake is NOT held back for fear of
+ * passing it, because the recovery trade may be the one that wins (so the
+ * final loss can exceed the stop loss by up to the last stake). Each new run
+ * starts from nothing.
+ *
+ * EVERY TRADE IS LOGGED. Each buy is one `buy` with its parameters and
+ * subscribe, settled from the contract stream; a line that drops with a trade
+ * in flight is reconciled from the profit table and the portfolio before the
+ * bot moves on, never bought twice. When a run ends, Deriv's own profit table
+ * is read back and any contract of the run that the page did not see settle is
+ * added, so the last trade before a stop is always in the list.
  */
 
 (function (global) {
@@ -39,19 +46,19 @@
   var fill = function (s, v) { return String(s).replace(/\{(\w+)\}/g, function (_, k) { return v[k] != null ? v[k] : ""; }); };
   var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
   var round2 = function (v) { return Math.round(v * 100) / 100; };
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
 
-  var WINDOW = 10;                       // "the last few ticks"
-  var TIER = 0.004;                      // markets within this of the best payout count as best-paying
+  var WINDOW = 10;
+  var TIER = 0.004;
   var DEFAULTS = { stake: 1, tp: 1000, sl: 1000, mult: 3.1 };
   var SETTINGS_KEY = "shalo_bot_settings";
   var FALLBACK_MIN = 0.35;
+  var LOG_ROWS = 2000;
 
   var store = {
     get: function (k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } },
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
   };
-
-  /* ── money ─────────────────────────────────────────────────────────── */
 
   function money(v, cur) {
     try {
@@ -59,6 +66,20 @@
     } catch (e) { return Number(v).toFixed(2) + " " + (cur || ""); }
   }
   function signed(v, cur) { return (v > 0 ? "+" : v < 0 ? "−" : "") + money(Math.abs(v), cur); }
+  var sideName = function (s) { return s === "even" ? T("Even") : T("Odd"); };
+
+  /** A contract's type and market, from its own fields, else its short code. */
+  function kindOf(x) {
+    if (x.contract_type) return String(x.contract_type);
+    var m = /^(DIGITEVEN|DIGITODD)_/.exec(String(x.shortcode || ""));
+    return m ? m[1] : "";
+  }
+  function symOf(x) {
+    if (x.underlying_symbol) return String(x.underlying_symbol);
+    var sc = String(x.shortcode || "").replace(/^DIGIT(EVEN|ODD)_/, "");
+    var known = hub.order.filter(function (s) { return sc.indexOf(s + "_") === 0; }).sort(function (a, b) { return b.length - a.length; })[0];
+    return known || sc.split("_")[0];
+  }
 
   /* ── the live scan ─────────────────────────────────────────────────── */
 
@@ -79,19 +100,27 @@
     hub.subs = [];
     hub.ready = false;
     hub.starting = null;
+    hub.account = null;
   }
 
-  /** Start (or restart) the scan on one account. Safe to call again: a
-   *  newer start makes every callback of an older one a no-op. */
-  function hubStart(accountId, stake) {
-    if (hub.account === accountId && (hub.ready || hub.starting)) return hub.starting || Promise.resolve();
+  /** Start (or join the start of) the scan on one account. `prog(done,
+   *  total, step)` hears each step. A newer start silences an older one. */
+  function hubStart(accountId, stake, prog) {
+    prog = prog || function () {};
+    if (hub.account === accountId && hub.ready) return Promise.resolve();
+    if (hub.account === accountId && hub.starting) return hub.starting;
     hubStop();
     hub.account = accountId;
     var gen = hub.gen;
     hub.starting = (async function () {
+      prog(0, 1, T("Connecting to the markets…"));
       for (var i = 0; ; i++) {
         try { await D.whenOpenOn(accountId, 6000); break; }
-        catch (e) { if (gen !== hub.gen) return; if (i > 6) throw new Error(T("Not connected to Deriv yet. Try again in a moment.")); await sleep(800); }
+        catch (e) {
+          if (gen !== hub.gen) return;
+          if (i > 6) throw new Error(T("Not connected to Deriv yet. Try again in a moment."));
+          await sleep(800);
+        }
       }
       if (gen !== hub.gen) return;
       var acc = D.accountOf(accountId);
@@ -103,7 +132,7 @@
       if (!list.length) throw new Error(T("No Even/Odd market is open right now."));
       if (gen !== hub.gen) return;
 
-      // The smallest stake Deriv takes for this currency, from Deriv's own refusal.
+      // Deriv's own refusal names the smallest stake for this currency.
       var probe = await D.askOn(accountId, { proposal: 1, amount: 0.01, basis: "stake", currency: hub.currency, underlying_symbol: list[0].underlying_symbol, contract_type: "DIGITEVEN", duration: 1, duration_unit: "t" });
       var arg = probe.error && probe.error.code_args && Number(probe.error.code_args[0]);
       hub.minStake = isFinite(arg) && arg > 0 ? arg : FALLBACK_MIN;
@@ -114,7 +143,8 @@
         hub.markets[x.underlying_symbol] = { sym: x.underlying_symbol, name: x.underlying_symbol_name, digits: [], times: [], ratio: null, at: 0 };
       });
 
-      // History first, so every market has a full window from the start.
+      var total = hub.order.length * 2, done = 0;
+      prog(0, total, fill(T("Reading the last ticks of {n} markets…"), { n: hub.order.length }));
       await Promise.all(hub.order.map(async function (sym) {
         var h = await D.askOn(accountId, { ticks_history: sym, end: "latest", count: 50, style: "ticks" });
         var m = hub.markets[sym];
@@ -124,12 +154,13 @@
           m.times = h.history.times.slice(-50);
           m.at = Date.now();
         }
+        prog(++done, total);
       }));
       if (gen !== hub.gen) return;
-      await price(accountId, stake, gen);
+      prog(done, total, fill(T("Pricing Even and Odd on {n} markets…"), { n: hub.order.length }));
+      await price(accountId, stake, gen, function () { prog(++done, total); });
       if (gen !== hub.gen) return;
 
-      // Then the live streams, one per market.
       hub.order.forEach(function (sym) {
         var s = D.streamOn(accountId, { ticks: sym, subscribe: 1 }, function (msg) {
           if (gen !== hub.gen) return;
@@ -141,14 +172,13 @@
           m.times.push(msg.tick.epoch);
           if (m.times.length > 50) m.times.splice(0, m.times.length - 50);
           m.at = Date.now();
-          scheduleScanPaint();
+          scheduleNow();
         });
         if (s) hub.subs.push(s);
       });
       hub.ready = true;
       hub.starting = null;
       paintMin();
-      scheduleScanPaint();
     })().catch(function (e) {
       if (gen === hub.gen) { hub.starting = null; hub.account = null; }
       throw e;
@@ -156,28 +186,27 @@
     return hub.starting;
   }
 
-  /** The line dropped: the streams are gone with it. Rebuild the scan once
-   *  the socket is back, keeping the run (if any) waiting meanwhile. */
+  /** The line dropped and took the streams with it: rebuild once it is back. */
   var recovering = false;
   function hubRecover(accountId, gen) {
     if (recovering || gen !== hub.gen) return;
     recovering = true;
-    hub.ready = false;
-    hub.account = null;
+    hubStop();
     setTimeout(function () {
       recovering = false;
-      var stake = run && run.active ? run.stake0 : readSettings().stake || DEFAULTS.stake;
+      var stake = run && run.active ? run.stake0 : (readSettings().stake || DEFAULTS.stake);
       hubStart(accountId, stake).catch(function () { setTimeout(function () { hubRecover(accountId, hub.gen); }, 3000); });
     }, 600);
   }
 
   /** What a win pays on each market at this stake, through this account. */
-  async function price(accountId, stake, gen) {
+  async function price(accountId, stake, gen, onEach) {
     var amount = Math.max(round2(stake || DEFAULTS.stake), hub.minStake);
     await Promise.all(hub.order.map(async function (sym) {
       var r = await D.askOn(accountId, { proposal: 1, amount: amount, basis: "stake", currency: hub.currency, underlying_symbol: sym, contract_type: "DIGITEVEN", duration: 1, duration_unit: "t" });
       if (gen !== hub.gen) return;
       hub.markets[sym].ratio = r.error ? null : Number(r.proposal.payout) / amount;
+      if (onEach) onEach();
     }));
     hub.pricedAt = Date.now();
     hub.pricedStake = amount;
@@ -188,8 +217,7 @@
     return t.length > 2 ? (t[t.length - 1] - t[0]) / (t.length - 1) : 2;
   }
 
-  /** The pick: the best-paying markets, then the side closest to 100% over
-   *  the last WINDOW ticks, then the faster market. */
+  /** The one best trade right now. */
   function choose() {
     var fresh = hub.order.map(function (s) { return hub.markets[s]; }).filter(function (m) {
       return m && m.ratio && m.digits.length >= WINDOW && Date.now() - m.at < 20000;
@@ -201,57 +229,38 @@
       if (m.ratio < top - TIER) return;
       var even = m.digits.filter(function (d) { return d % 2 === 0; }).length / m.digits.length;
       [["even", even], ["odd", 1 - even]].forEach(function (s) {
-        var c = { m: m, side: s[0], share: s[1], speed: interval(m) };
+        var c = { m: m, side: s[0], share: s[1], speed: interval(m), digits: m.digits.slice() };
         if (!best || c.share > best.share + 1e-9 || (Math.abs(c.share - best.share) < 1e-9 && c.speed < best.speed - 0.25)) best = c;
       });
     });
     return best;
   }
 
-  /* ── painting the scan ─────────────────────────────────────────────── */
-
-  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-  var sideName = function (s) { return s === "even" ? T("Even") : T("Odd"); };
-
-  var paintTimer = 0;
-  function scheduleScanPaint() {
-    if (paintTimer) return;
-    paintTimer = setTimeout(function () { paintTimer = 0; paintScan(); }, 600);
+  function dots(el, digits) {
+    el.innerHTML = digits.map(function (d) {
+      var e = d % 2 === 0;
+      return '<i class="' + (e ? "e" : "o") + '">' + d + "</i>";
+    }).join("");
   }
 
-  function paintScan() {
-    if (!hub.order.length) return;
-    var pick = choose();
-    var top = Math.max.apply(null, hub.order.map(function (s) { var m = hub.markets[s]; return (m && m.ratio) || 0; }));
-    var rows = hub.order.map(function (s) { return hub.markets[s]; }).filter(Boolean).map(function (m) {
-      var even = m.digits.length ? m.digits.filter(function (d) { return d % 2 === 0; }).length / m.digits.length : null;
-      var lead = even == null ? null : (even >= 0.5 ? "even" : "odd");
-      return { m: m, even: even, lead: lead, share: even == null ? 0 : Math.max(even, 1 - even), best: m.ratio && m.ratio >= top - TIER };
-    });
-    rows.sort(function (a, b) {
-      if (a.best !== b.best) return a.best ? -1 : 1;
-      return b.share - a.share || (b.m.ratio || 0) - (a.m.ratio || 0);
-    });
+  /* ── the live card, while a run is going ───────────────────────────── */
 
-    if (pick) {
-      $("pickMarket").textContent = pick.m.name;
-      $("pickSide").textContent = sideName(pick.side);
-      $("pickSide").className = "bot-pick-side bot-pick-side--" + pick.side;
-      $("pickShare").textContent = fill(T("{p}% of the last {n} ticks"), { p: Math.round(pick.share * 100), n: WINDOW });
-      $("botPick").hidden = false;
-    }
-    $("scanCount").textContent = fill(T("{n} markets · live"), { n: rows.length });
-    $("scanRows").innerHTML = rows.map(function (r) {
-      var m = r.m, isPick = pick && pick.m === m;
-      var pays = m.ratio ? "+" + ((m.ratio - 1) * 100).toFixed(1) + "%" : "—";
-      var bar = r.even == null ? "" :
-        '<span class="bot-bar" aria-hidden="true"><i class="e" style="width:' + Math.round(r.even * 100) + '%"></i></span>';
-      return '<tr class="' + (isPick ? "is-pick" : "") + (r.best ? "" : " is-low") + '">' +
-        '<td class="b-n">' + esc(m.name) + "</td>" +
-        '<td class="b-pay">' + esc(pays) + "</td>" +
-        '<td class="b-split">' + bar + '<span class="b-nums">' + (r.even == null ? "—" : Math.round(r.even * 100) + "% / " + Math.round((1 - r.even) * 100) + "%") + "</span></td>" +
-        '<td class="b-lead">' + (r.lead ? '<span class="b-chip b-chip--' + r.lead + '">' + esc(sideName(r.lead)) + " " + Math.round(r.share * 100) + "%</span>" : "—") + "</td></tr>";
-    }).join("");
+  var nowTimer = 0;
+  function scheduleNow() {
+    if (nowTimer || !(run && run.active)) return;
+    nowTimer = setTimeout(function () { nowTimer = 0; paintNow(); }, 500);
+  }
+  function paintNow() {
+    var on = !!(run && run.active);
+    $("botNow").hidden = !on;
+    if (!on) return;
+    var p = choose();
+    if (!p) return;
+    $("nowMarket").textContent = p.m.name;
+    $("nowSide").textContent = sideName(p.side);
+    $("nowSide").className = "bot-now-side bot-now-side--" + p.side;
+    $("nowShare").textContent = Math.round(p.share * 100) + "%";
+    dots($("nowDots"), p.digits);
   }
 
   /* ── settings ──────────────────────────────────────────────────────── */
@@ -261,24 +270,119 @@
     var v = Number(raw);
     return raw && isFinite(v) ? v : NaN;
   }
-
   function readSettings() {
     return { stake: round2(num("botStake")), tp: round2(num("botTp")), sl: round2(num("botSl")), mult: Math.round(num("botMult") * 100) / 100 };
   }
-
   function validate(s) {
     if (!(s.stake > 0)) return T("Enter a stake.");
-    if (s.stake < hub.minStake) return fill(T("The smallest stake Deriv accepts is {min}."), { min: money(hub.minStake, hub.currency) });
+    if (s.stake < hub.minStake - 1e-9) return fill(T("The smallest stake Deriv accepts is {min}."), { min: money(hub.minStake, hub.currency) });
     if (!(s.tp > 0)) return T("Enter a take profit above zero.");
     if (!(s.sl > 0)) return T("Enter a stop loss above zero.");
-    if (s.stake > s.sl) return T("The stake cannot be larger than the stop loss.");
     if (!(s.mult >= 1 && s.mult <= 10)) return T("Martingale must be between 1 (off) and 10.");
     return "";
   }
-
   function paintMin() {
     $("botMin").textContent = fill(T("Smallest stake Deriv accepts: {min}."), { min: money(hub.minStake, hub.currency) });
     Array.prototype.forEach.call(document.querySelectorAll("[data-bot-cur]"), function (e) { e.textContent = hub.currency; });
+  }
+
+  /* ── the popup ─────────────────────────────────────────────────────── */
+
+  var modal = { view: null, onClose: null, lastFocus: null };
+  function openModal(view) {
+    ["bmScan", "bmDone", "bmErr", "bmWin"].forEach(function (id) { $(id).hidden = id !== view; });
+    if ($("bmRoot").hidden) {
+      modal.lastFocus = document.activeElement;
+      $("bmRoot").hidden = false;
+      document.documentElement.style.overflow = "hidden";
+    }
+    $("bmRoot").setAttribute("data-view", view);
+    modal.view = view;
+    var focus = $("bmRoot").querySelector("#" + view + " .btn-blue") || $("bmRoot").querySelector(".bm-x");
+    if (focus) setTimeout(function () { try { focus.focus(); } catch (e) {} }, 30);
+  }
+  function closeModal() {
+    if ($("bmRoot").hidden) return;
+    $("bmRoot").hidden = true;
+    document.documentElement.style.overflow = "";
+    modal.view = null;
+    scanToken++;                         // a scan still running is abandoned
+    if (modal.lastFocus && modal.lastFocus.focus) modal.lastFocus.focus();
+  }
+
+  /* The bar eases towards the real progress and never jumps backwards, and a
+     scan is shown for at least a moment so the result reads as found, not
+     as a flash. */
+  var bar = { shown: 0, target: 0, raf: 0 };
+  function setProgress(frac, step) {
+    bar.target = Math.max(bar.target, Math.min(1, frac));
+    if (step) $("bmStep").textContent = step;
+    if (!bar.raf) bar.raf = requestAnimationFrame(tickBar);
+  }
+  function tickBar() {
+    bar.raf = 0;
+    bar.shown += (bar.target - bar.shown) * 0.18;
+    if (Math.abs(bar.target - bar.shown) < 0.002) bar.shown = bar.target;
+    $("bmBar").style.width = (bar.shown * 100).toFixed(1) + "%";
+    $("bmPct").textContent = Math.round(bar.shown * 100) + "%";
+    if (bar.shown < bar.target) bar.raf = requestAnimationFrame(tickBar);
+  }
+
+  var scanToken = 0, pending = null;
+
+  async function scanAndOffer() {
+    var c = D.current();
+    if (!c) return;
+    var s = readSettings();
+    say("");
+    var token = ++scanToken;
+    bar.shown = 0; bar.target = 0;
+    setProgress(0, T("Connecting to the markets…"));
+    openModal("bmScan");
+    var t0 = Date.now();
+    try {
+      var fresh = hub.account !== c.id || !hub.ready;
+      await hubStart(c.id, s.stake, function (done, total, step) {
+        if (token === scanToken) setProgress(0.08 + 0.72 * (total ? done / total : 0), step);
+      });
+      if (token !== scanToken) return;
+      var err = validate(s);
+      if (err) throw new Error(err);
+      if (!fresh) {
+        // Already live: price again at this stake and read the patterns now.
+        setProgress(0.35, fill(T("Pricing Even and Odd on {n} markets…"), { n: hub.order.length }));
+        var n = 0, total = hub.order.length;
+        await price(c.id, s.stake, hub.gen, function () { if (token === scanToken) setProgress(0.35 + 0.45 * (++n / total)); });
+      }
+      if (token !== scanToken) return;
+      setProgress(0.9, T("Finding the strongest pattern…"));
+      var pick = null;
+      for (var i = 0; i < 20 && !pick; i++) { pick = choose(); if (!pick) await sleep(300); }
+      if (!pick) throw new Error(T("Deriv did not price any market just now. Try again."));
+      var spent = Date.now() - t0;
+      if (spent < 1600) await sleep(1600 - spent);
+      if (token !== scanToken) return;
+      setProgress(1, T("Done"));
+      await sleep(350);
+      if (token !== scanToken) return;
+
+      pending = { account: c.id, settings: s };
+      $("bmMarket").textContent = pick.m.name;
+      $("bmSide").textContent = sideName(pick.side);
+      $("bmSide").className = "bm-pick-side bm-pick-side--" + pick.side;
+      $("bmShare").textContent = fill(T("{p}% of the last {n} ticks"), { p: Math.round(pick.share * 100), n: WINDOW });
+      dots($("bmDots"), pick.digits);
+      $("bmStake").textContent = money(s.stake, hub.currency);
+      $("bmMult").textContent = "×" + s.mult;
+      $("bmTp").textContent = money(s.tp, hub.currency);
+      $("bmSl").textContent = money(s.sl, hub.currency);
+      $("bmStart").textContent = fill(T("Start trading on {account}"), { account: c.type === "real" ? T("Real") : T("Demo") });
+      openModal("bmDone");
+    } catch (e) {
+      if (token !== scanToken) return;
+      $("bmErrText").textContent = e.message || T("The scan did not finish. Try again.");
+      openModal("bmErr");
+    }
   }
 
   /* ── the run ───────────────────────────────────────────────────────── */
@@ -289,30 +393,25 @@
     return {
       account: account, active: true, stopping: false, ended: null,
       stake0: s.stake, stake: s.stake, tp: s.tp, sl: s.sl, mult: s.mult,
-      pl: 0, n: 0, won: 0, lost: 0, streak: 0, errors: 0, log: [], currency: hub.currency,
+      pl: 0, n: 0, won: 0, lost: 0, streak: 0, errors: 0,
+      log: [], ids: {}, currency: hub.currency, startedAt: Math.floor(Date.now() / 1000) - 1,
     };
   }
 
-  async function start() {
-    if (run && run.active) return;
-    var c = D.current();
+  function startRun() {
+    if (!pending || (run && run.active)) return;
+    var c = D.accountOf(pending.account);
+    var s = pending.settings;
+    pending = null;
+    closeModal();
     if (!c) return;
-    var s = readSettings();
-    say("");
-    try { await hubStart(c.id, s.stake); } catch (e) { return say(e.message, "bad"); }
-    var err = validate(s);
-    if (err) return say(err, "bad");
     store.set(SETTINGS_KEY, s);
-
     // A fresh start: nothing from the last run carries over.
     run = newRun(c.id, s);
     $("botLog").innerHTML = "";
     paintRun();
     paintButton();
-
-    if (Math.abs(hub.pricedStake - Math.max(s.stake, hub.minStake)) > 0.001 || Date.now() - hub.pricedAt > 5 * 60000) {
-      try { await price(c.id, s.stake, hub.gen); } catch (e) {}
-    }
+    paintNow();
     loop(run);
   }
 
@@ -326,9 +425,14 @@
   function end(r, reason, detail) {
     if (!r.active) return;
     r.active = false;
-    r.ended = { reason: reason, detail: detail || "" };
+    r.ended = { reason: reason, detail: detail || "", at: Math.floor(Date.now() / 1000) + 1 };
     paintRun();
     paintButton();
+    paintNow();
+    finalSync(r).then(function () {
+      // Not over a scan the user has already started.
+      if (reason === "tp" && run === r && $("bmRoot").hidden) celebrate(r);
+    });
   }
 
   async function loop(r) {
@@ -337,17 +441,18 @@
       if (r.stopping) return end(r, "user");
       if (r.pl >= r.tp - 1e-9) return end(r, "tp");
       if (-r.pl >= r.sl - 1e-9) return end(r, "sl");
-      if (-r.pl + r.stake > r.sl + 1e-9) return end(r, "sl-next");
       var acc = D.accountOf(r.account);
       if (acc && acc.balance != null && r.stake > acc.balance + 1e-9) return end(r, "balance");
 
-      // Refresh what each market pays every few minutes during a long run.
-      if (Date.now() - hub.pricedAt > 5 * 60000 && hub.ready) { try { await price(r.account, r.stake0, hub.gen); } catch (e) {} }
+      if (Date.now() - hub.pricedAt > 5 * 60000 && hub.ready && hub.account === r.account) {
+        try { await price(r.account, r.stake0, hub.gen); } catch (e) {}
+      }
 
-      var pick = hub.ready ? choose() : null;
+      var pick = hub.ready && hub.account === r.account ? choose() : null;
       if (!pick) {
         if (!waitedSince) waitedSince = Date.now();
-        if (Date.now() - waitedSince > 45000) return end(r, "nodata");
+        if (Date.now() - waitedSince > 60000) return end(r, "nodata");
+        if (!hub.ready && !hub.starting && !recovering) hubStart(r.account, r.stake0).catch(function () {});
         paintRun(T("Waiting for live prices…"));
         await sleep(400);
         continue;
@@ -358,40 +463,74 @@
       try { res = await buyOnce(r, pick); }
       catch (e) {
         r.errors++;
+        if (e.code === "InsufficientBalance") return end(r, "balance");
         if (e.fatal || r.errors >= 3) return end(r, "error", e.message);
         paintRun(e.message);
         await sleep(1500);
         continue;
       }
       r.errors = 0;
-      record(r, pick, res);
+      record(r, { market: pick.m.name, sym: pick.m.sym, side: pick.side, share: pick.share }, res);
       r.stake = res.won ? r.stake0 : round2(r.stake * r.mult);
       paintRun();
     }
   }
 
-  function record(r, pick, res) {
+  /** One row of the log and the run's figures, once per contract. */
+  function record(r, what, res) {
+    if (res.id && r.ids[res.id]) return;
+    if (res.id) r.ids[res.id] = 1;
     r.n++;
     r.pl = round2(r.pl + res.pl);
     if (res.won) { r.won++; r.streak = 0; } else { r.lost++; r.streak++; }
-    var row = { at: Date.now(), market: pick.m.name, side: pick.side, share: pick.share, stake: res.stake, pl: res.pl, won: res.won, total: r.pl };
+    var row = { at: res.at || Date.now(), market: what.market, side: what.side, share: what.share, stake: res.stake, pl: res.pl, won: res.won, total: r.pl, late: !!what.late };
     r.log.unshift(row);
-    if (r.log.length > 500) r.log.length = 500;
+    if (run !== r) return;
     var el = document.createElement("li");
     el.className = "bot-row " + (row.won ? "is-won" : "is-lost");
     el.innerHTML =
       '<span class="br-t">' + esc(new Date(row.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })) + "</span>" +
       '<span class="br-m">' + esc(row.market) + "</span>" +
-      '<span class="br-s b-chip b-chip--' + row.side + '">' + esc(sideName(row.side)) + " " + Math.round(row.share * 100) + "%</span>" +
+      '<span class="br-s"><span class="b-chip b-chip--' + row.side + '">' + esc(sideName(row.side)) + (row.share != null ? " " + Math.round(row.share * 100) + "%" : "") + "</span></span>" +
       '<span class="br-k">' + esc(money(row.stake, r.currency)) + "</span>" +
       '<span class="br-p">' + esc(signed(row.pl, r.currency)) + "</span>" +
       '<span class="br-c">' + esc(signed(row.total, r.currency)) + "</span>";
     var list = $("botLog");
     list.insertBefore(el, list.firstChild);
-    while (list.children.length > 200) list.removeChild(list.lastChild);
+    while (list.children.length > LOG_ROWS) list.removeChild(list.lastChild);
+    paintRun();
   }
 
-  /** One contract, one tick, start to settlement. Resolves { won, pl, stake }. */
+  /** After a run: Deriv's profit table is the record. Anything of this run
+   *  the page did not see settle (a contract still open at the stop, a line
+   *  that dropped) is added now — the log matches Deriv, last trade included. */
+  async function finalSync(r) {
+    for (var attempt = 0; attempt < 4; attempt++) {
+      try {
+        await D.whenOpenOn(r.account, 6000);
+        var pt = await D.askOn(r.account, { profit_table: 1, limit: 100, sort: "DESC", description: 1, contract_type: ["DIGITEVEN", "DIGITODD"], date_from: String(r.startedAt) }, 10000);
+        var rows = ((pt.profit_table && pt.profit_table.transactions) || []).filter(function (x) {
+          return x.contract_id && Number(x.purchase_time) >= r.startedAt && Number(x.purchase_time) <= r.ended.at &&
+            /^DIGIT(EVEN|ODD)$/.test(kindOf(x)) && !r.ids[x.contract_id];
+        });
+        rows.reverse().forEach(function (x) {
+          var sym = symOf(x), m = hub.markets[sym];
+          var pl = round2(Number(x.sell_price) - Number(x.buy_price));
+          record(r, { market: (m && m.name) || sym, sym: sym, side: kindOf(x) === "DIGITEVEN" ? "even" : "odd", share: null, late: true },
+            { id: x.contract_id, won: pl > 0, pl: pl, stake: Number(x.buy_price), at: Number(x.sell_time || x.purchase_time) * 1000 });
+        });
+        var pf = await D.askOn(r.account, { portfolio: 1 }, 10000);
+        var open = ((pf.portfolio && pf.portfolio.contracts) || []).some(function (x) {
+          return Number(x.purchase_time) >= r.startedAt && /^DIGIT(EVEN|ODD)$/.test(kindOf(x));
+        });
+        if (!open) break;
+      } catch (e) { /* the line is coming back */ }
+      await sleep(2000);
+    }
+    if (run === r) { paintRun(); paintButton(); }
+  }
+
+  /** One contract, one tick, start to settlement. Resolves { won, pl, stake, id, at }. */
   function buyOnce(r, pick) {
     return new Promise(function (resolve, reject) {
       var type = pick.side === "even" ? "DIGITEVEN" : "DIGITODD";
@@ -408,35 +547,36 @@
         if (subId) D.askOn(r.account, { forget: subId }, 5000).catch(function () {});
         if (err) reject(err); else resolve(v);
       }
-      function fromContract(c) {
+      function fromContract(c, id) {
         var pl = c.profit != null && c.profit !== "" ? Number(c.profit)
           : Number(c.sell_price != null ? c.sell_price : 0) - Number(c.buy_price);
         pl = round2(pl);
-        done({ won: c.status === "won" || pl > 0, pl: pl, stake: Number(c.buy_price) || stake });
+        done({ won: c.status === "won" || pl > 0, pl: pl, stake: Number(c.buy_price) || stake, id: id || c.contract_id || (bought && bought.contract_id), at: Date.now() });
       }
       async function lost() {
         if (settled) return;
         paintRun(T("Checking the trade with Deriv…"));
-        for (var i = 0; i < 8 && !settled; i++) {
+        var match = function (x) {
+          return (bought && Number(x.contract_id) === Number(bought.contract_id)) ||
+            (!bought && Number(x.purchase_time) >= started && kindOf(x) === type && symOf(x) === pick.m.sym);
+        };
+        for (var i = 0; i < 10 && !settled; i++) {
           try {
             await D.whenOpenOn(r.account, 6000);
-            var match = function (x) {
-              return (bought && Number(x.contract_id) === Number(bought.contract_id)) ||
-                (!bought && Number(x.purchase_time) >= started && String(x.shortcode || "").indexOf(type + "_" + pick.m.sym + "_") === 0);
-            };
-            var pt = await D.askOn(r.account, { profit_table: 1, limit: 10, sort: "DESC", description: 1 }, 10000);
+            var pt = await D.askOn(r.account, { profit_table: 1, limit: 10, sort: "DESC", description: 1, contract_type: [type] }, 10000);
             var hit = ((pt.profit_table && pt.profit_table.transactions) || []).filter(match)[0];
-            if (hit) return fromContract({ buy_price: hit.buy_price, sell_price: hit.sell_price, status: Number(hit.sell_price) > Number(hit.buy_price) ? "won" : "lost" });
+            if (hit) return fromContract({ buy_price: hit.buy_price, sell_price: hit.sell_price, status: Number(hit.sell_price) > Number(hit.buy_price) ? "won" : "lost" }, hit.contract_id);
             var pf = await D.askOn(r.account, { portfolio: 1 }, 10000);
             var open = ((pf.portfolio && pf.portfolio.contracts) || []).some(match);
-            if (!open && !bought && i >= 1) {
-              var e = new Error(T("The trade was not placed. Nothing was spent."));
-              return done(null, e);
-            }
+            if (!open && !bought && i >= 1) return done(null, new Error(T("The trade was not placed. Nothing was spent.")));
           } catch (x) { /* still reconnecting */ }
           await sleep(2500);
         }
-        if (!settled) { var f = new Error(T("Could not confirm the last trade. The bot stopped so nothing is bought twice — check your Deriv statement.")); f.fatal = true; done(null, f); }
+        if (!settled) {
+          var f = new Error(T("Could not confirm the last trade. The bot stopped so nothing is bought twice — check your Deriv statement."));
+          f.fatal = true;
+          done(null, f);
+        }
       }
 
       handle = D.streamOn(r.account, {
@@ -448,8 +588,8 @@
         if (m.error) {
           if (bought) return lost();
           var e = new Error(T(m.error.message || "Deriv refused the trade."));
-          var code = m.error.code || "";
-          e.fatal = /InsufficientBalance|ContractBuyValidationError|InvalidContract|AuthorizationRequired|PermissionDenied/.test(code);
+          e.code = m.error.code || "";
+          e.fatal = /InsufficientBalance|ContractBuyValidationError|InvalidContract|AuthorizationRequired|PermissionDenied/.test(m.error.code || "");
           return done(null, e);
         }
         if (m.msg_type === "buy" && m.buy) {
@@ -457,11 +597,19 @@
           if (m.subscription) subId = m.subscription.id;
         } else if (m.msg_type === "proposal_open_contract" && m.proposal_open_contract) {
           if (m.subscription && !subId) subId = m.subscription.id;
-          if (m.proposal_open_contract.is_sold) fromContract(m.proposal_open_contract);
+          if (m.proposal_open_contract.is_sold) fromContract(m.proposal_open_contract, m.proposal_open_contract.contract_id);
         }
       });
       if (!handle) { clearTimeout(guard); settled = true; reject(new Error(T("Not connected to Deriv yet. Try again in a moment."))); }
     });
+  }
+
+  /* ── the take-profit popup ─────────────────────────────────────────── */
+
+  function celebrate(r) {
+    $("bmWinAmt").textContent = signed(r.pl, r.currency);
+    $("bmWinSum").textContent = fill(T("{n} trades · {w} won · {l} lost"), { n: r.n, w: r.won, l: r.lost });
+    openModal("bmWin");
   }
 
   /* ── painting the run ──────────────────────────────────────────────── */
@@ -470,7 +618,6 @@
     user: "Stopped.",
     tp: "Take profit reached.",
     sl: "Stop loss reached.",
-    "sl-next": "Stopped: the next stake would pass the stop loss.",
     balance: "Stopped: the account cannot cover the next stake.",
     nodata: "Stopped: no live prices from Deriv.",
     error: "Stopped after an error.",
@@ -484,12 +631,12 @@
     $("botN").textContent = String(r ? r.n : 0);
     $("botWon").textContent = String(r ? r.won : 0);
     $("botLost").textContent = String(r ? r.lost : 0);
-    $("botNext").textContent = r ? money(r.stake, cur) : "—";
+    $("botNext").textContent = r && r.active ? money(r.stake, cur) : "—";
     $("botStreak").textContent = String(r ? r.streak : 0);
     $("botEmpty").hidden = !!(r && r.n);
     $("logN").textContent = r && r.n ? fill(T("{n} this run"), { n: r.n }) : "";
 
-    var st = $("botState"), text, kind;
+    var text, kind;
     if (!r) { text = T("Ready"); kind = "idle"; }
     else if (r.active && r.stopping) { text = T("Stopping after this trade…"); kind = "wait"; }
     else if (r.active) { text = note || (r.n ? T("Running") : T("Starting…")); kind = "run"; }
@@ -499,21 +646,23 @@
       kind = r.ended.reason === "tp" ? "won" : (r.ended.reason === "user" ? "idle" : "bad");
     }
     $("botStateText").textContent = text;
-    st.className = "bot-state bot-state--" + kind;
+    $("botState").className = "bot-state bot-state--" + kind;
   }
 
   function paintButton() {
     var b = $("botGo"), c = D.current();
-    var running = run && run.active;
-    b.classList.toggle("is-stop", !!running);
+    var running = !!(run && run.active);
+    b.classList.toggle("is-stop", running);
     b.disabled = !!(running && run.stopping) || !c;
-    var where = c ? (c.type === "real" ? T("Real") : T("Demo")) : "";
-    $("botGoText").textContent = running ? (run.stopping ? T("Stopping…") : T("Stop")) : fill(T("Start on {account}"), { account: where });
+    $("botGoText").textContent = running ? (run.stopping ? T("Stopping…") : T("Stop")) : T("Scan & start");
     b.classList.toggle("is-real", !running && !!(c && c.type === "real"));
-    ["botStake", "botTp", "botSl", "botMult"].forEach(function (id) { $(id).disabled = !!running; });
+    ["botStake", "botTp", "botSl", "botMult"].forEach(function (id) { $(id).disabled = running; });
     if (running) {
       var acc = D.accountOf(run.account);
       $("botOn").textContent = acc ? fill(T("Trading on {account} {id}"), { account: acc.type === "real" ? T("Real") : T("Demo"), id: acc.id }) : "";
+      $("botOn").hidden = false;
+    } else if (c) {
+      $("botOn").textContent = fill(T("Will trade on {account} {id}"), { account: c.type === "real" ? T("Real") : T("Demo"), id: c.id });
       $("botOn").hidden = false;
     } else $("botOn").hidden = true;
   }
@@ -532,12 +681,11 @@
     var on = !!c && !$("acct").hidden;
     $("scan").hidden = !on;
     paintButton();
-    if (!on) return;
-    // The scan follows the chip — except while a run is going, when it stays
-    // on the run's own account.
-    var target = run && run.active ? run.account : c.id;
-    if (hub.account !== target) {
-      hubStart(target, readSettings().stake || DEFAULTS.stake).catch(function (e) { say(e.message, "bad"); });
+    // A different chip while idle: the next scan starts on that account.
+    if (on && !(run && run.active) && hub.account && hub.account !== c.id) hubStop();
+    if (on && !hub.account) {
+      var acc = D.accountOf(c.id);
+      if (acc && acc.currency && acc.currency !== hub.currency) { hub.currency = acc.currency; paintMin(); }
     }
   }
 
@@ -547,12 +695,31 @@
   $("botSl").value = String(saved.sl > 0 ? saved.sl : DEFAULTS.sl);
   $("botMult").value = String(saved.mult >= 1 ? saved.mult : DEFAULTS.mult);
 
-  $("botGo").addEventListener("click", function () { if (run && run.active) stop(); else start(); });
-  global.addEventListener("shalo:account", onAccount);
-  global.addEventListener("langchange", function () { paintScan(); paintRun(); paintButton(); paintMin(); });
-  global.addEventListener("beforeunload", function (e) {
-    if (run && run.active) { e.preventDefault(); e.returnValue = ""; }
+  $("botGo").addEventListener("click", function () {
+    if (run && run.active) return stop();
+    var s = readSettings();
+    var err = validate(s);
+    if (err) return say(err, "bad");
+    scanAndOffer();
   });
+  $("bmStart").addEventListener("click", startRun);
+  $("bmRetry").addEventListener("click", scanAndOffer);
+  $("bmRoot").addEventListener("click", function (e) { if (e.target.closest("[data-bm-close]")) closeModal(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("bmRoot").hidden) closeModal(); });
+  global.addEventListener("shalo:account", onAccount);
+  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); });
+  global.addEventListener("beforeunload", function (e) { if (run && run.active) { e.preventDefault(); e.returnValue = ""; } });
+
+  // The column heads line up with the rows whatever the scrollbar takes.
+  var wrap = document.querySelector(".bot-log-wrap"), head = document.querySelector(".bot-log-head");
+  if (wrap && head && global.ResizeObserver) {
+    var gutter = function () { head.style.setProperty("--sb", Math.max(0, wrap.offsetWidth - wrap.clientWidth) + "px"); };
+    var ro = new ResizeObserver(gutter);
+    ro.observe(wrap);
+    ro.observe($("botLog"));
+  }
+
   paintRun();
   onAccount();
+  global.ShaloBot = { run: function () { return run; }, hub: hub, choose: choose };
 })(window);
