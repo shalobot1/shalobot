@@ -683,7 +683,7 @@
 
   function celebrate(r) {
     $("bmWinAmt").textContent = signed(r.pl, r.currency);
-    $("bmWinSum").textContent = fill(T("{n} trades · {w} won · {l} lost"), { n: r.n, w: r.won, l: r.lost });
+    $("bmWinSum").textContent = fill(T("Trades: {n} · Won: {w} · Lost: {l}"), { n: r.n, w: r.won, l: r.lost });
     openModal("bmWin");
   }
 

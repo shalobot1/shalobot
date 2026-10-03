@@ -457,6 +457,6 @@
 "You hit your take profit.":"Alcanzaste tu take profit.",
 "of the last 10 ticks":"de los últimos 10 ticks",
 "{n} this run":"{n} en esta sesión",
-"{n} trades · {w} won · {l} lost":"{n} operaciones · {w} ganadas · {l} perdidas",
+"Trades: {n} · Won: {w} · Lost: {l}":"Operaciones: {n} · Ganadas: {w} · Perdidas: {l}",
 "{p}% of the last {n} ticks":"{p}% de los últimos {n} ticks"
 }
