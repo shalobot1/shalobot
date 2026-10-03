@@ -150,6 +150,7 @@
         var m = hub.markets[sym];
         if (!h.error && h.history) {
           var dec = Number(h.pip_size);
+          m.dec = dec;
           m.digits = h.history.prices.map(function (q) { return lastDigit(q, dec); }).slice(-WINDOW);
           m.times = h.history.times.slice(-50);
           m.at = Date.now();
@@ -167,7 +168,8 @@
           if (msg.closed) return hubRecover(accountId, gen);
           if (msg.error || !msg.tick) return;
           var m = hub.markets[sym];
-          m.digits.push(lastDigit(msg.tick.quote, Number(msg.tick.pip_size)));
+          m.dec = Number(msg.tick.pip_size);
+          m.digits.push(lastDigit(msg.tick.quote, m.dec));
           if (m.digits.length > WINDOW) m.digits.splice(0, m.digits.length - WINDOW);
           m.times.push(msg.tick.epoch);
           if (m.times.length > 50) m.times.splice(0, m.times.length - 50);
@@ -366,7 +368,7 @@
       await sleep(350);
       if (token !== scanToken) return;
 
-      pending = { account: c.id, settings: s };
+      pending = { account: c.id, settings: s, pick: { sym: pick.m.sym, side: pick.side, at: Date.now() } };
       $("bmMarket").textContent = pick.m.name;
       $("bmSide").textContent = sideName(pick.side);
       $("bmSide").className = "bm-pick-side bm-pick-side--" + pick.side;
@@ -401,13 +403,14 @@
   function startRun() {
     if (!pending || (run && run.active)) return;
     var c = D.accountOf(pending.account);
-    var s = pending.settings;
+    var s = pending.settings, first = pending.pick;
     pending = null;
     closeModal();
     if (!c) return;
     store.set(SETTINGS_KEY, s);
     // A fresh start: nothing from the last run carries over.
     run = newRun(c.id, s);
+    run.first = first;
     $("botLog").innerHTML = "";
     paintRun();
     paintButton();
@@ -435,6 +438,17 @@
     });
   }
 
+  /** The first trade is the one the popup showed, while it is still fresh. */
+  function firstPick(r) {
+    var f = r.first;
+    if (!f || r.n || Date.now() - f.at > 60000) return null;
+    r.first = null;
+    var m = hub.markets[f.sym];
+    if (!m || !m.ratio || m.digits.length < WINDOW || Date.now() - m.at > 20000) return null;
+    var even = m.digits.filter(function (d) { return d % 2 === 0; }).length / m.digits.length;
+    return { m: m, side: f.side, share: f.side === "even" ? even : 1 - even, digits: m.digits.slice() };
+  }
+
   async function loop(r) {
     var waitedSince = 0;
     while (r.active) {
@@ -448,7 +462,7 @@
         try { await price(r.account, r.stake0, hub.gen); } catch (e) {}
       }
 
-      var pick = hub.ready && hub.account === r.account ? choose() : null;
+      var pick = hub.ready && hub.account === r.account ? (firstPick(r) || choose()) : null;
       if (!pick) {
         if (!waitedSince) waitedSince = Date.now();
         if (Date.now() - waitedSince > 60000) return end(r, "nodata");
@@ -471,6 +485,7 @@
       }
       r.errors = 0;
       record(r, { market: pick.m.name, sym: pick.m.sym, side: pick.side, share: pick.share }, res);
+      if (res.final) res.final.then(function (f) { if (f) correct(r, f.id, f); });
       r.stake = res.won ? r.stake0 : round2(r.stake * r.mult);
       paintRun();
     }
@@ -483,18 +498,19 @@
     r.n++;
     r.pl = round2(r.pl + res.pl);
     if (res.won) { r.won++; r.streak = 0; } else { r.lost++; r.streak++; }
-    var row = { at: res.at || Date.now(), market: what.market, side: what.side, share: what.share, stake: res.stake, pl: res.pl, won: res.won, total: r.pl, late: !!what.late };
+    var row = { id: res.id, at: res.at || Date.now(), market: what.market, side: what.side, share: what.share, stake: res.stake, pl: res.pl, won: res.won, total: r.pl, late: !!what.late };
     r.log.unshift(row);
     if (run !== r) return;
     var el = document.createElement("li");
     el.className = "bot-row " + (row.won ? "is-won" : "is-lost");
     el.innerHTML =
-      '<span class="br-t">' + esc(new Date(row.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })) + "</span>" +
+      '<span class="br-t">' + esc(new Date(row.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })) + "</span>" +
       '<span class="br-m">' + esc(row.market) + "</span>" +
       '<span class="br-s"><span class="b-chip b-chip--' + row.side + '">' + esc(sideName(row.side)) + (row.share != null ? " " + Math.round(row.share * 100) + "%" : "") + "</span></span>" +
       '<span class="br-k">' + esc(money(row.stake, r.currency)) + "</span>" +
       '<span class="br-p">' + esc(signed(row.pl, r.currency)) + "</span>" +
       '<span class="br-c">' + esc(signed(row.total, r.currency)) + "</span>";
+    row.el = el;
     var list = $("botLog");
     list.insertBefore(el, list.firstChild);
     while (list.children.length > LOG_ROWS) list.removeChild(list.lastChild);
@@ -521,7 +537,7 @@
         });
         var pf = await D.askOn(r.account, { portfolio: 1 }, 10000);
         var open = ((pf.portfolio && pf.portfolio.contracts) || []).some(function (x) {
-          return Number(x.purchase_time) >= r.startedAt && /^DIGIT(EVEN|ODD)$/.test(kindOf(x));
+          return Number(x.purchase_time) >= r.startedAt && /^DIGIT(EVEN|ODD)$/.test(kindOf(x)) && !r.ids[x.contract_id];
         });
         if (!open) break;
       } catch (e) { /* the line is coming back */ }
@@ -530,28 +546,63 @@
     if (run === r) { paintRun(); paintButton(); }
   }
 
-  /** One contract, one tick, start to settlement. Resolves { won, pl, stake, id, at }. */
+  /** One contract, one tick. Resolves { won, pl, stake, id, at, final }.
+   *
+   *  A 1-tick Even/Odd contract is decided by its exit tick, and Deriv says so
+   *  at once (is_expired, is_settleable, the exit spot and the final profit);
+   *  booking it as sold follows 1 to 7 seconds later. The bot moves on at the
+   *  exit tick — but only when the exit spot's own last digit agrees with the
+   *  profit — and keeps listening until Deriv books it: `final` resolves with
+   *  the booked result (or null if the line went), and the run corrects
+   *  itself on the rare chance the two differ. */
   function buyOnce(r, pick) {
     return new Promise(function (resolve, reject) {
       var type = pick.side === "even" ? "DIGITEVEN" : "DIGITODD";
       var stake = r.stake;
       var started = Math.floor(Date.now() / 1000) - 2;
-      var settled = false, bought = null, subId = null, handle = null;
+      var settled = false, closed = false, bought = null, subId = null, handle = null, tail = 0;
+      var finalResolve, final = new Promise(function (res) { finalResolve = res; });
       var guard = setTimeout(function () { if (!settled) lost(); }, 30000);
 
-      function done(v, err) {
-        if (settled) return;
-        settled = true;
+      function close() {
+        if (closed) return;
+        closed = true;
         clearTimeout(guard);
+        clearTimeout(tail);
         if (handle) handle.end();
         if (subId) D.askOn(r.account, { forget: subId }, 5000).catch(function () {});
-        if (err) reject(err); else resolve(v);
       }
-      function fromContract(c, id) {
+      function fail(err) {
+        if (settled) return;
+        settled = true;
+        close();
+        finalResolve(null);
+        reject(err);
+      }
+      function result(c, id) {
         var pl = c.profit != null && c.profit !== "" ? Number(c.profit)
           : Number(c.sell_price != null ? c.sell_price : 0) - Number(c.buy_price);
         pl = round2(pl);
-        done({ won: c.status === "won" || pl > 0, pl: pl, stake: Number(c.buy_price) || stake, id: id || c.contract_id || (bought && bought.contract_id), at: Date.now() });
+        return { won: pl > 0, pl: pl, stake: Number(c.buy_price) || stake, id: id || c.contract_id || (bought && bought.contract_id), at: Date.now() };
+      }
+      /** isFinal: Deriv has booked it. Otherwise the exit tick has decided it. */
+      function settle(v, isFinal) {
+        if (!settled) {
+          settled = true;
+          clearTimeout(guard);
+          v.final = final;
+          resolve(v);
+          if (isFinal) { finalResolve(v); close(); }
+          else tail = setTimeout(function () { finalResolve(null); close(); }, 30000);
+        } else if (isFinal) { finalResolve(v); close(); }
+      }
+      function decided(c) {
+        if (Number(c.is_expired) !== 1 || Number(c.is_settleable) !== 1) return false;
+        if (c.exit_spot == null || c.exit_spot === "" || c.profit == null || c.profit === "") return false;
+        var m = hub.markets[pick.m.sym];
+        var spot = m && isFinite(m.dec) ? Number(c.exit_spot).toFixed(m.dec) : String(c.exit_spot);
+        var even = Number(spot.charAt(spot.length - 1)) % 2 === 0;
+        return (even === (type === "DIGITEVEN")) === (Number(c.profit) > 0);
       }
       async function lost() {
         if (settled) return;
@@ -565,17 +616,17 @@
             await D.whenOpenOn(r.account, 6000);
             var pt = await D.askOn(r.account, { profit_table: 1, limit: 10, sort: "DESC", description: 1, contract_type: [type] }, 10000);
             var hit = ((pt.profit_table && pt.profit_table.transactions) || []).filter(match)[0];
-            if (hit) return fromContract({ buy_price: hit.buy_price, sell_price: hit.sell_price, status: Number(hit.sell_price) > Number(hit.buy_price) ? "won" : "lost" }, hit.contract_id);
+            if (hit) return settle(result({ buy_price: hit.buy_price, sell_price: hit.sell_price }, hit.contract_id), true);
             var pf = await D.askOn(r.account, { portfolio: 1 }, 10000);
             var open = ((pf.portfolio && pf.portfolio.contracts) || []).some(match);
-            if (!open && !bought && i >= 1) return done(null, new Error(T("The trade was not placed. Nothing was spent.")));
+            if (!open && !bought && i >= 1) return fail(new Error(T("The trade was not placed. Nothing was spent.")));
           } catch (x) { /* still reconnecting */ }
           await sleep(2500);
         }
         if (!settled) {
           var f = new Error(T("Could not confirm the last trade. The bot stopped so nothing is bought twice — check your Deriv statement."));
           f.fatal = true;
-          done(null, f);
+          fail(f);
         }
       }
 
@@ -583,25 +634,49 @@
         buy: 1, price: stake, subscribe: 1,
         parameters: { contract_type: type, underlying_symbol: pick.m.sym, duration: 1, duration_unit: "t", basis: "stake", amount: stake, currency: r.currency },
       }, function (m) {
-        if (settled) return;
+        if (closed) return;
+        var c = m.msg_type === "proposal_open_contract" && m.proposal_open_contract;
+        if (settled) {
+          // Decided already; only Deriv's booking is still to come.
+          if (c && c.is_sold) settle(result(c, c.contract_id), true);
+          else if (m.closed || m.error) { finalResolve(null); close(); }
+          return;
+        }
         if (m.closed) return lost();
         if (m.error) {
           if (bought) return lost();
           var e = new Error(T(m.error.message || "Deriv refused the trade."));
           e.code = m.error.code || "";
-          e.fatal = /InsufficientBalance|ContractBuyValidationError|InvalidContract|AuthorizationRequired|PermissionDenied/.test(m.error.code || "");
-          return done(null, e);
+          e.fatal = /InsufficientBalance|ContractBuyValidationError|InvalidContract|AuthorizationRequired|PermissionDenied/.test(e.code);
+          return fail(e);
         }
         if (m.msg_type === "buy" && m.buy) {
           bought = m.buy;
           if (m.subscription) subId = m.subscription.id;
-        } else if (m.msg_type === "proposal_open_contract" && m.proposal_open_contract) {
+        } else if (c) {
           if (m.subscription && !subId) subId = m.subscription.id;
-          if (m.proposal_open_contract.is_sold) fromContract(m.proposal_open_contract, m.proposal_open_contract.contract_id);
+          if (c.is_sold) settle(result(c, c.contract_id), true);
+          else if (decided(c)) settle(result(c, c.contract_id), false);
         }
       });
-      if (!handle) { clearTimeout(guard); settled = true; reject(new Error(T("Not connected to Deriv yet. Try again in a moment."))); }
+      if (!handle) { clearTimeout(guard); settled = closed = true; finalResolve(null); reject(new Error(T("Not connected to Deriv yet. Try again in a moment."))); }
     });
+  }
+
+  /** Deriv booked a trade differently from its exit tick: put the run right. */
+  function correct(r, id, f) {
+    var row = r.log.filter(function (x) { return x.id === id; })[0];
+    if (!row || (row.pl === f.pl && row.won === f.won)) return;
+    r.pl = round2(r.pl - row.pl + f.pl);
+    if (row.won !== f.won) {
+      if (f.won) { r.won++; r.lost--; } else { r.lost++; r.won--; }
+    }
+    row.pl = f.pl; row.won = f.won;
+    if (row.el) {
+      row.el.className = "bot-row " + (f.won ? "is-won" : "is-lost");
+      row.el.querySelector(".br-p").textContent = signed(f.pl, r.currency);
+    }
+    if (run === r) paintRun();
   }
 
   /* ── the take-profit popup ─────────────────────────────────────────── */
