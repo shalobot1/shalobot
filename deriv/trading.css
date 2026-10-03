@@ -35,7 +35,7 @@
 .tmain {
   min-height: 100vh;
   padding: 68px var(--gutter) 40px;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
 }
 
 /* ── the account chip ─────────────────────────────────────────────────── */
@@ -125,7 +125,7 @@
 
 /* ── the states the page can be in before the balances arrive ────────── */
 
-.tstate { width: 100%; max-width: 520px; text-align: center; }
+.tstate { width: 100%; max-width: 520px; margin: auto 0; text-align: center; }  /* centred while it is alone */
 .tstate[hidden], .tstate > [hidden] { display: none !important; }
 
 .tstate-busy { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--ink-muted); font-size: 14.5px; }

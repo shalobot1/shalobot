@@ -104,11 +104,13 @@
     $("tConnect").hidden = false;
     $("tConnectMsg").textContent = T(message || "Sign in on Deriv's own page and come straight back. Shalobot never sees your password.");
     $("acct").hidden = true;
+    if ($("scan")) $("scan").hidden = true;
     painted = false;
   }
   function showNote(text) {
     painted = false;
     $("acct").hidden = true;
+    if ($("scan")) $("scan").hidden = true;
     $("tState").hidden = false;
     $("tBusy").hidden = true;
     $("tConnect").hidden = true;
@@ -301,6 +303,8 @@
     $("acctAmt").textContent = money(a.balance, a.currency);
     $("acctBtn").setAttribute("aria-label", (a.type === "real" ? T("Real") : T("Demo")) + " " + money(a.balance, a.currency));
     if (!$("acctMenu").hidden) paintMenu();
+    // Anything else on the page that shows the account (the scanner) follows it.
+    try { global.dispatchEvent(new CustomEvent("shalo:account")); } catch (e) {}
   }
 
   function paintMenu() {
@@ -382,6 +386,62 @@
     this.timer = 0;
     this.pinger = 0;
     this.stopped = false;
+    /* The same socket carries the scanner's questions and the trades: one
+       connection per account, because Deriv allows five per person in all. */
+    this.seq = 100;          // req_id 1 is the balance stream
+    this.pending = {};       // req_id → { resolve, reject, timer }
+    this.streams = {};       // req_id → function (message)
+  }
+
+  /** Resolves once the socket is open, or rejects after `ms`. */
+  Feed.prototype.whenOpen = function (ms) {
+    var self = this;
+    return new Promise(function (resolve, reject) {
+      var until = Date.now() + (ms || 10000);
+      (function check() {
+        if (self.stopped) return reject(new Error("stopped"));
+        if (self.ws && self.ws.readyState === 1) return resolve();
+        if (Date.now() > until) return reject(new Error("Not connected to Deriv yet."));
+        setTimeout(check, 120);
+      })();
+    });
+  };
+
+  /** One request, one answer — the answer is resolved even when it carries
+   *  an error, so the caller reads Deriv's own reason. Rejects only when no
+   *  answer could come: not connected, the line dropped, or `ms` passed. */
+  Feed.prototype.ask = function (req, ms) {
+    var self = this;
+    return this.whenOpen(10000).then(function () {
+      return new Promise(function (resolve, reject) {
+        var id = ++self.seq;
+        var t = setTimeout(function () { delete self.pending[id]; reject(new Error("Deriv did not answer in time.")); }, ms || 15000);
+        self.pending[id] = { resolve: resolve, reject: reject, timer: t };
+        try { self.ws.send(JSON.stringify(Object.assign({}, req, { req_id: id }))); }
+        catch (e) { clearTimeout(t); delete self.pending[id]; reject(e); }
+      });
+    });
+  };
+
+  /** A request whose answers keep coming (a subscription, a buy with
+   *  subscribe). `onMsg` gets every message for it, and { closed: true } if the
+   *  line drops first. Returns the req_id, or 0 when it could not be sent. */
+  Feed.prototype.stream = function (req, onMsg) {
+    if (!this.ws || this.ws.readyState !== 1) return 0;
+    var id = ++this.seq;
+    this.streams[id] = onMsg;
+    try { this.ws.send(JSON.stringify(Object.assign({}, req, { req_id: id }))); }
+    catch (e) { delete this.streams[id]; return 0; }
+    return id;
+  };
+  Feed.prototype.endStream = function (id) { delete this.streams[id]; };
+
+  /** Everything waiting on this socket learns at once that it is gone. */
+  Feed.prototype.failAll = function () {
+    var p = this.pending, s = this.streams;
+    this.pending = {}; this.streams = {};
+    Object.keys(p).forEach(function (k) { clearTimeout(p[k].timer); p[k].reject(new Error("The connection to Deriv dropped.")); });
+    Object.keys(s).forEach(function (k) { try { s[k]({ closed: true }); } catch (e) {} });
   }
 
   Feed.prototype.open = function (url) {
@@ -404,6 +464,13 @@
     ws.onmessage = function (ev) {
       self.last = Date.now();
       var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.req_id && m.req_id > 1) {
+        var sub = self.streams[m.req_id];
+        if (sub) { try { sub(m); } catch (e) {} return; }
+        var w = self.pending[m.req_id];
+        if (w) { delete self.pending[m.req_id]; clearTimeout(w.timer); w.resolve(m); }
+        return;
+      }
       if (m.error) {
         // A refused subscription means this socket cannot serve a balance:
         // replace it rather than sit on a feed that will never speak.
@@ -428,6 +495,7 @@
       self.ws = null;
       self.live = false;
       clearInterval(self.pinger);
+      self.failAll();
       paint();
       if (!self.stopped) self.retry();
     };
@@ -448,6 +516,7 @@
     this.ws = null;
     this.live = false;
     if (ws) { ws.onclose = null; try { ws.close(); } catch (e) {} }
+    this.failAll();
   };
 
   /** Throw away a socket that has gone quiet or bad, and open another now. */
@@ -528,6 +597,35 @@
   if (q.get("state") && (q.get("code") || q.get("error"))) finishSignIn(q);
   else { paintLast(); boot(); }
 
-  // For debugging in the console: the live state, never a token (there is none here).
-  global.ShaloDeriv = { accounts: function () { return accounts; }, feeds: feeds, revive: revive };
+  /* What the scanner and the trade buttons use: the account in the chip, and
+     its socket. Never a token — there is none in this page. */
+  function current() {
+    var a = account(picked);
+    var f = a && feeds[a.id];
+    return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live) } : null;
+  }
+  function feedOfCurrent() {
+    var a = account(picked);
+    var f = a && feeds[a.id];
+    if (!f) throw new Error("No live connection for this account yet.");
+    return f;
+  }
+
+  global.ShaloDeriv = {
+    accounts: function () { return accounts; },
+    feeds: feeds,
+    revive: revive,
+    current: current,
+    ask: function (req, ms) {
+      try { return feedOfCurrent().ask(req, ms); } catch (e) { return Promise.reject(e); }
+    },
+    stream: function (req, onMsg) {
+      var f; try { f = feedOfCurrent(); } catch (e) { return null; }
+      var id = f.stream(req, onMsg);
+      return id ? { end: function () { f.endStream(id); } } : null;
+    },
+    whenOpen: function (ms) {
+      try { return feedOfCurrent().whenOpen(ms); } catch (e) { return Promise.reject(e); }
+    },
+  };
 })(window);
