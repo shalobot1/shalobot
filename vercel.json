@@ -4,14 +4,17 @@
   "trailingSlash": false,
   "redirects": [
     { "source": "/dashboard.html", "destination": "/dashboard", "permanent": true },
-    { "source": "/index.html", "destination": "/", "permanent": true }
+    { "source": "/index.html", "destination": "/", "permanent": true },
+    { "source": "/trading.html", "destination": "/trading", "permanent": true }
   ],
   "rewrites": [
-    { "source": "/dashboard", "destination": "/dashboard.html" }
+    { "source": "/dashboard", "destination": "/dashboard.html" },
+    { "source": "/trading", "destination": "/trading.html" }
   ],
   "functions": {
     "api/mt5/signals.js": { "maxDuration": 30 },
-    "api/mt5/ea-download.js": { "includeFiles": "api/_files/**" }
+    "api/mt5/ea-download.js": { "includeFiles": "api/_files/**" },
+    "api/deriv/*.js": { "maxDuration": 30 }
   },
   "headers": [
     {
@@ -24,11 +27,11 @@
       "headers": [{ "key": "Content-Type", "value": "application/xml; charset=utf-8" }]
     },
     {
-      "source": "/(index|dashboard).html",
+      "source": "/(index|dashboard|trading).html",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
     },
     {
-      "source": "/(sw.js|mt5/.*|support.js|support.css|i18n/.*)",
+      "source": "/(sw.js|mt5/.*|deriv/.*|support.js|support.css|i18n/.*)",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
     },
     {

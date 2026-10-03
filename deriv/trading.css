@@ -1,0 +1,144 @@
+/*
+ * SHALOBOT — /trading.
+ *
+ * The page is the site's own dotted ground and one thing in the header: the
+ * balance of the account in use. That figure sits on a white chip on every
+ * theme, which is what lets the two colours asked for hold anywhere — real in
+ * green, demo in black — instead of the black vanishing into charcoal.
+ *
+ * Inter for the figures, with tabular numbers so a balance that changes does
+ * not shuffle its own width.
+ */
+
+.trade { min-height: 100vh; }
+.tnav { border-bottom-color: var(--line); }
+.tnav .nav-inner { gap: 14px; }
+
+.tmain {
+  min-height: 100vh;
+  padding: 68px var(--gutter) 40px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── the account chip ─────────────────────────────────────────────────── */
+
+.acct { position: relative; margin-left: auto; font-family: Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; }
+.acct[hidden] { display: none; }
+
+.acct-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  height: 38px; padding: 0 10px 0 12px;
+  border: 1px solid rgba(15, 23, 42, 0.10); border-radius: 999px;
+  background: #ffffff; color: #0b0f17;
+  font: inherit; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 18px rgba(0, 0, 0, 0.10);
+  transition: box-shadow .15s ease, transform .15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.acct-chip:hover { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(0, 0, 0, 0.16); }
+.acct-chip:active { transform: scale(0.98); }
+.acct-chip:focus-visible { outline: 2px solid #0a8f5b; outline-offset: 2px; }
+
+.acct-kind {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: #64748b;
+}
+.acct-amt {
+  font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "cv11" 1;
+  white-space: nowrap;
+}
+.acct.is-real .acct-amt { color: #0a8f5b; }   /* real money: green */
+.acct.is-demo .acct-amt { color: #0b0f17; }   /* demo: black */
+.acct-caret { color: #94a3b8; flex: none; transition: transform .15s ease; }
+.acct-chip[aria-expanded="true"] .acct-caret { transform: rotate(180deg); }
+
+/* The heartbeat of the feed: green and breathing while the socket is live,
+   amber while it reopens, grey before the first word from Deriv. */
+.acct-live { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #cbd5e1; }
+.acct.is-live .acct-live { background: #16a34a; animation: acct-beat 2.4s ease-in-out infinite; }
+.acct.is-wait .acct-live { background: #f59e0b; }
+@keyframes acct-beat {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45); }
+  50%      { box-shadow: 0 0 0 4px rgba(22, 163, 74, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .acct.is-live .acct-live { animation: none; } }
+
+/* ── the switcher ─────────────────────────────────────────────────────── */
+
+.acct-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60;
+  min-width: 280px; padding: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 16px;
+  background: #ffffff; color: #0b0f17;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+}
+.acct-menu[hidden] { display: none; }
+
+.acct-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 11px 12px; border: 0; border-radius: 11px;
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.acct-row:hover, .acct-row:focus-visible { background: #f1f5f9; outline: none; }
+.acct-row[disabled] { cursor: default; opacity: .55; }
+.acct-row-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.acct-row-k { font-size: 12.5px; font-weight: 700; }
+.acct-row-id { font-size: 11.5px; color: #64748b; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.acct-row-v {
+  margin-left: auto; font-size: 14.5px; font-weight: 700;
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; white-space: nowrap;
+}
+.acct-row.is-real .acct-row-v { color: #0a8f5b; }
+.acct-row.is-demo .acct-row-v { color: #0b0f17; }
+.acct-row-on { width: 16px; height: 16px; flex: none; color: #0a8f5b; visibility: hidden; }
+.acct-row[aria-checked="true"] .acct-row-on { visibility: visible; }
+.acct-empty { margin: 6px 12px 8px; font-size: 12.5px; color: #64748b; }
+
+.acct-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 4px; padding: 8px 6px 2px; border-top: 1px solid #eef2f6;
+}
+.acct-lang:empty { display: none; }
+.acct-lang .lang-btn { background: #f8fafc; border-color: #e2e8f0; color: #0b0f17; }
+.acct-out {
+  margin-left: auto; padding: 8px 12px; border: 0; border-radius: 10px;
+  background: transparent; color: #d92d20; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.acct-out:hover { background: #fef2f2; }
+
+/* ── the states the page can be in before the balances arrive ────────── */
+
+.tstate { width: 100%; max-width: 520px; text-align: center; }
+.tstate[hidden], .tstate > [hidden] { display: none !important; }
+
+.tstate-busy { display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--ink-muted); font-size: 14.5px; }
+.tspin {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2.5px solid var(--line-hi); border-top-color: var(--blue);
+  animation: tspin .8s linear infinite;
+}
+@keyframes tspin { to { transform: rotate(360deg); } }
+
+.tconnect {
+  padding: 30px 26px 24px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--raise);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.22);
+}
+.tconnect-mark { display: inline-flex; padding: 9px 14px; border-radius: 12px; background: #ffffff; }
+.tconnect-mark img { display: block; height: 20px; width: auto; }
+.tconnect h1 { margin: 18px 0 8px; font-size: clamp(22px, 3.2vw, 28px); letter-spacing: -0.02em; line-height: 1.15; }
+.tconnect-lede { margin: 0 auto; max-width: 420px; color: var(--ink-muted); font-size: 15px; line-height: 1.55; }
+.tconnect-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+.tconnect-actions .btn { justify-content: center; width: 100%; }
+.tconnect-fine { margin: 14px 0 0; font-size: 12.5px; color: var(--ink-faint); }
+
+.tnote { padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--raise); color: var(--ink-muted); font-size: 14.5px; line-height: 1.55; }
+.tnote p { margin: 0; }
+
+@media (max-width: 560px) {
+  .tnav .brand-name { display: none; }
+  .acct-chip { height: 36px; gap: 7px; padding: 0 9px 0 11px; }
+  .acct-amt { font-size: 14px; }
+  .acct-menu { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; }
+}
