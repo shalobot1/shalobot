@@ -20,7 +20,8 @@
  *
  * THE SCAN, on the account's own socket (no extra connection; Deriv allows
  * five per person): which markets offer digit contracts now; what a win pays
- * on each side at this account's stake (app markup and rounding included);
+ * on each side through this app (markup included, read at a stake of 10 so
+ * cent rounding does not hide the gaps between markets);
  * and a tick stream per market keeping its last LONG last digits, each written
  * with the decimals Deriv gives so a trailing zero is a real 0.
  *
@@ -64,6 +65,7 @@
   var LONG = 100;           // the tie-break: the last 100
   var TIER = 0.0025;        // "pays the most": within 0.25% of the best payout
   var MULT_MAX = 50;
+  var PRICE_REF = 10;       // payouts are read at 10 or more: at 0.35 the cent rounding hides the gaps between markets
   var DEFAULTS = { stake: 1, tp: 1000, sl: 1000 };
   var STATE_KEY = "shalo_bot_v2";
   var OLD_KEY = "shalo_bot_settings";   // Even/Odd only, before the types
@@ -308,10 +310,13 @@
     }, 600);
   }
 
-  /** What a win pays on each market and side at this stake, through this
-   *  account. A refusal for rate keeps the last price; any other clears it. */
+  /** What a win pays on each market and side through this account (app
+   *  markup included), read at the stake or at PRICE_REF if that is more —
+   *  at 0.35 every market rounds to the same cents, and a Martingale stake
+   *  would then land on one that pays less. A refusal for rate keeps the
+   *  last price; any other (a market that offers no return) clears it. */
   async function price(accountId, stake, gen, onEach, spec) {
-    var amount = Math.max(round2(stake || DEFAULTS.stake), hub.minStake);
+    var amount = Math.max(round2(stake || DEFAULTS.stake), hub.minStake, PRICE_REF);
     var jobs = [];
     hub.order.forEach(function (sym) { spec.prices.forEach(function (p) { jobs.push([sym, p]); }); });
     await Promise.all(jobs.map(async function (j) {
