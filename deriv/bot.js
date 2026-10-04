@@ -12,6 +12,9 @@
  * same chance of winning, so the scan decides WHERE and WHICH, never how much
  * risk — that is the user's choice:
  *   Even/Odd         Even or Odd (50%).
+ *   Rise/Fall        Rise or Fall over one tick (50%). The top payout tier is
+ *                    the Step indices (1.845, prices move in fixed steps so a
+ *                    tick never ties); Volatility indices pay 1.783.
  *   Over/Under       the user picks a prediction pair, Over N / Under 9−N —
  *                    mirror contracts with the same chance and the same payout
  *                    (measured on all 20 markets) — and the scan picks the side.
@@ -19,11 +22,12 @@
  *                    scan picks the digit.
  *
  * THE SCAN, on the account's own socket (no extra connection; Deriv allows
- * five per person): which markets offer digit contracts now; what a win pays
- * on each side through this app (markup included, read at a stake of 10 so
- * cent rounding does not hide the gaps between markets);
- * and a tick stream per market keeping its last LONG last digits, each written
- * with the decimals Deriv gives so a trailing zero is a real 0.
+ * five per person): which markets sell digit contracts or 1-tick Rise/Fall
+ * now; what a win pays on each side through this app (markup included, read at
+ * a stake of 10 so cent rounding does not hide the gaps between markets); and a
+ * tick stream per market keeping its last LONG last digits — each written with
+ * the decimals Deriv gives, so a trailing zero is a real 0 — and its last LONG
+ * tick-to-tick moves.
  *
  * THE PICK: among the sides that pay the most, the one whose last WINDOW ticks
  * would have won closest to 100% of the time; a tie goes to the last LONG
@@ -71,7 +75,7 @@
   var OLD_KEY = "shalo_bot_settings";   // Even/Odd only, before the types
   var FALLBACK_MIN = 0.35;
   var LOG_ROWS = 2000;
-  var ENABLED = ["evenodd", "overunder", "matchdiff"];
+  var ENABLED = ["evenodd", "risefall", "overunder", "matchdiff"];
 
   var store = {
     get: function (k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } },
@@ -92,10 +96,13 @@
      rounded up (measured 2026-10-04). */
   var OU_MULT = { 0: 17.7, 1: 6.3, 2: 3.9, 3: 2.8, 4: 2.2, 5: 1.8, 6: 1.6, 7: 1.4, 8: 1.2 };
 
-  /** One contract the bot can buy. `wins(d)`: does last digit d win it. */
-  function side(key, ct, barrier, tone, wins, label, priceBarrier) {
-    var pb = priceBarrier != null ? priceBarrier : barrier;
-    return { key: key, ct: ct, barrier: barrier, tone: tone, wins: wins, label: label,
+  /** One contract the bot can buy. `wins(x)`: does x win it, where x is a
+   *  last digit (series "digits") or a tick-to-tick move, +1 / -1 / 0
+   *  (series "moves"). `priceBarrier`: the barrier its price is read at. */
+  function side(key, ct, barrier, tone, wins, label, opts) {
+    opts = opts || {};
+    var pb = opts.priceBarrier != null ? opts.priceBarrier : barrier;
+    return { key: key, ct: ct, barrier: barrier, tone: tone, wins: wins, label: label, series: opts.series || "digits",
       price: { ct: ct, barrier: pb }, priceKey: ct + (pb != null ? ":" + pb : "") };
   }
 
@@ -114,6 +121,21 @@
       },
       pricing: function () { return T("Pricing Even and Odd on {n} markets…"); },
       dot: function (d) { return d % 2 === 0 ? "e" : "o"; },
+    },
+    risefall: {
+      title: "Scanning Rise/Fall markets",
+      lede: "Finds the best market and direction, Rise or Fall, then trades it one 1-tick contract at a time until your take profit or stop loss.",
+      variants: null, defVariant: "x",
+      // Step indices pay 1.845 and never tie: 1.845 / 0.845, rounded up.
+      defMult: function () { return 2.2; },
+      contracts: function () { return ["CALL", "PUT"]; },
+      sides: function () {
+        return [
+          side("rise", "CALL", null, "a", function (x) { return x > 0; }, function () { return T("Rise"); }, { series: "moves" }),
+          side("fall", "PUT", null, "b", function (x) { return x < 0; }, function () { return T("Fall"); }, { series: "moves" }),
+        ];
+      },
+      pricing: function () { return T("Pricing Rise and Fall on {n} markets…"); },
     },
     overunder: {
       title: "Scanning Over/Under markets",
@@ -145,8 +167,8 @@
         var out = [];
         for (var k = 0; k <= 9; k++) (function (k) {
           out.push(v === "match"
-            ? side("match" + k, "DIGITMATCH", k, "b", function (d) { return d === k; }, function () { return fill(T("Matches {n}"), { n: k }); }, 5)
-            : side("diff" + k, "DIGITDIFF", k, "a", function (d) { return d !== k; }, function () { return fill(T("Differs {n}"), { n: k }); }, 5));
+            ? side("match" + k, "DIGITMATCH", k, "b", function (d) { return d === k; }, function () { return fill(T("Matches {n}"), { n: k }); }, { priceBarrier: 5 })
+            : side("diff" + k, "DIGITDIFF", k, "a", function (d) { return d !== k; }, function () { return fill(T("Differs {n}"), { n: k }); }, { priceBarrier: 5 }));
         })(k);
         return out;
       },
@@ -232,10 +254,19 @@
       var acc = D.accountOf(accountId);
       hub.currency = (acc && acc.currency) || "USD";
 
-      // The 20 digit markets are the same for every digit type (measured).
+      // The 20 digit markets (the same for every digit type, measured), and
+      // the synthetic indices that sell Rise/Fall — in ticks, which adds the
+      // 5 Step indices. Forex and the rest sell Rise/Fall only in minutes.
       var a = await D.askOn(accountId, { active_symbols: "brief", contract_type: ["DIGITEVEN"] });
       if (a.error) throw new Error(a.error.message);
-      var list = (a.active_symbols || []).filter(function (x) { return x.exchange_is_open && !x.is_trading_suspended; });
+      var rf = await D.askOn(accountId, { active_symbols: "brief", contract_type: ["CALL"] });
+      var open = function (x) { return x.exchange_is_open && !x.is_trading_suspended; };
+      var list = (a.active_symbols || []).filter(open), seenSym = {};
+      list.forEach(function (x) { seenSym[x.underlying_symbol] = 1; });
+      ((rf && rf.active_symbols) || []).forEach(function (x) {
+        // (The basket indices are synthetic too, but sell Rise/Fall only in minutes.)
+        if (open(x) && x.market === "synthetic_index" && !/basket/.test(x.submarket || "") && !seenSym[x.underlying_symbol]) { seenSym[x.underlying_symbol] = 1; list.push(x); }
+      });
       if (!list.length) throw new Error(T("No Even/Odd market is open right now."));
       if (gen !== hub.gen) return;
 
@@ -247,19 +278,22 @@
       hub.markets = {}; hub.order = [];
       list.forEach(function (x) {
         hub.order.push(x.underlying_symbol);
-        hub.markets[x.underlying_symbol] = { sym: x.underlying_symbol, name: x.underlying_symbol_name, digits: [], times: [], ratio: {}, at: 0 };
+        hub.markets[x.underlying_symbol] = { sym: x.underlying_symbol, name: x.underlying_symbol_name, digits: [], moves: [], times: [], ratio: {}, at: 0, lastQuote: null, lastEpoch: 0 };
       });
 
       var total = hub.order.length * (1 + spec.prices.length), done = 0;
       prog(0, total, fill(T("Reading the last ticks of {n} markets…"), { n: hub.order.length }));
       await Promise.all(hub.order.map(async function (sym) {
-        var h = await D.askOn(accountId, { ticks_history: sym, end: "latest", count: LONG, style: "ticks" });
+        var h = await D.askOn(accountId, { ticks_history: sym, end: "latest", count: LONG + 1, style: "ticks" });
         var m = hub.markets[sym];
-        if (!h.error && h.history) {
-          var dec = Number(h.pip_size);
+        if (!h.error && h.history && h.history.prices.length) {
+          var dec = Number(h.pip_size), pr = h.history.prices.map(Number);
           m.dec = dec;
-          m.digits = h.history.prices.map(function (q) { return lastDigit(q, dec); }).slice(-LONG);
+          m.digits = pr.map(function (q) { return lastDigit(q, dec); }).slice(-LONG);
+          m.moves = pr.slice(1).map(function (q, i) { return Math.sign(q - pr[i]); }).slice(-LONG);
           m.times = h.history.times.slice(-50);
+          m.lastQuote = pr[pr.length - 1];
+          m.lastEpoch = h.history.times[h.history.times.length - 1];
           m.at = Date.now();
         }
         prog(++done, total);
@@ -275,9 +309,19 @@
           if (msg.closed) return hubRecover(accountId, gen);
           if (msg.error || !msg.tick) return;
           var m = hub.markets[sym];
+          m.at = Date.now();
+          // The subscription opens with the latest tick, which the history already has.
+          if (msg.tick.epoch <= m.lastEpoch) return;
+          var q = Number(msg.tick.quote);
           m.dec = Number(msg.tick.pip_size);
-          m.digits.push(lastDigit(msg.tick.quote, m.dec));
+          m.digits.push(lastDigit(q, m.dec));
           if (m.digits.length > LONG) m.digits.splice(0, m.digits.length - LONG);
+          if (m.lastQuote != null) {
+            m.moves.push(Math.sign(Number(q.toFixed(m.dec)) - Number(m.lastQuote.toFixed(m.dec))));
+            if (m.moves.length > LONG) m.moves.splice(0, m.moves.length - LONG);
+          }
+          m.lastQuote = q;
+          m.lastEpoch = msg.tick.epoch;
           m.times.push(msg.tick.epoch);
           if (m.times.length > 50) m.times.splice(0, m.times.length - 50);
           m.at = Date.now();
@@ -350,8 +394,10 @@
   function candidate(m, sd) {
     var ratio = m && m.ratio[sd.priceKey];
     if (!ratio || m.digits.length < WINDOW || Date.now() - m.at > 20000) return null;
-    var last = m.digits.slice(-WINDOW);
-    return { m: m, side: sd, ratio: ratio, share: share(last, sd.wins), long: share(m.digits, sd.wins), speed: interval(m), digits: last };
+    var series = m[sd.series] || [];
+    if (series.length < WINDOW) return null;
+    var last = series.slice(-WINDOW);
+    return { m: m, side: sd, ratio: ratio, share: share(last, sd.wins), long: share(series, sd.wins), speed: interval(m), digits: last };
   }
   function better(a, b) {
     if (Math.abs(a.share - b.share) > 1e-9) return a.share > b.share;
@@ -375,7 +421,8 @@
   function dots(el, p, spec) {
     el.innerHTML = p.digits.map(function (d) {
       var cls = spec.t.dot ? spec.t.dot(d) : (p.side.wins(d) ? "w t-" + p.side.tone : "x");
-      return '<i class="' + cls + '">' + d + "</i>";
+      var glyph = p.side.series === "moves" ? (d > 0 ? "↑" : d < 0 ? "↓" : "=") : d;
+      return '<i class="' + cls + '">' + glyph + "</i>";
     }).join("");
   }
 
@@ -834,6 +881,10 @@
         if (Number(c.is_expired) !== 1 || Number(c.is_settleable) !== 1) return false;
         if (c.exit_spot == null || c.exit_spot === "" || c.profit == null || c.profit === "") return false;
         var m = hub.markets[pick.m.sym];
+        if (sd.series === "moves") {
+          if (c.entry_spot == null || c.entry_spot === "") return false;
+          return sd.wins(Math.sign(Number(c.exit_spot) - Number(c.entry_spot))) === (Number(c.profit) > 0);
+        }
         var spot = m && isFinite(m.dec) ? Number(c.exit_spot).toFixed(m.dec) : String(c.exit_spot);
         return sd.wins(Number(spot.charAt(spot.length - 1))) === (Number(c.profit) > 0);
       }

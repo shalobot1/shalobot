@@ -477,5 +477,11 @@
 "Pricing Over {a} and Under {b} on {n} markets…":"Cotation de Supérieur à {a} et Inférieur à {b} sur {n} marchés…",
 "Pricing Differs on {n} markets…":"Cotation du contrat Différent sur {n} marchés…",
 "Pricing Matches on {n} markets…":"Cotation du contrat Égal sur {n} marchés…",
-"Martingale must be between 1 (off) and {max}.":"La martingale doit être comprise entre 1 (désactivée) et {max}."
+"Martingale must be between 1 (off) and {max}.":"La martingale doit être comprise entre 1 (désactivée) et {max}.",
+"Rise / Fall":"Hausse / Baisse",
+"Rise":"Hausse",
+"Fall":"Baisse",
+"Scanning Rise/Fall markets":"Scan des marchés Hausse/Baisse",
+"Finds the best market and direction, Rise or Fall, then trades it one 1-tick contract at a time until your take profit or stop loss.":"Trouve le meilleur marché et la meilleure direction, Hausse ou Baisse, puis le trade un contrat d’1 tick à la fois jusqu’à votre take profit ou stop loss.",
+"Pricing Rise and Fall on {n} markets…":"Cotation de Hausse et Baisse sur {n} marchés…"
 }

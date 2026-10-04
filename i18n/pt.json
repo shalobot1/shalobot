@@ -477,5 +477,11 @@
 "Pricing Over {a} and Under {b} on {n} markets…":"Cotando Acima de {a} e Abaixo de {b} em {n} mercados…",
 "Pricing Differs on {n} markets…":"Cotando Diferente em {n} mercados…",
 "Pricing Matches on {n} markets…":"Cotando Igual em {n} mercados…",
-"Martingale must be between 1 (off) and {max}.":"O Martingale deve ficar entre 1 (desligado) e {max}."
+"Martingale must be between 1 (off) and {max}.":"O Martingale deve ficar entre 1 (desligado) e {max}.",
+"Rise / Fall":"Sobe / Desce",
+"Rise":"Sobe",
+"Fall":"Desce",
+"Scanning Rise/Fall markets":"Escaneando mercados Sobe/Desce",
+"Finds the best market and direction, Rise or Fall, then trades it one 1-tick contract at a time until your take profit or stop loss.":"Encontra o melhor mercado e direção, Sobe ou Desce, e opera um contrato de 1 tick por vez até o seu take profit ou stop loss.",
+"Pricing Rise and Fall on {n} markets…":"Cotando Sobe e Desce em {n} mercados…"
 }
