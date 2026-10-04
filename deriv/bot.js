@@ -71,7 +71,6 @@
   var TIER = 0.0025;        // "pays the most": within 0.25% of the best payout
   var MULT_MAX = 50;
   var PRICE_REF = 10;       // payouts are read at 10 or more: at 0.35 the cent rounding hides the gaps between markets
-  var DEFAULTS = { stake: 1, tp: 1000, sl: 1000 };
   var STATE_KEY = "shalo_bot_v2";
   var OLD_KEY = "shalo_bot_settings";   // Even/Odd only, before the types
   var FALLBACK_MIN = 0.35;
@@ -142,7 +141,7 @@
       title: "Scanning Over/Under markets",
       lede: "Finds the best market and side for your prediction, Over or Under, then trades it one 1-tick contract at a time until your take profit or stop loss.",
       variantLabel: "Prediction",
-      variants: ["0", "1", "2", "3", "4", "5", "6", "7", "8"], defVariant: "2",
+      variants: ["0", "1", "2", "3", "4", "5", "6", "7", "8"], defVariant: "0",
       variantText: function (v) { var n = Number(v); return fill(T("Over {a} / Under {b} · {p}%"), { a: n, b: 9 - n, p: (9 - n) * 10 }); },
       defMult: function (v) { return OU_MULT[v] || 2; },
       contracts: function () { return ["DIGITOVER", "DIGITUNDER"]; },
@@ -361,7 +360,7 @@
     setTimeout(function () {
       recovering = false;
       var live = run && run.active;
-      var stake = live ? run.stake0 : (readSettings().stake || DEFAULTS.stake);
+      var stake = live ? run.stake0 : readSettings().stake;
       var spec = live ? run.spec : formSpec();
       hubStart(accountId, stake, null, spec).catch(function () { setTimeout(function () { hubRecover(accountId, hub.gen); }, 3000); });
     }, 600);
@@ -406,7 +405,7 @@
    *  would then land on one that pays less. A refusal for rate keeps the
    *  last price; any other (a market that offers no return) clears it. */
   async function price(accountId, stake, gen, onEach, spec) {
-    var amount = Math.max(round2(stake || DEFAULTS.stake), hub.minStake, PRICE_REF);
+    var amount = Math.max(round2(stake) || 0, hub.minStake, PRICE_REF);
     var jobs = [];
     hub.order.forEach(function (sym) { spec.prices.forEach(function (p) { jobs.push([sym, p]); }); });
     await Promise.all(jobs.map(async function (j) {
@@ -504,12 +503,43 @@
     state = { type: "evenodd", t: { evenodd: { stake: old.stake, tp: old.tp, sl: old.sl, variant: "x", mult: { x: old.mult } } } };
   }
   if (ENABLED.indexOf(state.type) < 0) state.type = "evenodd";
+  // Saved before the figures followed the balance: a stake of 1, take profit of 1000 or stop
+  // loss of 1000 was only the old default and gives way to the balance's; anything else is the
+  // user's own. Over/Under's old default prediction (2) gives way to the new one (0).
+  if (state.ver !== 3) {
+    Object.keys(state.t).forEach(function (type) {
+      var ts = state.t[type], own = {};
+      [["stake", 1], ["tp", 1000], ["sl", 1000]].forEach(function (f) {
+        if (ts[f[0]] > 0 && ts[f[0]] !== f[1]) own[f[0]] = 1; else delete ts[f[0]];
+      });
+      ts.own = own;
+    });
+    if (state.t.overunder && state.t.overunder.variant === "2") delete state.t.overunder.variant;
+    state.ver = 3;
+    store.set(STATE_KEY, state);
+  }
   function typeState(type) {
     var ts = state.t[type] || (state.t[type] = {});
     if (!ts.mult) ts.mult = {};
+    if (!ts.own) ts.own = {};                // the figures the user typed: stake, tp, sl
     if (!ts.variant) ts.variant = TYPES[type].defVariant;
     return ts;
   }
+
+  /* Starting figures that fit the balance, until the user types their own: up to 10, a 0.35
+     stake and 1 take profit; up to 100, 1 and 10; up to 1,000, 10 and 100 — each tenfold
+     balance a tenfold stake and take profit, up to 1,000 and 10,000 from 10,000 on (a 10,000
+     stake would pass Deriv's largest payout). Stop loss 1,000 for everyone. */
+  function defaultsFor(balance) {
+    var top = 10;
+    while (top < balance && top < 100000) top *= 10;
+    return { stake: Math.max(hub.minStake || FALLBACK_MIN, top / 100), tp: top / 10, sl: 1000 };
+  }
+  function balanceOf(id) {
+    var acc = id && D.accountOf(id);
+    return acc && acc.balance != null ? Number(acc.balance) : NaN;
+  }
+  var FIGURES = { botStake: "stake", botTp: "tp", botSl: "sl" };
   var formVariant = null;   // the variant whose multiplier the field is showing
 
   function num(id) {
@@ -526,12 +556,9 @@
   }
   function formSpec() { var s = readSettings(); return makeSpec(s.type, s.variant); }
 
-  /** The form's numbers into this type's memory (only the ones that are numbers). */
+  /** The form's Martingale and prediction into this type's memory (the figures are kept as they are typed). */
   function saveForm() {
     var s = readSettings(), ts = typeState(s.type);
-    if (s.stake > 0) ts.stake = s.stake;
-    if (s.tp > 0) ts.tp = s.tp;
-    if (s.sl > 0) ts.sl = s.sl;
     if (s.mult >= 1) ts.mult[formVariant || s.variant] = s.mult;
     ts.variant = s.variant;
     store.set(STATE_KEY, state);
@@ -540,11 +567,24 @@
     var v = typeState(type).mult[variant];
     return v >= 1 ? v : TYPES[type].defMult(variant);
   }
+  /** Each figure: the user's own for this type, or the balance's default. */
+  function paintFigures() {
+    var ts = typeState(state.type), c = D.current(), d = defaultsFor(balanceOf(c && c.id));
+    Object.keys(FIGURES).forEach(function (id) {
+      var k = FIGURES[id], v = ts.own[k] && ts[k] > 0 ? ts[k] : d[k];
+      $(id).value = k === "stake" ? v.toFixed(2) : String(v);
+    });
+  }
+  /** A figure typed by the user is theirs from then on (a balance change no longer moves it). */
+  function onFigure(e) {
+    var k = FIGURES[e.target.id], v = round2(num(e.target.id)), ts = typeState(state.type);
+    ts.own[k] = 1;
+    if (v > 0) ts[k] = v;
+    store.set(STATE_KEY, state);
+  }
   function loadForm() {
-    var type = state.type, t = TYPES[type], ts = typeState(type);
-    $("botStake").value = (ts.stake >= FALLBACK_MIN ? ts.stake : DEFAULTS.stake).toFixed(2);
-    $("botTp").value = String(ts.tp > 0 ? ts.tp : DEFAULTS.tp);
-    $("botSl").value = String(ts.sl > 0 ? ts.sl : DEFAULTS.sl);
+    var type = state.type, t = TYPES[type];
+    paintFigures();
     paintVariants();
     formVariant = t.variants ? $("botVar").value : t.defVariant;
     $("botMult").value = String(multFor(type, formVariant));
@@ -738,7 +778,7 @@
     return {
       account: account, active: true, stopping: false, ended: null, spec: spec,
       stake0: s.stake, stake: s.stake, tp: s.tp, sl: s.sl, mult: s.mult,
-      pl: 0, n: 0, won: 0, lost: 0, streak: 0, errors: 0,
+      pl: 0, n: 0, won: 0, lost: 0, streak: 0, errors: 0, unpaid: 0, bookedAt: 0,
       log: [], ids: {}, currency: hub.currency, startedAt: Math.floor(Date.now() / 1000) - 1,
     };
   }
@@ -918,7 +958,10 @@
       if (r.pl >= r.tp - 1e-9) return end(r, "tp");
       if (-r.pl >= r.sl - 1e-9) return end(r, "sl");
       var acc = D.accountOf(r.account);
-      if (acc && acc.balance != null && r.stake > acc.balance + 1e-9) return end(r, "balance");
+      if (acc && acc.balance != null && r.stake > acc.balance + 1e-9) {
+        if (await covered(r) || r.stopping) continue;
+        return end(r, "balance");
+      }
 
       if (hub.ready && hub.account === r.account && (Date.now() - hub.pricedAt > 5 * 60000 || hub.pricedSpec !== r.spec.key)) {
         try { await price(r.account, r.stake0, hub.gen, null, r.spec); } catch (e) {}
@@ -951,7 +994,10 @@
           continue;
         }
         r.errors++;
-        if (e.code === "InsufficientBalance") return end(r, "balance");
+        if (e.code === "InsufficientBalance") {
+          if (r.errors < 3 && (await covered(r) || r.stopping)) continue;
+          return end(r, "balance");
+        }
         if (e.fatal || r.errors >= 3) return end(r, "error", e.message);
         paintRun(e.message);
         await sleep(1500);
@@ -959,10 +1005,30 @@
       }
       r.errors = 0;
       record(r, { market: pick.m.name, sym: pick.m.sym, side: pick.side, share: pick.share }, res);
-      if (res.final) res.final.then(function (f) { if (f) correct(r, f.id, f); });
+      // A win decided at its exit tick is paid out when Deriv books it.
+      var pay = res.won ? round2(res.stake + res.pl) : 0;
+      r.unpaid = round2(r.unpaid + pay);
+      res.final.then(function (f) { r.unpaid = round2(r.unpaid - pay); r.bookedAt = Date.now(); if (f) correct(r, f.id, f); });
       r.stake = res.won ? r.stake0 : round2(r.stake * r.mult);
       saveRun(r);
       paintRun();
+    }
+  }
+
+  /** A trade is decided at its exit tick, but Deriv pays a win out only when it books the
+   *  sale, 1 to 7 seconds later: until then the balance lacks that payout. True once the
+   *  balance covers the next stake; false at once when even the payouts still to come
+   *  would not cover it (a Martingale stake the account cannot pay), or once they have
+   *  come and the balance has had a moment to show them. */
+  async function covered(r) {
+    var t0 = Date.now();
+    for (;;) {
+      var acc = D.accountOf(r.account);
+      if (!acc || acc.balance == null || r.stake <= Number(acc.balance) + 1e-9) return true;
+      if (!r.active || r.stopping || Date.now() - t0 > 30000) return false;
+      if (r.stake > Number(acc.balance) + r.unpaid + 1e-9 && Date.now() - r.bookedAt > 3000) return false;
+      paintRun(T("Waiting for Deriv to pay out the last trade…"));
+      await sleep(250);
     }
   }
 
@@ -1277,6 +1343,7 @@
       var acc = D.accountOf(c.id);
       if (acc && acc.currency && acc.currency !== hub.currency) { hub.currency = acc.currency; paintMin(); }
     }
+    if (on && !(run && run.active)) paintFigures();
     if (!resumeTried) resumeRun();
   }
 
@@ -1298,6 +1365,7 @@
     e.preventDefault();
   });
   $("botVar").addEventListener("change", onVariant);
+  Object.keys(FIGURES).forEach(function (id) { $(id).addEventListener("input", onFigure); });
   $("botGo").addEventListener("click", function () {
     if (run && run.active) return stop();
     if (lockHolder()) return say(T("The bot is already running in another tab or window. Stop it there first."), "bad");

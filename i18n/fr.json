@@ -486,5 +486,6 @@
 "Reconnecting to Deriv…":"Reconnexion à Deriv…",
 "Resuming your session…":"Reprise de votre session…",
 "Your session was resumed after the page reloaded.":"Votre session a repris après le rechargement de la page.",
-"The bot is already running in another tab or window. Stop it there first.":"Le bot tourne déjà dans un autre onglet ou une autre fenêtre. Arrêtez-le d’abord là-bas."
+"The bot is already running in another tab or window. Stop it there first.":"Le bot tourne déjà dans un autre onglet ou une autre fenêtre. Arrêtez-le d’abord là-bas.",
+"Waiting for Deriv to pay out the last trade…":"En attente du paiement de la dernière opération par Deriv…"
 }
