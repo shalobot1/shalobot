@@ -39,9 +39,11 @@
 @media (min-width: 1001px) and (min-height: 560px) {
   .bot { height: calc(100dvh - 68px - 16px - 16px); }
   .bot-grid { height: 100%; }
-  .bot-side { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--sb-thumb) transparent; }
+  .bot-side { overflow-y: auto; overscroll-behavior: contain; }
   .bot-side::-webkit-scrollbar { width: 8px; }
+  .bot-side::-webkit-scrollbar-track { background: transparent; }
   .bot-side::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 999px; }
+  .bot-side::-webkit-scrollbar-button { display: none; height: 0; }
   .bot-trades { flex: 1; }
 }
 
@@ -183,7 +185,11 @@
 .bot-log-wrap {
   position: relative; flex: 1; min-height: 0; margin: 0 -6px 0 0; padding-right: 6px;
   overflow-y: auto; overscroll-behavior: contain;
-  scrollbar-width: thin; scrollbar-color: var(--sb-thumb) transparent;
+}
+/* Firefox has no ::-webkit-scrollbar; it gets the standard thin bar. (Set
+   for Chrome too, these would switch off the styling below.) */
+@supports not selector(::-webkit-scrollbar) {
+  .bot-log-wrap, .bot-side { scrollbar-width: thin; scrollbar-color: var(--sb-thumb) transparent; }
 }
 .bot-log-wrap::-webkit-scrollbar { width: 10px; }
 .bot-log-wrap::-webkit-scrollbar-track { background: transparent; margin: 6px 0; }
@@ -246,8 +252,11 @@
   .bot-min { margin-top: 6px; }
   .bot-on { margin-top: 6px; }
   .bot-pl-v { font-size: 22px; }
-  .bot-stats > div { padding: 6px 10px; }
-  .bot-stats dd { font-size: 14px; margin-top: 1px; }
+  .bot-card { padding-top: 13px; padding-bottom: 13px; }
+  .bot-pl { margin-top: 6px; }
+  .bot-stats { margin-top: 8px; }
+  .bot-stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 6px 10px; }
+  .bot-stats dd { font-size: 13.5px; margin: 0; }
 }
 
 /* The trades follow their own card's width. Narrower: the figures shrink
