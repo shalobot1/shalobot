@@ -39,8 +39,9 @@
 @media (min-width: 1001px) and (min-height: 560px) {
   .bot { height: calc(100dvh - 68px - 16px - 16px); }
   .bot-grid { height: 100%; }
-  .bot-side { overflow-y: auto; scrollbar-width: none; }
-  .bot-side::-webkit-scrollbar { display: none; }
+  .bot-side { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--sb-thumb) transparent; }
+  .bot-side::-webkit-scrollbar { width: 8px; }
+  .bot-side::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 999px; }
   .bot-trades { flex: 1; }
 }
 
@@ -165,7 +166,7 @@
 
 /* ── the trades ────────────────────────────────────────────────────── */
 
-.bot-trades { display: flex; flex-direction: column; min-height: 0; padding-bottom: 8px; }
+.bot-trades { display: flex; flex-direction: column; min-height: 0; padding-bottom: 8px; container: trades / inline-size; }
 .bot-log-head, .bot-row {
   display: grid; align-items: center; gap: 10px;
   grid-template-columns: 70px minmax(0, 1fr) minmax(96px, 140px) 80px 84px 90px;
@@ -235,10 +236,36 @@
 
 /* ── one column ────────────────────────────────────────────────────── */
 
-/* A narrower right column: the figures shrink before the market name goes. */
-@media (min-width: 1001px) and (max-width: 1320px) {
+/* Shorter still (a 768-pixel laptop): the title goes, the tabs say it. */
+@media (min-width: 1001px) and (max-height: 760px) {
+  .bot-set h1 { display: none; }
+  .bot-fields { margin-top: 10px; }
+  .bot-f { gap: 4px; }
+  .bot-in { height: 38px; }
+  .bot-go { height: 42px; margin-top: 8px; }
+  .bot-min { margin-top: 6px; }
+  .bot-on { margin-top: 6px; }
+  .bot-pl-v { font-size: 22px; }
+  .bot-stats > div { padding: 6px 10px; }
+  .bot-stats dd { font-size: 14px; margin-top: 1px; }
+}
+
+/* The trades follow their own card's width. Narrower: the figures shrink
+   before the market name goes. Narrower still: two-line rows. */
+@container trades (max-width: 780px) {
   .bot-log-head, .bot-row { gap: 8px; grid-template-columns: 62px minmax(0, 1fr) minmax(88px, 120px) 66px 72px 76px; }
   .bot-row { font-size: 12.5px; }
+}
+@container trades (max-width: 600px) {
+  .bot-log-head { display: none; }
+  .bot-log-wrap { margin-top: 8px; }
+  .bot-row { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; padding: 10px 4px; font-size: 13px; }
+  .br-m { grid-column: 1; grid-row: 1; font-weight: 600; }
+  .br-p { grid-column: 2; grid-row: 1; }
+  .br-t { grid-column: 1; grid-row: 2; font-size: 12px; }
+  .br-c { grid-column: 2; grid-row: 2; font-size: 12px; font-weight: 600; color: var(--ink-muted); }
+  .br-s { grid-column: 1; grid-row: 3; justify-self: start; }
+  .br-k { grid-column: 2; grid-row: 3; font-size: 12px; }
 }
 
 @media (max-width: 1000px) {
@@ -250,15 +277,6 @@
   .bot-card { padding: 15px; border-radius: 16px; }
   .bot-set h1 { font-size: 21px; }
   .bot-pl-v { font-size: 26px; }
-  .bot-log-head { display: none; }
-  .bot-log-wrap { margin-top: 8px; }
-  .bot-row { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; padding: 10px 4px; }
-  .br-m { grid-column: 1; grid-row: 1; font-weight: 600; }
-  .br-p { grid-column: 2; grid-row: 1; }
-  .br-t { grid-column: 1; grid-row: 2; font-size: 12px; }
-  .br-c { grid-column: 2; grid-row: 2; font-size: 12px; font-weight: 600; color: var(--ink-muted); }
-  .br-s { grid-column: 1; grid-row: 3; justify-self: start; }
-  .br-k { grid-column: 2; grid-row: 3; font-size: 12px; }
   .bot-now-side { font-size: 22px; }
   .bot-now-p b { font-size: 26px; }
   .bot-dots i { width: 24px; height: 24px; border-radius: 7px; font-size: 12px; }
