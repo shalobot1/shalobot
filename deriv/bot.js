@@ -624,7 +624,9 @@
     $("bmRoot").hidden = true;
     document.documentElement.style.overflow = "";
     modal.view = null;
-    if (was === "bmDone" && run && run.active) toTrades();
+    // The result popup is the one that started a session: show its trades, even if a quick
+    // session has already finished by now.
+    if (was === "bmDone" && run) toTrades();
     scanToken++;                         // a scan still running is abandoned
     if (modal.lastFocus && modal.lastFocus.focus) modal.lastFocus.focus();
   }
