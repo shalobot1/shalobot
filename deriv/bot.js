@@ -378,7 +378,8 @@
      the closed streams bring hubRecover. */
   var resubAt = {}, rebuildAt = 0;
   setInterval(function () {
-    if (!hub.ready || !hub.account || !lineUp(hub.account) || document.visibilityState === "hidden") return;
+    // (In a background tab too: a bot keeps trading while its page is not on screen.)
+    if (!hub.ready || !hub.account || !lineUp(hub.account)) return;
     var now = Date.now(), acc = hub.account, gen = hub.gen;
     var quiet = hub.order.filter(function (sym) { return now - hub.markets[sym].at > 25000; });
     if (!quiet.length) return;
