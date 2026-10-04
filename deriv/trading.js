@@ -34,6 +34,13 @@
  * has to ask, a renewal that was only early is dropped (the current token
  * still has days left); a token that has actually lapsed goes to Deriv's
  * sign-in, and that is the only time anybody sees it again.
+ *
+ * Nothing here ever interrupts a running bot. The session is looked at every
+ * 30 minutes; a renewal that is due, or a token that lapsed, waits until no
+ * run is going and the page is not being looked at (or the next visit). A
+ * network change pings every socket and replaces one that does not answer in
+ * 6 s; reconnecting carries on while the browser says it is offline; and a
+ * check every 30 s reopens any feed left closed with nothing scheduled.
  */
 
 (function (global) {
@@ -118,6 +125,12 @@
     $("tNoteText").textContent = T(text);
   }
   function clearState() { $("tState").hidden = true; }
+
+  /** A bot run is going in this page (bot.js): nothing may navigate away. */
+  function busy() {
+    try { var r = global.ShaloBot && global.ShaloBot.run && global.ShaloBot.run(); return !!(r && r.active); }
+    catch (e) { return false; }
+  }
 
   /* ── renewing the token ────────────────────────────────────────────── */
 
@@ -391,6 +404,7 @@
     this.seq = 100;          // req_id 1 is the balance stream
     this.pending = {};       // req_id → { resolve, reject, timer }
     this.streams = {};       // req_id → function (message)
+    this.waiting = false;    // a reconnect is scheduled
   }
 
   /** Resolves once the socket is open, or rejects after `ms`. */
@@ -502,6 +516,16 @@
     ws.onerror = function () { /* onclose follows and handles it */ };
   };
 
+  /** After a network change: is this socket still really there? A ping
+   *  answered within 6 s says yes; silence replaces it. */
+  Feed.prototype.probe = function () {
+    var self = this, ws = this.ws;
+    if (!ws || ws.readyState !== 1) return;
+    var at = Date.now();
+    try { ws.send(JSON.stringify({ ping: 1 })); } catch (e) { return this.drop(); }
+    setTimeout(function () { if (self.ws === ws && self.last < at) self.drop(); }, 6000);
+  };
+
   Feed.prototype.beat = function () {
     if (!this.ws || this.ws.readyState !== 1) return;
     if (Date.now() - this.last > STALE_MS) return this.drop();
@@ -530,10 +554,13 @@
     clearTimeout(this.timer);
     var wait = now ? 0 : Math.min(30000, 500 * Math.pow(2, this.tries)) * (0.75 + Math.random() * 0.5);
     this.tries = Math.min(this.tries + 1, 10);
+    this.waiting = true;
     paint();
     this.timer = setTimeout(function () {
+      self.waiting = false;
       if (self.stopped) return;
-      if (navigator.onLine === false) return;          // "online" brings it back
+      // Offline: keep trying on the backoff (the "online" event brings it back sooner).
+      if (navigator.onLine === false) return self.retry();
       call("POST", "/api/deriv/otp", { account: self.id }).then(function (r) {
         if (self.stopped) return;
         if (r.url) return self.open(r.url);
@@ -554,9 +581,11 @@
     });
   }
 
-  var gone = false;
+  var gone = false, owed = null;     // owed: "expired" or "renew", held while a run is going or the page is in view
   function expired() {
     if (gone) return;
+    // The sockets that are open stay authorised; a run on them finishes first.
+    if (busy()) { owed = "expired"; return; }
     gone = true;
     Object.keys(feeds).forEach(function (id) { feeds[id].stop(); });
     if (!silentRenew(false)) showConnect("Please sign in to Deriv again to carry on.");
@@ -584,10 +613,45 @@
     }, POLL_MS);
   }
 
+  /* ── keeping it up, quietly ────────────────────────────────────────── */
+
+  function settleOwed() {
+    if (!owed || busy()) return;
+    // Never under someone's eyes while the feeds still work: it waits for the
+    // page to be out of view (or for a visit with nothing live).
+    var anyLive = Object.keys(feeds).some(function (id) { return feeds[id].live; });
+    if (document.visibilityState === "visible" && anyLive) return;
+    var what = owed;
+    owed = null;
+    if (what === "expired") return expired();
+    if (renewDue()) silentRenew(true);
+  }
+  setInterval(function () {
+    settleOwed();
+    if (gone || !accounts.length) return;
+    call("GET", "/api/deriv/session").then(function (r) {
+      if (r.connected === false) return expired();
+      if (r.connected && r.renewSoon && renewDue()) { owed = owed || "renew"; settleOwed(); }
+    }, function () {});
+  }, 30 * 60000);
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") settleOwed(); });
+  global.addEventListener("shalo:runend", function () { setTimeout(settleOwed, 0); });
+
+  function probeAll() { Object.keys(feeds).forEach(function (id) { feeds[id].probe(); }); }
+  if (navigator.connection && navigator.connection.addEventListener) navigator.connection.addEventListener("change", function () { revive(); probeAll(); });
+
+  // Any feed left closed with nothing scheduled — whatever the reason — reopens.
+  setInterval(function () {
+    Object.keys(feeds).forEach(function (id) {
+      var f = feeds[id];
+      if (!f.stopped && !f.waiting && (!f.ws || f.ws.readyState > 1)) { f.tries = 0; f.retry(true); }
+    });
+  }, 30000);
+
   /* ── go ────────────────────────────────────────────────────────────── */
 
   bindSwitcher();
-  global.addEventListener("online", revive);
+  global.addEventListener("online", function () { revive(); probeAll(); });
   global.addEventListener("offline", function () { paint(); });
   document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") revive(); });
   global.addEventListener("pageshow", function (e) { if (e.persisted) revive(); });

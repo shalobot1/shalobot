@@ -104,6 +104,7 @@
 .bot-on { margin: 8px 2px 0; font-size: 12px; color: var(--ink-muted); text-align: center; }
 .bot-msg { margin: 12px 0 0; padding: 10px 12px; border-radius: 11px; font-size: 13.5px; line-height: 1.5; }
 .bot-msg--bad { color: var(--danger); background: rgba(217, 45, 32, 0.10); border: 1px solid rgba(217, 45, 32, 0.28); }
+.bot-msg--info { color: var(--ink); background: var(--real-tint); border: 1px solid color-mix(in srgb, var(--real) 35%, transparent); }
 
 /* ── the run ───────────────────────────────────────────────────────── */
 
@@ -184,7 +185,7 @@
    surface, inset from the edge, no arrows, brighter under the pointer. */
 .bot-log-wrap {
   position: relative; flex: 1; min-height: 0; margin: 0 -6px 0 0; padding-right: 6px;
-  overflow-y: auto; overscroll-behavior: contain;
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
 }
 /* Firefox has no ::-webkit-scrollbar; it gets the standard thin bar. (Set
    for Chrome too, these would switch off the styling below.) */
@@ -204,10 +205,43 @@
 }
 .bot-row:last-child { border-bottom: 0; }
 .bot-row:hover { background: var(--surface-2); }
-.bot-row:first-child { animation: bot-in .6s ease-out; }
-@keyframes bot-in { from { background: var(--real-tint); } to { background: transparent; } }
-.bot-row.is-lost:first-child { animation-name: bot-in-lost; }
-@keyframes bot-in-lost { from { background: rgba(217, 45, 32, 0.10); } to { background: transparent; } }
+.bot-row { position: relative; }
+
+/* Each trade wears a thin bar on its left in its result's colour. */
+.bot-row::before {
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 3px;
+  background: var(--line-hi); transform-origin: center;
+}
+.bot-row.is-won::before { background: var(--real); }
+.bot-row.is-lost::before { background: var(--danger); }
+
+/* A new trade comes in fast from the right, hits the left edge a touch past
+   it, and settles; at the hit its bar flares and a wash of its colour fades
+   off to the right. */
+.bot-row.is-new { animation: bot-row-in .66s both; }
+@keyframes bot-row-in {
+  0%   { transform: translateX(104%); opacity: 0; animation-timing-function: cubic-bezier(.5, 0, .9, .4); }
+  12%  { opacity: 1; }
+  52%  { transform: translateX(-9px); animation-timing-function: cubic-bezier(.2, .7, .3, 1); }
+  70%  { transform: translateX(3px); }
+  86%  { transform: translateX(-1px); }
+  100% { transform: none; opacity: 1; }
+}
+.bot-row.is-new::before { animation: bot-row-bar .66s both; }
+@keyframes bot-row-bar {
+  0%, 48% { transform: scaleY(.35); opacity: .5; }
+  56%     { transform: scaleY(1.3); opacity: 1; box-shadow: 0 0 10px 1px currentColor; }
+  100%    { transform: none; opacity: 1; box-shadow: none; }
+}
+.bot-row.is-won.is-new::before { color: var(--real); }
+.bot-row.is-lost.is-new::before { color: var(--danger); }
+.bot-row.is-new::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, var(--real-tint), transparent 70%);
+  animation: bot-row-wash .9s both;
+}
+.bot-row.is-lost.is-new::after { background: linear-gradient(90deg, rgba(217, 45, 32, 0.14), transparent 70%); }
+@keyframes bot-row-wash { 0%, 48% { opacity: 0; } 56% { opacity: 1; } 100% { opacity: 0; } }
 .br-t { color: var(--ink-muted); }
 .br-m { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .br-s { min-width: 0; display: flex; }
@@ -439,7 +473,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bot-state--run i, .bot-now-k i, .bot-now, .bot-row:first-child,
+  .bot-state--run i, .bot-now-k i, .bot-now, .bot-row.is-new, .bot-row.is-new::before, .bot-row.is-new::after,
   .bm, .bm-back, .bm-radar i, .bm-radar svg, .bm-bar i::after, .bm-erricon, .bm-trophy, .bm-amount, .bm-tick { animation: none; }
   .bm-tick circle, .bm-tick path { animation: none; stroke-dashoffset: 0; }
   .bm-confetti { display: none; }

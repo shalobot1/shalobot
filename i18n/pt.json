@@ -482,5 +482,9 @@
 "Scanning Rise/Fall markets":"Escaneando mercados Sobe/Desce",
 "Finds the best market and direction, Rise or Fall, then trades it one 1-tick contract at a time until your take profit or stop loss.":"Encontra o melhor mercado e direção, Sobe ou Desce, e opera um contrato de 1 tick por vez até o seu take profit ou stop loss.",
 "Pricing Rise and Fall on {n} markets…":"Cotando Sobe e Desce em {n} mercados…",
-"Trading started":"Bot em execução"
+"Trading started":"Bot em execução",
+"Reconnecting to Deriv…":"Reconectando à Deriv…",
+"Resuming your session…":"Retomando sua sessão…",
+"Your session was resumed after the page reloaded.":"Sua sessão foi retomada depois que a página recarregou.",
+"The bot is already running in another tab or window. Stop it there first.":"O bot já está rodando em outra aba ou janela. Pare-o lá primeiro."
 }
