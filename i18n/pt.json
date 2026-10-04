@@ -433,8 +433,6 @@
 "Scanning Even/Odd markets":"Escaneando mercados Par/Ímpar",
 "Smallest stake Deriv accepts: {min}.":"Menor valor que a Deriv aceita: {min}.",
 "Smart Scan bot":"Bot Smart Scan",
-"Start trading":"Começar a operar",
-"Start trading on {account}":"Começar a operar na {account}",
 "Starting…":"Iniciando…",
 "Stop loss reached.":"Stop loss atingido.",
 "Stopped after an error.":"Parado após um erro.",
@@ -483,5 +481,6 @@
 "Fall":"Desce",
 "Scanning Rise/Fall markets":"Escaneando mercados Sobe/Desce",
 "Finds the best market and direction, Rise or Fall, then trades it one 1-tick contract at a time until your take profit or stop loss.":"Encontra o melhor mercado e direção, Sobe ou Desce, e opera um contrato de 1 tick por vez até o seu take profit ou stop loss.",
-"Pricing Rise and Fall on {n} markets…":"Cotando Sobe e Desce em {n} mercados…"
+"Pricing Rise and Fall on {n} markets…":"Cotando Sobe e Desce em {n} mercados…",
+"Trading started":"Bot em execução"
 }

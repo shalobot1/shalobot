@@ -371,6 +371,11 @@
 .bm-pick-s { font-size: 13px; color: var(--ink-muted); }
 .bm-dots { justify-content: center; margin-top: 8px; }
 
+.bm-live {
+  display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 0; padding: 8px 15px; border-radius: 999px;
+  background: var(--real-tint); color: var(--real); font-size: 14px; font-weight: 700;
+}
+.bm-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--real); animation: bot-beat 1.6s ease-in-out infinite; }
 .bm-sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 14px 0 0; }
 .bm-sum > div { min-width: 0; padding: 8px 4px; border-radius: 12px; background: var(--surface-2); }
 .bm-sum dt { font-size: 11px; font-weight: 600; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

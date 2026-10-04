@@ -3,8 +3,8 @@
  *
  *   Pick a trade type (Even/Odd, Over/Under, Matches/Differs), then Scan &
  *   start → a popup scans every market live (progress bar), settles on the ONE
- *   best market and side (animated tick), and Start trading hands it to the
- *   bot. The bot then trades one 1-tick contract at a time — re-scanning before
+ *   best market and side (animated tick), and the bot starts on it by
+ *   itself. The bot then trades one 1-tick contract at a time — re-scanning before
  *   every trade — until take profit, stop loss, Stop, or a balance that cannot
  *   cover the next stake. Take profit ends in a congratulations popup.
  *
@@ -647,8 +647,11 @@
       $("bmMult").textContent = "×" + s.mult;
       $("bmTp").textContent = money(s.tp, hub.currency);
       $("bmSl").textContent = money(s.sl, hub.currency);
-      $("bmStart").textContent = fill(T("Start trading on {account}"), { account: c.type === "real" ? T("Real") : T("Demo") });
       openModal("bmDone");
+      // No button to press: the bot starts on what the popup shows, and the
+      // popup steps aside a moment later (x closes it sooner; trading goes on).
+      startRun(true);
+      setTimeout(function () { if (modal.view === "bmDone") closeModal(); }, 2800);
     } catch (e) {
       if (token !== scanToken) return;
       $("bmErrText").textContent = e.message || T("The scan did not finish. Try again.");
@@ -656,8 +659,7 @@
     }
   }
 
-  /** The popup's result, and what Start will trade. While the popup is open
-   *  it follows the ticks, so the first trade is always what is on screen. */
+  /** The popup's result: the first trade the bot places, while it is fresh. */
   function showPick(p) {
     pending.pick = { sym: p.m.sym, side: p.side.key, at: Date.now() };
     $("bmMarket").textContent = p.m.name;
@@ -685,12 +687,12 @@
     };
   }
 
-  function startRun() {
+  function startRun(keepPopup) {
     if (!pending || (run && run.active)) return;
     var c = D.accountOf(pending.account);
     var s = pending.settings, spec = pending.spec, first = pending.pick;
     pending = null;
-    closeModal();
+    if (!keepPopup) closeModal();
     if (!c) return;
     saveForm();
     // A fresh start: nothing from the last run carries over.
@@ -1080,7 +1082,6 @@
     if (err) return say(err, "bad");
     scanAndOffer();
   });
-  $("bmStart").addEventListener("click", startRun);
   $("bmRetry").addEventListener("click", scanAndOffer);
   $("bmRoot").addEventListener("click", function (e) { if (e.target.closest("[data-bm-close]")) closeModal(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("bmRoot").hidden) closeModal(); });
