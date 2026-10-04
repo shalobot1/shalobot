@@ -29,7 +29,8 @@
  * the decimals Deriv gives, so a trailing zero is a real 0 — and its last LONG
  * tick-to-tick moves.
  *
- * THE PICK: among the sides that pay the most, the one whose last WINDOW ticks
+ * THE PICK: among the sides that pay the most (for Rise/Fall: payout times the
+ * share of ticks that move at all, since an equal tick loses), the one whose last WINDOW ticks
  * would have won closest to 100% of the time; a tie goes to the last LONG
  * ticks, then to the faster market. This is the owner's rule. Backtested on
  * 400,000 real ticks the digits are random, so it is shown as a recent
@@ -397,7 +398,11 @@
     var series = m[sd.series] || [];
     if (series.length < WINDOW) return null;
     var last = series.slice(-WINDOW);
-    return { m: m, side: sd, ratio: ratio, share: share(last, sd.wins), long: share(series, sd.wins), speed: interval(m), digits: last };
+    // What a win is worth here: the payout, and for a move the share of ticks
+    // that move at all — an equal tick loses both Rise and Fall, and Jump 100
+    // ties about one tick in five (measured), so its higher payout is a trap.
+    var value = sd.series === "moves" ? ratio * (1 - share(series, function (x) { return x === 0; })) : ratio;
+    return { m: m, side: sd, ratio: ratio, value: value, share: share(last, sd.wins), long: share(series, sd.wins), speed: interval(m), digits: last };
   }
   function better(a, b) {
     if (Math.abs(a.share - b.share) > 1e-9) return a.share > b.share;
@@ -412,9 +417,9 @@
       spec.sides.forEach(function (sd) { var c = candidate(hub.markets[sym], sd); if (c) all.push(c); });
     });
     if (!all.length) return null;
-    var top = Math.max.apply(null, all.map(function (c) { return c.ratio; }));
+    var top = Math.max.apply(null, all.map(function (c) { return c.value; }));
     var best = null;
-    all.forEach(function (c) { if (c.ratio >= top * (1 - TIER) && (!best || better(c, best))) best = c; });
+    all.forEach(function (c) { if (c.value >= top * (1 - TIER) && (!best || better(c, best))) best = c; });
     return best;
   }
 
