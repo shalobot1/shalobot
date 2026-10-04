@@ -39,12 +39,12 @@
  * THE RUN. Martingale: after a loss the stake is multiplied, after a win it
  * returns to the starting stake. Each type and prediction remembers its own
  * multiplier; the defaults are the smallest that win back every loss plus one
- * normal win (Even/Odd keeps the owner's 3.1). The stop loss is the most a
- * run may lose: a Martingale stake bigger than what is left before it is
- * placed at what is left, so the recovery trade still happens and a losing run
- * stops exactly on the stop loss (a popup says so, as one does for take
- * profit). A balance that cannot cover the next trade ends the run with a
- * popup pointing to Deriv to top up. Each new run starts from nothing.
+ * normal win (Even/Odd keeps the owner's 3.1). The Martingale stake is never
+ * cut for the stop loss: the recovery trade is placed in full, and the run
+ * stops once the loss has reached or passed the stop loss (so the last trade
+ * may take it past), with a popup as for take profit. A balance that cannot
+ * cover the next trade ends the run with a popup pointing to Deriv to top up.
+ * Each new run starts from nothing.
  *
  * EVERY TRADE IS LOGGED. Each buy is one `buy` with its parameters and
  * subscribe, settled from the contract stream; a line that drops with a trade
@@ -956,11 +956,6 @@
       if (r.stopping) return end(r, "user");
       if (r.pl >= r.tp - 1e-9) return end(r, "tp");
       if (-r.pl >= r.sl - 1e-9) return end(r, "sl");
-      // A stake bigger than what is left before the stop loss is placed at what is left, so a
-      // losing run stops exactly on it; less left than Deriv's smallest stake is the stop loss.
-      var left = round2(r.sl + r.pl);
-      if (left < (hub.minStake || FALLBACK_MIN) - 1e-9) return end(r, "sl");
-      if (r.stake > left) r.stake = left;
       var acc = D.accountOf(r.account);
       if (acc && acc.balance != null && r.stake > acc.balance + 1e-9) {
         if (await covered(r) || r.stopping) continue;
