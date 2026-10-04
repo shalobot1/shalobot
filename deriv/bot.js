@@ -480,8 +480,8 @@
 
   var nowTimer = 0;
   function scheduleNow() {
-    if (nowTimer || !((run && run.active) || (modal.view === "bmDone" && pending))) return;
-    nowTimer = setTimeout(function () { nowTimer = 0; paintNow(); paintPick(); }, 500);
+    if (nowTimer || !(run && run.active)) return;
+    nowTimer = setTimeout(function () { nowTimer = 0; paintNow(); }, 500);
   }
   function paintNow() {
     var on = !!(run && run.active);
@@ -711,7 +711,7 @@
       openModal("bmDone");
       // No button to press: the bot starts on what the popup shows, and the
       // popup steps aside a moment later (x closes it sooner; trading goes on).
-      startRun(true);
+      startRun();
       setTimeout(function () { if (modal.view === "bmDone") closeModal(); }, 2800);
     } catch (e) {
       if (token !== scanToken) return;
@@ -728,11 +728,6 @@
     $("bmSide").className = "bm-pick-side bm-pick-side--" + p.side.tone;
     $("bmShare").textContent = fill(T("{p}% of the last {n} ticks"), { p: Math.round(p.share * 100), n: WINDOW });
     dots($("bmDots"), p, pending.spec);
-  }
-  function paintPick() {
-    if (modal.view !== "bmDone" || !pending || hub.account !== pending.account) return;
-    var p = choose(pending.spec);
-    if (p) showPick(p);
   }
 
   /* ── the run ───────────────────────────────────────────────────────── */
@@ -866,12 +861,11 @@
     loop(r);
   }
 
-  function startRun(keepPopup) {
+  function startRun() {
     if (!pending || (run && run.active)) return;
     var c = D.accountOf(pending.account);
     var s = pending.settings, spec = pending.spec, first = pending.pick;
     pending = null;
-    if (!keepPopup) closeModal();
     if (!c) return;
     saveForm();
     // A fresh start: nothing from the last run carries over.
