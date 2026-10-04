@@ -120,7 +120,11 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
             <label class="bot-f"><span>Stop loss</span>
               <span class="bot-in"><input id="botSl" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" /><em data-bot-cur data-i18n-skip>USD</em></span></label>
           </div>
-          <p class="bot-min" id="botMin">Smallest stake Deriv accepts: 0.35 USD.</p>
+          <div class="bot-note">
+            <p class="bot-min" id="botMin">Smallest stake Deriv accepts: 0.35 USD.</p>
+            <!-- Off: every visit starts from the defaults. On: the settings stay in this browser. -->
+            <label class="bot-keep"><input type="checkbox" id="botKeep" role="switch" /><i aria-hidden="true"></i><span>Save settings</span></label>
+          </div>
 
           <button class="btn btn-blue btn-lg bot-go" id="botGo" type="button">
             <svg class="bot-go-play" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.6-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
@@ -247,6 +251,32 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
       <p class="bm-win-sum" id="bmWinSum" data-i18n-skip></p>
       <div class="bm-actions">
         <button class="btn btn-blue btn-lg" type="button" data-bm-close>Done</button>
+      </div>
+    </div>
+
+    <div class="bm-view" id="bmLoss" hidden>
+      <div class="bm-badge bm-badge--loss" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6L12 3z"/><path d="M9 12h6"/></svg>
+      </div>
+      <h2>Stop loss reached</h2>
+      <p class="bm-step">The bot stopped at your limit.</p>
+      <div class="bm-amount bm-amount--loss" id="bmLossAmt" data-i18n-skip></div>
+      <p class="bm-win-sum" id="bmLossSum" data-i18n-skip></p>
+      <div class="bm-actions">
+        <button class="btn btn-blue btn-lg" type="button" data-bm-close>Done</button>
+      </div>
+    </div>
+
+    <div class="bm-view" id="bmFund" hidden>
+      <div class="bm-badge bm-badge--fund" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5.5A1.5 1.5 0 0 0 17.5 4h-12A2.5 2.5 0 0 0 3 6.5v11A2.5 2.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/><path d="M3 6.5A2.5 2.5 0 0 0 5.5 9H20v6h-4a3 3 0 0 1 0-6"/><circle cx="16.5" cy="12" r=".6" fill="currentColor"/></svg>
+      </div>
+      <h2>Top up to keep trading</h2>
+      <p class="bm-step" id="bmFundText" data-i18n-skip></p>
+      <p class="bm-fund-note" id="bmFundNote" data-i18n-skip></p>
+      <div class="bm-actions">
+        <button class="btn btn-line btn-lg" type="button" data-bm-close>Close</button>
+        <a class="btn btn-blue btn-lg" id="bmFundGo" href="https://home.deriv.com/dashboard/portfolio" target="_blank" rel="noopener" data-bm-close data-i18n-skip>Deposit on Deriv</a>
       </div>
     </div>
   </div>

@@ -92,7 +92,21 @@
 .bot-in select option { background: var(--raise); color: var(--ink); }
 .bot-in--select svg { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-muted); pointer-events: none; }
 .bot-in em { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--ink-muted); }
-.bot-min { margin: 8px 2px 0; font-size: 12px; color: var(--ink-muted); }
+.bot-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin: 8px 2px 0; }
+.bot-min { margin: 0; font-size: 12px; color: var(--ink-muted); }
+
+/* "Save settings": a small switch beside the smallest-stake note. */
+.bot-keep { position: relative; display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; color: var(--ink-muted); cursor: pointer; user-select: none; -webkit-user-select: none; }
+.bot-keep input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.bot-keep i { position: relative; flex: none; width: 26px; height: 15px; border-radius: 999px; background: var(--line-hi); transition: background .18s ease; }
+.bot-keep i::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .35); transition: transform .18s ease;
+}
+.bot-keep input:checked + i { background: var(--real); }
+.bot-keep input:checked + i::after { transform: translateX(11px); }
+.bot-keep input:checked ~ span, .bot-keep:hover span { color: var(--ink); }
+.bot-keep input:focus-visible + i { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 .bot-go { width: 100%; height: 50px; margin-top: 14px; gap: 9px; justify-content: center; border-radius: 13px; font-size: 16px; }
 .bot-go .bot-go-stop { display: none; }
@@ -283,7 +297,7 @@
   .bot-f { gap: 4px; }
   .bot-in { height: 38px; }
   .bot-go { height: 42px; margin-top: 8px; }
-  .bot-min { margin-top: 6px; }
+  .bot-note { margin-top: 6px; }
   .bot-on { margin-top: 6px; }
   .bot-pl-v { font-size: 22px; }
   .bot-card { padding-top: 13px; padding-bottom: 13px; }
@@ -462,6 +476,21 @@
 .bm-amount { margin-top: 14px; font-size: 38px; font-weight: 800; letter-spacing: -0.03em; color: var(--real); font-variant-numeric: tabular-nums; animation: bot-rise .5s .3s ease-out both; }
 .bm-win-sum { margin: 4px 0 0; font-size: 13px; color: var(--ink-muted); }
 
+/* Stop loss and top-up: a calm badge, no celebration. */
+.bm-badge {
+  display: grid; place-items: center; width: 80px; height: 80px; margin: 0 auto; border-radius: 50%;
+  animation: bm-badge .55s cubic-bezier(.2, .9, .3, 1.3) both;
+}
+@keyframes bm-badge { from { transform: scale(.4); opacity: 0; } }
+.bm-badge--loss { color: var(--danger); background: rgba(217, 45, 32, 0.12); box-shadow: 0 0 0 10px rgba(217, 45, 32, 0.05); }
+.bm-badge--fund { color: var(--blue); background: color-mix(in srgb, var(--blue) 14%, transparent); box-shadow: 0 0 0 10px color-mix(in srgb, var(--blue) 6%, transparent); }
+.bm-amount--loss { color: var(--danger); }
+.bm-fund-note {
+  margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2);
+  font-size: 12.5px; line-height: 1.5; color: var(--ink-muted);
+}
+.bm-actions a.btn { text-decoration: none; }
+
 @media (max-width: 420px) {
   .bm { padding: 28px 18px 18px; border-radius: 22px; }
   .bm-sum { grid-template-columns: repeat(2, 1fr); }
@@ -474,7 +503,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bot-state--run i, .bot-now-k i, .bot-now, .bot-row.is-new, .bot-row.is-new::before, .bot-row.is-new::after,
-  .bm, .bm-back, .bm-radar i, .bm-radar svg, .bm-bar i::after, .bm-erricon, .bm-trophy, .bm-amount, .bm-tick { animation: none; }
+  .bm, .bm-back, .bm-radar i, .bm-radar svg, .bm-bar i::after, .bm-erricon, .bm-trophy, .bm-badge, .bm-amount, .bm-tick { animation: none; }
   .bm-tick circle, .bm-tick path { animation: none; stroke-dashoffset: 0; }
   .bm-confetti { display: none; }
 }

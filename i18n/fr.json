@@ -487,5 +487,14 @@
 "Resuming your session…":"Reprise de votre session…",
 "Your session was resumed after the page reloaded.":"Votre session a repris après le rechargement de la page.",
 "The bot is already running in another tab or window. Stop it there first.":"Le bot tourne déjà dans un autre onglet ou une autre fenêtre. Arrêtez-le d’abord là-bas.",
-"Waiting for Deriv to pay out the last trade…":"En attente du paiement de la dernière opération par Deriv…"
+"Waiting for Deriv to pay out the last trade…":"En attente du paiement de la dernière opération par Deriv…",
+"Save settings":"Enregistrer les réglages",
+"Stop loss reached":"Stop loss atteint",
+"The bot stopped at your limit.":"Le bot s’est arrêté à votre limite.",
+"Top up to keep trading":"Rechargez pour continuer à trader",
+"Your balance ({bal}) can't cover the next trade ({stake}).":"Votre solde ({bal}) ne couvre pas la prochaine opération ({stake}).",
+"Can't see your full balance? On Deriv, transfer it to your Options account.":"Vous ne voyez pas tout votre solde ? Sur Deriv, transférez-le vers votre compte Options.",
+"Top up or reset your demo balance on Deriv.":"Rechargez ou réinitialisez votre solde démo sur Deriv.",
+"Deposit on Deriv":"Déposer sur Deriv",
+"Go to Deriv":"Aller sur Deriv"
 }

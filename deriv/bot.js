@@ -39,11 +39,12 @@
  * THE RUN. Martingale: after a loss the stake is multiplied, after a win it
  * returns to the starting stake. Each type and prediction remembers its own
  * multiplier; the defaults are the smallest that win back every loss plus one
- * normal win (Even/Odd keeps the owner's 3.1). Stop loss stops the run once
- * the loss has reached it — the next stake is NOT held back for fear of
- * passing it, because the recovery trade may be the one that wins (so the
- * final loss can exceed the stop loss by up to the last stake). Each new run
- * starts from nothing.
+ * normal win (Even/Odd keeps the owner's 3.1). The stop loss is the most a
+ * run may lose: a Martingale stake bigger than what is left before it is
+ * placed at what is left, so the recovery trade still happens and a losing run
+ * stops exactly on the stop loss (a popup says so, as one does for take
+ * profit). A balance that cannot cover the next trade ends the run with a
+ * popup pointing to Deriv to top up. Each new run starts from nothing.
  *
  * EVERY TRADE IS LOGGED. Each buy is one `buy` with its parameters and
  * subscribe, settled from the contract stream; a line that drops with a trade
@@ -72,7 +73,8 @@
   var MULT_MAX = 50;
   var PRICE_REF = 10;       // payouts are read at 10 or more: at 0.35 the cent rounding hides the gaps between markets
   var STATE_KEY = "shalo_bot_v2";
-  var OLD_KEY = "shalo_bot_settings";   // Even/Odd only, before the types
+  var KEEP_KEY = "shalo_bot_keep";      // 1: "Save settings" is on
+  var DEPOSIT_URL = "https://home.deriv.com/dashboard/portfolio";
   var FALLBACK_MIN = 0.35;
   var LOG_ROWS = 2000;
   var ENABLED = ["evenodd", "risefall", "overunder", "matchdiff"];
@@ -80,6 +82,7 @@
   var store = {
     get: function (k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } },
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) {} },
   };
 
   function money(v, cur) {
@@ -497,26 +500,18 @@
 
   /* ── settings: one set per type, one multiplier per prediction ─────── */
 
-  var state = store.get(STATE_KEY);
-  if (!state || !state.t) {
-    var old = store.get(OLD_KEY) || {};
-    state = { type: "evenodd", t: { evenodd: { stake: old.stake, tp: old.tp, sl: old.sl, variant: "x", mult: { x: old.mult } } } };
-  }
+  /* Every visit starts from the defaults; what the user changes lives in this page only —
+     unless "Save settings" is on, which keeps it in this browser for the next visit. */
+  var keep = store.get(KEEP_KEY) === 1;
+  var state = (keep && store.get(STATE_KEY)) || null;
+  if (!keep) store.del(STATE_KEY);
+  if (!state || !state.t) state = { type: "evenodd", t: {} };
   if (ENABLED.indexOf(state.type) < 0) state.type = "evenodd";
-  // Saved before the figures followed the balance: a stake of 1, take profit of 1000 or stop
-  // loss of 1000 was only the old default and gives way to the balance's; anything else is the
-  // user's own. Over/Under's old default prediction (2) gives way to the new one (0).
-  if (state.ver !== 3) {
-    Object.keys(state.t).forEach(function (type) {
-      var ts = state.t[type], own = {};
-      [["stake", 1], ["tp", 1000], ["sl", 1000]].forEach(function (f) {
-        if (ts[f[0]] > 0 && ts[f[0]] !== f[1]) own[f[0]] = 1; else delete ts[f[0]];
-      });
-      ts.own = own;
-    });
-    if (state.t.overunder && state.t.overunder.variant === "2") delete state.t.overunder.variant;
-    state.ver = 3;
-    store.set(STATE_KEY, state);
+  function persist() { if (keep) store.set(STATE_KEY, state); }
+  function setKeep(on) {
+    keep = on;
+    if (on) { store.set(KEEP_KEY, 1); saveForm(); }
+    else { store.del(KEEP_KEY); store.del(STATE_KEY); }
   }
   function typeState(type) {
     var ts = state.t[type] || (state.t[type] = {});
@@ -561,7 +556,7 @@
     var s = readSettings(), ts = typeState(s.type);
     if (s.mult >= 1) ts.mult[formVariant || s.variant] = s.mult;
     ts.variant = s.variant;
-    store.set(STATE_KEY, state);
+    persist();
   }
   function multFor(type, variant) {
     var v = typeState(type).mult[variant];
@@ -580,7 +575,7 @@
     var k = FIGURES[e.target.id], v = round2(num(e.target.id)), ts = typeState(state.type);
     ts.own[k] = 1;
     if (v > 0) ts[k] = v;
-    store.set(STATE_KEY, state);
+    persist();
   }
   function loadForm() {
     var type = state.type, t = TYPES[type];
@@ -617,7 +612,7 @@
     $("botVar").value = "";
     loadForm();
     paintType();
-    store.set(STATE_KEY, state);
+    persist();
     say("");
   }
   function onVariant() {
@@ -627,7 +622,7 @@
     formVariant = s.variant;
     ts.variant = s.variant;
     $("botMult").value = String(multFor(s.type, s.variant));
-    store.set(STATE_KEY, state);
+    persist();
   }
 
   function validate(s) {
@@ -645,9 +640,9 @@
 
   /* ── the popup ─────────────────────────────────────────────────────── */
 
-  var modal = { view: null, onClose: null, lastFocus: null };
+  var modal = { view: null, onClose: null, lastFocus: null, glide: false };
   function openModal(view) {
-    ["bmScan", "bmDone", "bmErr", "bmWin"].forEach(function (id) { $(id).hidden = id !== view; });
+    ["bmScan", "bmDone", "bmErr", "bmWin", "bmLoss", "bmFund"].forEach(function (id) { $(id).hidden = id !== view; });
     if ($("bmRoot").hidden) {
       modal.lastFocus = document.activeElement;
       $("bmRoot").hidden = false;
@@ -666,7 +661,8 @@
     modal.view = null;
     // The result popup is the one that started a session: show its trades, even if a quick
     // session has already finished by now.
-    if (was === "bmDone" && run) toTrades();
+    if ((was === "bmDone" || modal.glide) && run) toTrades();
+    modal.glide = false;
     scanToken++;                         // a scan still running is abandoned
     if (modal.lastFocus && modal.lastFocus.focus) modal.lastFocus.focus();
   }
@@ -937,8 +933,11 @@
     paintButton();
     paintNow();
     finalSync(r).then(function () {
-      // Not over a scan the user has already started.
-      if (reason === "tp" && run === r && $("bmRoot").hidden) celebrate(r);
+      // A popup for how it ended — taking over from the start popup, never over a new scan.
+      if (run !== r || !($("bmRoot").hidden || modal.view === "bmDone")) return;
+      if (reason === "tp") celebrate(r);
+      else if (reason === "sl") stopped(r);
+      else if (reason === "balance") topUp(r.account, r.stake);
     });
   }
 
@@ -957,6 +956,11 @@
       if (r.stopping) return end(r, "user");
       if (r.pl >= r.tp - 1e-9) return end(r, "tp");
       if (-r.pl >= r.sl - 1e-9) return end(r, "sl");
+      // A stake bigger than what is left before the stop loss is placed at what is left, so a
+      // losing run stops exactly on it; less left than Deriv's smallest stake is the stop loss.
+      var left = round2(r.sl + r.pl);
+      if (left < (hub.minStake || FALLBACK_MIN) - 1e-9) return end(r, "sl");
+      if (r.stake > left) r.stake = left;
       var acc = D.accountOf(r.account);
       if (acc && acc.balance != null && r.stake > acc.balance + 1e-9) {
         if (await covered(r) || r.stopping) continue;
@@ -1260,10 +1264,35 @@
 
   /* ── the take-profit popup ─────────────────────────────────────────── */
 
+  /** A result popup; one that takes over from the start popup still glides to the trades on a phone. */
+  function result(view) {
+    var glide = modal.view === "bmDone";
+    openModal(view);
+    modal.glide = glide;
+  }
   function celebrate(r) {
     $("bmWinAmt").textContent = signed(r.pl, r.currency);
     $("bmWinSum").textContent = fill(T("Trades: {n} · Won: {w} · Lost: {l}"), { n: r.n, w: r.won, l: r.lost });
-    openModal("bmWin");
+    result("bmWin");
+  }
+
+  /* ── the stop-loss popup ───────────────────────────────────────────── */
+
+  function stopped(r) {
+    $("bmLossAmt").textContent = signed(r.pl, r.currency);
+    $("bmLossSum").textContent = fill(T("Trades: {n} · Won: {w} · Lost: {l}"), { n: r.n, w: r.won, l: r.lost });
+    result("bmLoss");
+  }
+
+  /* ── not enough balance: where to top up ───────────────────────────── */
+
+  function topUp(accountId, stake) {
+    var acc = D.accountOf(accountId), real = !!(acc && acc.type === "real"), cur = (acc && acc.currency) || hub.currency;
+    $("bmFundText").textContent = fill(T("Your balance ({bal}) can't cover the next trade ({stake})."), { bal: money(acc ? Number(acc.balance) || 0 : 0, cur), stake: money(stake, cur) });
+    $("bmFundNote").textContent = real ? T("Can't see your full balance? On Deriv, transfer it to your Options account.") : T("Top up or reset your demo balance on Deriv.");
+    $("bmFundGo").textContent = real ? T("Deposit on Deriv") : T("Go to Deriv");
+    $("bmFundGo").href = DEPOSIT_URL;
+    result("bmFund");
   }
 
   /* ── painting the run ──────────────────────────────────────────────── */
@@ -1366,12 +1395,16 @@
   });
   $("botVar").addEventListener("change", onVariant);
   Object.keys(FIGURES).forEach(function (id) { $(id).addEventListener("input", onFigure); });
+  $("botKeep").checked = keep;
+  $("botKeep").addEventListener("change", function () { setKeep($("botKeep").checked); });
   $("botGo").addEventListener("click", function () {
     if (run && run.active) return stop();
     if (lockHolder()) return say(T("The bot is already running in another tab or window. Stop it there first."), "bad");
     var s = readSettings();
     var err = validate(s);
     if (err) return say(err, "bad");
+    var c = D.current(), acc = c && D.accountOf(c.id);
+    if (acc && acc.balance != null && s.stake > Number(acc.balance) + 1e-9) return topUp(c.id, s.stake);
     scanAndOffer();
   });
   $("bmRetry").addEventListener("click", scanAndOffer);
