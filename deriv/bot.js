@@ -69,7 +69,7 @@
   var OLD_KEY = "shalo_bot_settings";   // Even/Odd only, before the types
   var FALLBACK_MIN = 0.35;
   var LOG_ROWS = 2000;
-  var ENABLED = ["evenodd", "overunder"];
+  var ENABLED = ["evenodd", "overunder", "matchdiff"];
 
   var store = {
     get: function (k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } },
