@@ -505,8 +505,8 @@
   var keep = store.get(KEEP_KEY) === 1;
   var state = (keep && store.get(STATE_KEY)) || null;
   if (!keep) store.del(STATE_KEY);
-  if (!state || !state.t) state = { type: "evenodd", t: {} };
-  if (ENABLED.indexOf(state.type) < 0) state.type = "evenodd";
+  if (!state || !state.t) state = { type: "matchdiff", t: {} };   // Matches/Differs (Differs) first
+  if (ENABLED.indexOf(state.type) < 0) state.type = "matchdiff";
   function persist() { if (keep) store.set(STATE_KEY, state); }
   function setKeep(on) {
     keep = on;
@@ -522,12 +522,11 @@
   }
 
   /* Starting figures that fit the balance, until the user types their own: up to 10, a 0.35
-     stake and 1 take profit; up to 100, 1 and 10; up to 1,000, 10 and 100 — each tenfold
-     balance a tenfold stake and take profit, up to 1,000 and 10,000 from 10,000 on (a 10,000
-     stake would pass Deriv's largest payout). Stop loss 1,000 for everyone. */
+     stake and 1 take profit; up to 100, 1 and 10; above that 10 and 100, whatever the balance.
+     Stop loss 1,000 for everyone. */
   function defaultsFor(balance) {
     var top = 10;
-    while (top < balance && top < 100000) top *= 10;
+    while (top < balance && top < 1000) top *= 10;
     return { stake: Math.max(hub.minStake || FALLBACK_MIN, top / 100), tp: top / 10, sl: 1000 };
   }
   function balanceOf(id) {
@@ -1284,7 +1283,7 @@
   function topUp(accountId, stake) {
     var acc = D.accountOf(accountId), real = !!(acc && acc.type === "real"), cur = (acc && acc.currency) || hub.currency;
     $("bmFundText").textContent = fill(T("Your balance ({bal}) can't cover the next trade ({stake})."), { bal: money(acc ? Number(acc.balance) || 0 : 0, cur), stake: money(stake, cur) });
-    $("bmFundNote").textContent = real ? T("Can't see your full balance? On Deriv, transfer it to your Options account.") : T("Top up or reset your demo balance on Deriv.");
+    $("bmFundNote").textContent = real ? T("Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.") : T("Top up or reset your demo balance on Deriv.");
     $("bmFundGo").textContent = real ? T("Deposit on Deriv") : T("Go to Deriv");
     $("bmFundGo").href = DEPOSIT_URL;
     result("bmFund");

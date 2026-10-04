@@ -20,6 +20,27 @@
 
 .tnav-end { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 
+/* The MetaTrader 5 button: the full logo on a chip like the ones beside it. */
+.tmt5 {
+  display: inline-flex; align-items: center; flex: none; height: 38px; padding: 0 14px;
+  border: 1px solid var(--line-hi); border-radius: 999px; background: var(--raise);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  transition: border-color .15s ease, transform .15s ease; -webkit-tap-highlight-color: transparent;
+}
+.tmt5:hover { border-color: var(--blue); }
+.tmt5:active { transform: scale(0.98); }
+.tmt5:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.tmt5 img { display: block; height: 18px; width: auto; }
+.tmt5 .lt { display: none; }
+:root[data-theme="light"] .tmt5 .dk { display: none; }
+:root[data-theme="light"] .tmt5 .lt { display: block; }
+.tmt5--top { display: none; }
+@media (max-width: 759px) {
+  .tmt5--nav { display: none; }
+  .tmt5--top { display: inline-flex; align-self: center; height: 36px; margin: 2px 0 14px; }
+  .tmt5--top img { height: 16px; }
+}
+
 /* The language switch, matched to the chip beside it. */
 .tnav-lang:empty { display: none; }
 .tnav-lang .lang-btn {

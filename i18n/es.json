@@ -126,7 +126,6 @@
 "The file is temporarily unavailable.":"El archivo no está disponible temporalmente.",
 "Your code works only on this browser.":"Tu código solo funciona en este navegador.",
 "Give it a moment before sending another.":"Espera un momento antes de enviar otro.",
-"New to Headway? Claim $150 + a 50% bonus":"¿Nuevo en Headway? Reclama $150 + un bono del 50%",
 "Requested the Shalobot EA — MT5 ID {id}.":"Solicitado el EA de Shalobot — ID de MT5 {id}.",
 "Add the email address we should reply to.":"Añade el email al que debemos responder.",
 "Asked for the Shalobot EA again — ID {id}":"Solicitado de nuevo el EA de Shalobot — ID {id}",
@@ -493,8 +492,8 @@
 "The bot stopped at your limit.":"El bot se detuvo en tu límite.",
 "Top up to keep trading":"Recarga para seguir operando",
 "Your balance ({bal}) can't cover the next trade ({stake}).":"Tu saldo ({bal}) no cubre la próxima operación ({stake}).",
-"Can't see your full balance? On Deriv, transfer it to your Options account.":"¿No ves todo tu saldo? En Deriv, transfiérelo a tu cuenta de Opciones.",
 "Top up or reset your demo balance on Deriv.":"Recarga o restablece tu saldo demo en Deriv.",
 "Deposit on Deriv":"Depositar en Deriv",
-"Go to Deriv":"Ir a Deriv"
+"Go to Deriv":"Ir a Deriv",
+"Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.":"¿Ya depositaste y no lo ves aquí? En Deriv, toca Transferir y pasa el dinero a Opciones."
 }

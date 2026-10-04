@@ -38,6 +38,9 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
     </a>
 
     <div class="tnav-end">
+      <!-- The MT5 side of Shalobot (the EA dashboard). Wide screens carry it
+           here; narrow ones at the top of the page, where it fits. -->
+      <a class="tmt5 tmt5--nav" href="/dashboard" title="MetaTrader 5 EA"><img class="dk" src="/logos/metatrader5.svg" alt="MetaTrader 5" width="186" height="32" /><img class="lt" src="/logos/metatrader5-ink.svg" alt="MetaTrader 5" width="186" height="32" /></a>
       <!-- The language, on its own — there before an account is, and the same
            switch every other page carries. -->
       <div class="tnav-lang" data-lang-switch></div>
@@ -64,6 +67,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 </header>
 
 <main class="tmain" id="tmain">
+  <a class="tmt5 tmt5--top" href="/dashboard" title="MetaTrader 5 EA"><img class="dk" src="/logos/metatrader5.svg" alt="MetaTrader 5" width="186" height="32" /><img class="lt" src="/logos/metatrader5-ink.svg" alt="MetaTrader 5" width="186" height="32" /></a>
   <!-- Only shown when there is something to say: connecting, not connected,
        or Deriv not answering. Once the balances are live the page is just
        the ground, ready for what comes next. -->

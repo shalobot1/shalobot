@@ -43,6 +43,8 @@ main { padding-top: 68px; }
 .fact--logo { display: inline-flex; align-items: center; padding: 6px 14px; border-color: var(--line-hi); background: var(--raise); }
 .fact--logo img { display: block; height: 22px; width: auto; }
 .fact--logo .lt { display: none; }
+/* The Deriv logo as the hero's second button. */
+.hero-deriv img { display: block; height: 22px; width: auto; }
 :root[data-theme="light"] .fact--logo .dk { display: none; }
 :root[data-theme="light"] .fact--logo .lt { display: block; }
 

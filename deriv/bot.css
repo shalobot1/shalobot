@@ -485,10 +485,7 @@
 .bm-badge--loss { color: var(--danger); background: rgba(217, 45, 32, 0.12); box-shadow: 0 0 0 10px rgba(217, 45, 32, 0.05); }
 .bm-badge--fund { color: var(--blue); background: color-mix(in srgb, var(--blue) 14%, transparent); box-shadow: 0 0 0 10px color-mix(in srgb, var(--blue) 6%, transparent); }
 .bm-amount--loss { color: var(--danger); }
-.bm-fund-note {
-  margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2);
-  font-size: 12.5px; line-height: 1.5; color: var(--ink-muted);
-}
+.bm-fund-note { margin: 12px auto 0; max-width: 330px; font-size: 13px; line-height: 1.5; font-weight: 600; color: var(--amber); }
 .bm-actions a.btn { text-decoration: none; }
 
 @media (max-width: 420px) {
