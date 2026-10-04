@@ -46,10 +46,22 @@
 
 /* ── settings ──────────────────────────────────────────────────────── */
 
-.bot-eyebrow {
-  display: inline-block; padding: 4px 10px; border: 1px solid var(--line-hi); border-radius: 999px;
-  color: var(--ink-muted); font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+/* The trade type: three tabs on the field's own surface. */
+.bot-types {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; padding: 3px;
+  border: 1px solid var(--line-hi); border-radius: 12px; background: var(--surface);
 }
+.bot-type {
+  min-width: 0; min-height: 32px; padding: 5px 6px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--ink-muted); cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 700; line-height: 1.2; letter-spacing: .01em;
+  transition: background .15s ease, color .15s ease;
+}
+.bot-type:hover { color: var(--ink); }
+.bot-type.is-on { background: var(--blue); color: var(--on-accent); }
+.bot-type:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.bot-type:disabled { opacity: .45; cursor: default; }
+.bot-types.is-locked .bot-type.is-on { cursor: default; }
 .bot-set h1 { margin: 10px 0 6px; font-size: 24px; letter-spacing: -0.025em; line-height: 1.15; }
 .bot-lede { margin: 0; color: var(--ink-muted); font-size: 13.5px; line-height: 1.55; }
 
@@ -66,6 +78,16 @@
   font: inherit; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .bot-in input:disabled { color: var(--ink-muted); }
+.bot-f--wide { grid-column: 1 / -1; }
+.bot-in--select { position: relative; padding-right: 8px; }
+.bot-in select {
+  flex: 1; min-width: 0; width: 100%; height: 100%; padding: 0 22px 0 0; border: 0; outline: 0;
+  appearance: none; -webkit-appearance: none; background: transparent; color: var(--ink); cursor: pointer;
+  font: inherit; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.bot-in select:disabled { color: var(--ink-muted); cursor: default; }
+.bot-in select option { background: var(--raise); color: var(--ink); }
+.bot-in--select svg { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--ink-muted); pointer-events: none; }
 .bot-in em { font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--ink-muted); }
 .bot-min { margin: 8px 2px 0; font-size: 12px; color: var(--ink-muted); }
 
@@ -116,8 +138,8 @@
 .bot-now-t { min-width: 0; }
 .bot-now-m { font-size: 17px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bot-now-side { margin-top: 2px; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
-.bot-now-side--even { color: var(--even); }
-.bot-now-side--odd { color: var(--odd); }
+.bot-now-side--a { color: var(--even); }
+.bot-now-side--b { color: var(--odd); }
 .bot-now-p { flex: none; text-align: right; }
 .bot-now-p b { display: block; font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; color: var(--ink); font-variant-numeric: tabular-nums; }
 .bot-now-p span { font-size: 12px; color: var(--ink-muted); }
@@ -131,17 +153,22 @@
 }
 .bot-dots i.e { color: var(--even); background: color-mix(in srgb, var(--even) 15%, transparent); }
 .bot-dots i.o { color: var(--odd); background: color-mix(in srgb, var(--odd) 15%, transparent); }
+/* Over/Under and Matches/Differs: a digit that would have won the side wears
+   the side's colour, one that would have lost is plain. */
+.bot-dots i.w.t-a { color: var(--even); background: color-mix(in srgb, var(--even) 15%, transparent); }
+.bot-dots i.w.t-b { color: var(--odd); background: color-mix(in srgb, var(--odd) 15%, transparent); }
+.bot-dots i.x { color: var(--ink-faint); background: var(--surface-2); }
 
-.b-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
-.b-chip--even { color: var(--even); background: color-mix(in srgb, var(--even) 14%, transparent); }
-.b-chip--odd { color: var(--odd); background: color-mix(in srgb, var(--odd) 14%, transparent); }
+.b-chip { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.b-chip--a { color: var(--even); background: color-mix(in srgb, var(--even) 14%, transparent); }
+.b-chip--b { color: var(--odd); background: color-mix(in srgb, var(--odd) 14%, transparent); }
 
 /* ── the trades ────────────────────────────────────────────────────── */
 
 .bot-trades { display: flex; flex-direction: column; min-height: 0; padding-bottom: 8px; }
 .bot-log-head, .bot-row {
   display: grid; align-items: center; gap: 10px;
-  grid-template-columns: 76px minmax(0, 1fr) 104px 86px 88px 96px;
+  grid-template-columns: 70px minmax(0, 1fr) minmax(96px, 140px) 80px 84px 90px;
 }
 .bot-log-head {
   margin: 12px 0 0; padding: 0 calc(10px + var(--sb, 0px)) 8px 10px; border-bottom: 1px solid var(--line);
@@ -176,6 +203,7 @@
 @keyframes bot-in-lost { from { background: rgba(217, 45, 32, 0.10); } to { background: transparent; } }
 .br-t { color: var(--ink-muted); }
 .br-m { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br-s { min-width: 0; display: flex; }
 .br-k { text-align: right; color: var(--ink-muted); }
 .br-p, .br-c { text-align: right; font-weight: 700; white-space: nowrap; }
 .bot-row.is-won .br-p { color: var(--real); }
@@ -206,6 +234,12 @@
 }
 
 /* ── one column ────────────────────────────────────────────────────── */
+
+/* A narrower right column: the figures shrink before the market name goes. */
+@media (min-width: 1001px) and (max-width: 1320px) {
+  .bot-log-head, .bot-row { gap: 8px; grid-template-columns: 62px minmax(0, 1fr) minmax(88px, 120px) 66px 72px 76px; }
+  .bot-row { font-size: 12.5px; }
+}
 
 @media (max-width: 1000px) {
   .bot-grid { grid-template-columns: minmax(0, 1fr); }
@@ -305,8 +339,8 @@
 }
 .bm-pick-m { font-size: 15px; font-weight: 700; color: var(--ink); }
 .bm-pick-side { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
-.bm-pick-side--even { color: var(--even); }
-.bm-pick-side--odd { color: var(--odd); }
+.bm-pick-side--a { color: var(--even); }
+.bm-pick-side--b { color: var(--odd); }
 .bm-pick-s { font-size: 13px; color: var(--ink-muted); }
 .bm-dots { justify-content: center; margin-top: 8px; }
 

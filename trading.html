@@ -98,11 +98,18 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
     <div class="bot-grid">
       <aside class="bot-side">
         <div class="bot-card bot-set">
-          <span class="bot-eyebrow">Even / Odd</span>
+          <div class="bot-types" id="botTypes" role="tablist" aria-label="Trade type">
+            <button class="bot-type" type="button" role="tab" data-type="evenodd">Even / Odd</button>
+            <button class="bot-type" type="button" role="tab" data-type="overunder">Over / Under</button>
+            <button class="bot-type" type="button" role="tab" data-type="matchdiff" hidden>Matches / Differs</button>
+          </div>
           <h1 id="botTitle">Smart Scan bot</h1>
-          <p class="bot-lede">Finds the best Even/Odd market and side, then trades it one 1-tick contract at a time until your take profit or stop loss.</p>
+          <p class="bot-lede" id="botLede">Finds the best Even/Odd market and side, then trades it one 1-tick contract at a time until your take profit or stop loss.</p>
 
           <div class="bot-fields">
+            <label class="bot-f bot-f--wide" id="botVarWrap" hidden><span id="botVarLabel">Prediction</span>
+              <span class="bot-in bot-in--select"><select id="botVar"></select>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
             <label class="bot-f"><span>Stake</span>
               <span class="bot-in"><input id="botStake" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" /><em data-bot-cur data-i18n-skip>USD</em></span></label>
             <label class="bot-f"><span>Martingale</span>

@@ -1,27 +1,39 @@
 /**
- * SHALOBOT — the Smart Scan bot, Even/Odd. A full automation:
+ * SHALOBOT — the Smart Scan bot for Deriv's digit contracts. A full automation:
  *
- *   Scan & start → a popup scans every Even/Odd market live (progress bar),
- *   settles on the ONE best market and side (animated tick), and Start trading
- *   hands it to the bot. The bot then trades one 1-tick contract at a time —
- *   re-scanning before every trade — until take profit, stop loss, Stop, or a
- *   balance that cannot cover the next stake. Take profit ends in a
- *   congratulations popup.
+ *   Pick a trade type (Even/Odd, Over/Under, Matches/Differs), then Scan &
+ *   start → a popup scans every market live (progress bar), settles on the ONE
+ *   best market and side (animated tick), and Start trading hands it to the
+ *   bot. The bot then trades one 1-tick contract at a time — re-scanning before
+ *   every trade — until take profit, stop loss, Stop, or a balance that cannot
+ *   cover the next stake. Take profit ends in a congratulations popup.
+ *
+ * THE TYPES. Each is a set of sides the scan chooses between, all with the
+ * same chance of winning, so the scan decides WHERE and WHICH, never how much
+ * risk — that is the user's choice:
+ *   Even/Odd         Even or Odd (50%).
+ *   Over/Under       the user picks a prediction pair, Over N / Under 9−N —
+ *                    mirror contracts with the same chance and the same payout
+ *                    (measured on all 20 markets) — and the scan picks the side.
+ *   Matches/Differs  the user picks Differs (90%) or Matches (10%), and the
+ *                    scan picks the digit.
  *
  * THE SCAN, on the account's own socket (no extra connection; Deriv allows
- * five per person): which markets offer Even/Odd now; what a win pays on each
- * at this account's stake (app markup and rounding included); and a tick
- * stream per market keeping its last WINDOW last digits, each written with
- * the decimals Deriv gives so a trailing zero is a real 0.
+ * five per person): which markets offer digit contracts now; what a win pays
+ * on each side at this account's stake (app markup and rounding included);
+ * and a tick stream per market keeping its last LONG last digits, each written
+ * with the decimals Deriv gives so a trailing zero is a real 0.
  *
- * THE PICK: among the markets that pay the most, the market and side whose
- * last WINDOW ticks come closest to 100% of one side; a tie goes to the
- * faster market. This is the owner's rule. Backtested on 400,000 real ticks
- * it won ~50% — the digits are random — so it is shown as a recent pattern,
- * never as odds.
+ * THE PICK: among the sides that pay the most, the one whose last WINDOW ticks
+ * would have won closest to 100% of the time; a tie goes to the last LONG
+ * ticks, then to the faster market. This is the owner's rule. Backtested on
+ * 400,000 real ticks the digits are random, so it is shown as a recent
+ * pattern, never as odds.
  *
- * THE RUN. Martingale: after a loss the stake is multiplied (default x3.1),
- * after a win it returns to the starting stake. Stop loss stops the run once
+ * THE RUN. Martingale: after a loss the stake is multiplied, after a win it
+ * returns to the starting stake. Each type and prediction remembers its own
+ * multiplier; the defaults are the smallest that win back every loss plus one
+ * normal win (Even/Odd keeps the owner's 3.1). Stop loss stops the run once
  * the loss has reached it — the next stake is NOT held back for fear of
  * passing it, because the recovery trade may be the one that wins (so the
  * final loss can exceed the stop loss by up to the last stake). Each new run
@@ -48,12 +60,16 @@
   var round2 = function (v) { return Math.round(v * 100) / 100; };
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
 
-  var WINDOW = 10;
-  var TIER = 0.004;
-  var DEFAULTS = { stake: 1, tp: 1000, sl: 1000, mult: 3.1 };
-  var SETTINGS_KEY = "shalo_bot_settings";
+  var WINDOW = 10;          // the pattern the user sees: the last 10 ticks
+  var LONG = 100;           // the tie-break: the last 100
+  var TIER = 0.0025;        // "pays the most": within 0.25% of the best payout
+  var MULT_MAX = 50;
+  var DEFAULTS = { stake: 1, tp: 1000, sl: 1000 };
+  var STATE_KEY = "shalo_bot_v2";
+  var OLD_KEY = "shalo_bot_settings";   // Even/Odd only, before the types
   var FALLBACK_MIN = 0.35;
   var LOG_ROWS = 2000;
+  var ENABLED = ["evenodd", "overunder"];
 
   var store = {
     get: function (k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } },
@@ -66,19 +82,107 @@
     } catch (e) { return Number(v).toFixed(2) + " " + (cur || ""); }
   }
   function signed(v, cur) { return (v > 0 ? "+" : v < 0 ? "−" : "") + money(Math.abs(v), cur); }
-  var sideName = function (s) { return s === "even" ? T("Even") : T("Odd"); };
 
-  /** A contract's type and market, from its own fields, else its short code. */
+  /* ── the trade types ───────────────────────────────────────────────── */
+
+  /* The smallest multiplier that wins back every loss plus one normal win:
+     payout / (payout − 1), at the top payout through this app at stake 1,
+     rounded up (measured 2026-10-04). */
+  var OU_MULT = { 0: 17.7, 1: 6.3, 2: 3.9, 3: 2.8, 4: 2.2, 5: 1.8, 6: 1.6, 7: 1.4, 8: 1.2 };
+
+  /** One contract the bot can buy. `wins(d)`: does last digit d win it. */
+  function side(key, ct, barrier, tone, wins, label, priceBarrier) {
+    var pb = priceBarrier != null ? priceBarrier : barrier;
+    return { key: key, ct: ct, barrier: barrier, tone: tone, wins: wins, label: label,
+      price: { ct: ct, barrier: pb }, priceKey: ct + (pb != null ? ":" + pb : "") };
+  }
+
+  var TYPES = {
+    evenodd: {
+      title: "Scanning Even/Odd markets",
+      lede: "Finds the best Even/Odd market and side, then trades it one 1-tick contract at a time until your take profit or stop loss.",
+      variants: null, defVariant: "x",
+      defMult: function () { return 3.1; },
+      contracts: function () { return ["DIGITEVEN", "DIGITODD"]; },
+      sides: function () {
+        return [
+          side("even", "DIGITEVEN", null, "a", function (d) { return d % 2 === 0; }, function () { return T("Even"); }),
+          side("odd", "DIGITODD", null, "b", function (d) { return d % 2 === 1; }, function () { return T("Odd"); }),
+        ];
+      },
+      pricing: function () { return T("Pricing Even and Odd on {n} markets…"); },
+      dot: function (d) { return d % 2 === 0 ? "e" : "o"; },
+    },
+    overunder: {
+      title: "Scanning Over/Under markets",
+      lede: "Finds the best market and side for your prediction, Over or Under, then trades it one 1-tick contract at a time until your take profit or stop loss.",
+      variantLabel: "Prediction",
+      variants: ["0", "1", "2", "3", "4", "5", "6", "7", "8"], defVariant: "2",
+      variantText: function (v) { var n = Number(v); return fill(T("Over {a} / Under {b} · {p}%"), { a: n, b: 9 - n, p: (9 - n) * 10 }); },
+      defMult: function (v) { return OU_MULT[v] || 2; },
+      contracts: function () { return ["DIGITOVER", "DIGITUNDER"]; },
+      sides: function (v) {
+        var n = Number(v), u = 9 - n;
+        return [
+          side("over" + n, "DIGITOVER", n, "a", function (d) { return d > n; }, function () { return fill(T("Over {n}"), { n: n }); }),
+          side("under" + u, "DIGITUNDER", u, "b", function (d) { return d < u; }, function () { return fill(T("Under {n}"), { n: u }); }),
+        ];
+      },
+      pricing: function (v) { var n = Number(v); return fill(T("Pricing Over {a} and Under {b} on {n} markets…"), { a: n, b: 9 - n, n: "{n}" }); },
+    },
+    matchdiff: {
+      title: "Scanning Matches/Differs markets",
+      lede: "Finds the best market and digit for your contract, Differs or Matches, then trades it one 1-tick contract at a time until your take profit or stop loss.",
+      variantLabel: "Contract",
+      variants: ["diff", "match"], defVariant: "diff",
+      variantText: function (v) { return v === "match" ? fill(T("Matches · {p}%"), { p: 10 }) : fill(T("Differs · {p}%"), { p: 90 }); },
+      defMult: function (v) { return v === "match" ? 1.2 : 17.7; },
+      contracts: function (v) { return v === "match" ? ["DIGITMATCH"] : ["DIGITDIFF"]; },
+      // Every digit has the same chance, so one price per market serves all ten.
+      sides: function (v) {
+        var out = [];
+        for (var k = 0; k <= 9; k++) (function (k) {
+          out.push(v === "match"
+            ? side("match" + k, "DIGITMATCH", k, "b", function (d) { return d === k; }, function () { return fill(T("Matches {n}"), { n: k }); }, 5)
+            : side("diff" + k, "DIGITDIFF", k, "a", function (d) { return d !== k; }, function () { return fill(T("Differs {n}"), { n: k }); }, 5));
+        })(k);
+        return out;
+      },
+      pricing: function (v) { return v === "match" ? T("Pricing Matches on {n} markets…") : T("Pricing Differs on {n} markets…"); },
+    },
+  };
+
+  /** Everything a scan or a run needs to know about one type and variant. */
+  function makeSpec(type, variant) {
+    var t = TYPES[type];
+    var v = t.variants ? (t.variants.indexOf(variant) >= 0 ? variant : t.defVariant) : t.defVariant;
+    var sides = t.sides(v), prices = [], seen = {};
+    sides.forEach(function (sd) { if (!seen[sd.priceKey]) { seen[sd.priceKey] = 1; prices.push(sd.price); } });
+    return { type: type, variant: v, key: type + ":" + v, t: t, sides: sides, prices: prices, contracts: t.contracts(v) };
+  }
+
+  /** A contract of Deriv's, back as one of this spec's sides (for the log). */
+  function sideOf(spec, ct, barrier) {
+    var b = barrier == null || barrier === "" ? null : Number(barrier);
+    return spec.sides.filter(function (sd) { return sd.ct === ct && (sd.barrier == null || sd.barrier === b); })[0] || null;
+  }
+
+  /** A contract's type, market and barrier, from its own fields, else its short code. */
   function kindOf(x) {
     if (x.contract_type) return String(x.contract_type);
-    var m = /^(DIGITEVEN|DIGITODD)_/.exec(String(x.shortcode || ""));
+    var m = /^(DIGIT[A-Z]+)_/.exec(String(x.shortcode || ""));
     return m ? m[1] : "";
   }
   function symOf(x) {
     if (x.underlying_symbol) return String(x.underlying_symbol);
-    var sc = String(x.shortcode || "").replace(/^DIGIT(EVEN|ODD)_/, "");
+    var sc = String(x.shortcode || "").replace(/^DIGIT[A-Z]+_/, "");
     var known = hub.order.filter(function (s) { return sc.indexOf(s + "_") === 0; }).sort(function (a, b) { return b.length - a.length; })[0];
     return known || sc.split("_")[0];
+  }
+  function barrierOf(x) {
+    if (x.barrier != null && x.barrier !== "") return x.barrier;
+    var m = /_\d+T_(\d)_\d+$/.exec(String(x.shortcode || ""));   // DIGITOVER_R_10_0.47_1791086752_1T_2_0
+    return m ? m[1] : null;
   }
 
   /* ── the live scan ─────────────────────────────────────────────────── */
@@ -86,7 +190,7 @@
   var hub = {
     account: null, gen: 0, ready: false, starting: null,
     currency: "USD", minStake: FALLBACK_MIN,
-    markets: {}, order: [], subs: [], pricedAt: 0, pricedStake: 0,
+    markets: {}, order: [], subs: [], pricedAt: 0, pricedStake: 0, pricedSpec: "",
   };
 
   function lastDigit(quote, dec) {
@@ -105,7 +209,7 @@
 
   /** Start (or join the start of) the scan on one account. `prog(done,
    *  total, step)` hears each step. A newer start silences an older one. */
-  function hubStart(accountId, stake, prog) {
+  function hubStart(accountId, stake, prog, spec) {
     prog = prog || function () {};
     if (hub.account === accountId && hub.ready) return Promise.resolve();
     if (hub.account === accountId && hub.starting) return hub.starting;
@@ -126,6 +230,7 @@
       var acc = D.accountOf(accountId);
       hub.currency = (acc && acc.currency) || "USD";
 
+      // The 20 digit markets are the same for every digit type (measured).
       var a = await D.askOn(accountId, { active_symbols: "brief", contract_type: ["DIGITEVEN"] });
       if (a.error) throw new Error(a.error.message);
       var list = (a.active_symbols || []).filter(function (x) { return x.exchange_is_open && !x.is_trading_suspended; });
@@ -140,26 +245,26 @@
       hub.markets = {}; hub.order = [];
       list.forEach(function (x) {
         hub.order.push(x.underlying_symbol);
-        hub.markets[x.underlying_symbol] = { sym: x.underlying_symbol, name: x.underlying_symbol_name, digits: [], times: [], ratio: null, at: 0 };
+        hub.markets[x.underlying_symbol] = { sym: x.underlying_symbol, name: x.underlying_symbol_name, digits: [], times: [], ratio: {}, at: 0 };
       });
 
-      var total = hub.order.length * 2, done = 0;
+      var total = hub.order.length * (1 + spec.prices.length), done = 0;
       prog(0, total, fill(T("Reading the last ticks of {n} markets…"), { n: hub.order.length }));
       await Promise.all(hub.order.map(async function (sym) {
-        var h = await D.askOn(accountId, { ticks_history: sym, end: "latest", count: 50, style: "ticks" });
+        var h = await D.askOn(accountId, { ticks_history: sym, end: "latest", count: LONG, style: "ticks" });
         var m = hub.markets[sym];
         if (!h.error && h.history) {
           var dec = Number(h.pip_size);
           m.dec = dec;
-          m.digits = h.history.prices.map(function (q) { return lastDigit(q, dec); }).slice(-WINDOW);
+          m.digits = h.history.prices.map(function (q) { return lastDigit(q, dec); }).slice(-LONG);
           m.times = h.history.times.slice(-50);
           m.at = Date.now();
         }
         prog(++done, total);
       }));
       if (gen !== hub.gen) return;
-      prog(done, total, fill(T("Pricing Even and Odd on {n} markets…"), { n: hub.order.length }));
-      await price(accountId, stake, gen, function () { prog(++done, total); });
+      prog(done, total, fill(spec.t.pricing(spec.variant), { n: hub.order.length }));
+      await price(accountId, stake, gen, function () { prog(++done, total); }, spec);
       if (gen !== hub.gen) return;
 
       hub.order.forEach(function (sym) {
@@ -170,7 +275,7 @@
           var m = hub.markets[sym];
           m.dec = Number(msg.tick.pip_size);
           m.digits.push(lastDigit(msg.tick.quote, m.dec));
-          if (m.digits.length > WINDOW) m.digits.splice(0, m.digits.length - WINDOW);
+          if (m.digits.length > LONG) m.digits.splice(0, m.digits.length - LONG);
           m.times.push(msg.tick.epoch);
           if (m.times.length > 50) m.times.splice(0, m.times.length - 50);
           m.at = Date.now();
@@ -196,52 +301,76 @@
     hubStop();
     setTimeout(function () {
       recovering = false;
-      var stake = run && run.active ? run.stake0 : (readSettings().stake || DEFAULTS.stake);
-      hubStart(accountId, stake).catch(function () { setTimeout(function () { hubRecover(accountId, hub.gen); }, 3000); });
+      var live = run && run.active;
+      var stake = live ? run.stake0 : (readSettings().stake || DEFAULTS.stake);
+      var spec = live ? run.spec : formSpec();
+      hubStart(accountId, stake, null, spec).catch(function () { setTimeout(function () { hubRecover(accountId, hub.gen); }, 3000); });
     }, 600);
   }
 
-  /** What a win pays on each market at this stake, through this account. */
-  async function price(accountId, stake, gen, onEach) {
+  /** What a win pays on each market and side at this stake, through this
+   *  account. A refusal for rate keeps the last price; any other clears it. */
+  async function price(accountId, stake, gen, onEach, spec) {
     var amount = Math.max(round2(stake || DEFAULTS.stake), hub.minStake);
-    await Promise.all(hub.order.map(async function (sym) {
-      var r = await D.askOn(accountId, { proposal: 1, amount: amount, basis: "stake", currency: hub.currency, underlying_symbol: sym, contract_type: "DIGITEVEN", duration: 1, duration_unit: "t" });
+    var jobs = [];
+    hub.order.forEach(function (sym) { spec.prices.forEach(function (p) { jobs.push([sym, p]); }); });
+    await Promise.all(jobs.map(async function (j) {
+      var req = { proposal: 1, amount: amount, basis: "stake", currency: hub.currency, underlying_symbol: j[0], contract_type: j[1].ct, duration: 1, duration_unit: "t" };
+      if (j[1].barrier != null) req.barrier = String(j[1].barrier);
+      var r = await D.askOn(accountId, req);
       if (gen !== hub.gen) return;
-      hub.markets[sym].ratio = r.error ? null : Number(r.proposal.payout) / amount;
+      var key = j[1].ct + (j[1].barrier != null ? ":" + j[1].barrier : "");
+      var m = hub.markets[j[0]];
+      if (!r.error) m.ratio[key] = Number(r.proposal.payout) / amount;
+      else if (r.error.code !== "RateLimit") m.ratio[key] = null;
       if (onEach) onEach();
     }));
     hub.pricedAt = Date.now();
     hub.pricedStake = amount;
+    hub.pricedSpec = spec.key;
   }
 
   function interval(m) {
     var t = m.times;
     return t.length > 2 ? (t[t.length - 1] - t[0]) / (t.length - 1) : 2;
   }
+  function share(digits, wins) {
+    if (!digits.length) return 0;
+    var n = 0;
+    for (var i = 0; i < digits.length; i++) if (wins(digits[i])) n++;
+    return n / digits.length;
+  }
 
-  /** The one best trade right now. */
-  function choose() {
-    var fresh = hub.order.map(function (s) { return hub.markets[s]; }).filter(function (m) {
-      return m && m.ratio && m.digits.length >= WINDOW && Date.now() - m.at < 20000;
+  /** One market and side, read now. Null when its prices or ticks are stale. */
+  function candidate(m, sd) {
+    var ratio = m && m.ratio[sd.priceKey];
+    if (!ratio || m.digits.length < WINDOW || Date.now() - m.at > 20000) return null;
+    var last = m.digits.slice(-WINDOW);
+    return { m: m, side: sd, ratio: ratio, share: share(last, sd.wins), long: share(m.digits, sd.wins), speed: interval(m), digits: last };
+  }
+  function better(a, b) {
+    if (Math.abs(a.share - b.share) > 1e-9) return a.share > b.share;
+    if (Math.abs(a.long - b.long) > 1e-9) return a.long > b.long;
+    return a.speed < b.speed - 0.25;
+  }
+
+  /** The one best trade right now for this type. */
+  function choose(spec) {
+    var all = [];
+    hub.order.forEach(function (sym) {
+      spec.sides.forEach(function (sd) { var c = candidate(hub.markets[sym], sd); if (c) all.push(c); });
     });
-    if (!fresh.length) return null;
-    var top = Math.max.apply(null, fresh.map(function (m) { return m.ratio; }));
+    if (!all.length) return null;
+    var top = Math.max.apply(null, all.map(function (c) { return c.ratio; }));
     var best = null;
-    fresh.forEach(function (m) {
-      if (m.ratio < top - TIER) return;
-      var even = m.digits.filter(function (d) { return d % 2 === 0; }).length / m.digits.length;
-      [["even", even], ["odd", 1 - even]].forEach(function (s) {
-        var c = { m: m, side: s[0], share: s[1], speed: interval(m), digits: m.digits.slice() };
-        if (!best || c.share > best.share + 1e-9 || (Math.abs(c.share - best.share) < 1e-9 && c.speed < best.speed - 0.25)) best = c;
-      });
-    });
+    all.forEach(function (c) { if (c.ratio >= top * (1 - TIER) && (!best || better(c, best))) best = c; });
     return best;
   }
 
-  function dots(el, digits) {
-    el.innerHTML = digits.map(function (d) {
-      var e = d % 2 === 0;
-      return '<i class="' + (e ? "e" : "o") + '">' + d + "</i>";
+  function dots(el, p, spec) {
+    el.innerHTML = p.digits.map(function (d) {
+      var cls = spec.t.dot ? spec.t.dot(d) : (p.side.wins(d) ? "w t-" + p.side.tone : "x");
+      return '<i class="' + cls + '">' + d + "</i>";
     }).join("");
   }
 
@@ -256,16 +385,30 @@
     var on = !!(run && run.active);
     $("botNow").hidden = !on;
     if (!on) return;
-    var p = choose();
+    var p = choose(run.spec);
     if (!p) return;
     $("nowMarket").textContent = p.m.name;
-    $("nowSide").textContent = sideName(p.side);
-    $("nowSide").className = "bot-now-side bot-now-side--" + p.side;
+    $("nowSide").textContent = p.side.label();
+    $("nowSide").className = "bot-now-side bot-now-side--" + p.side.tone;
     $("nowShare").textContent = Math.round(p.share * 100) + "%";
-    dots($("nowDots"), p.digits);
+    dots($("nowDots"), p, run.spec);
   }
 
-  /* ── settings ──────────────────────────────────────────────────────── */
+  /* ── settings: one set per type, one multiplier per prediction ─────── */
+
+  var state = store.get(STATE_KEY);
+  if (!state || !state.t) {
+    var old = store.get(OLD_KEY) || {};
+    state = { type: "evenodd", t: { evenodd: { stake: old.stake, tp: old.tp, sl: old.sl, variant: "x", mult: { x: old.mult } } } };
+  }
+  if (ENABLED.indexOf(state.type) < 0) state.type = "evenodd";
+  function typeState(type) {
+    var ts = state.t[type] || (state.t[type] = {});
+    if (!ts.mult) ts.mult = {};
+    if (!ts.variant) ts.variant = TYPES[type].defVariant;
+    return ts;
+  }
+  var formVariant = null;   // the variant whose multiplier the field is showing
 
   function num(id) {
     var raw = String($(id).value || "").replace(",", ".").trim();
@@ -273,14 +416,84 @@
     return raw && isFinite(v) ? v : NaN;
   }
   function readSettings() {
-    return { stake: round2(num("botStake")), tp: round2(num("botTp")), sl: round2(num("botSl")), mult: Math.round(num("botMult") * 100) / 100 };
+    var t = TYPES[state.type];
+    return {
+      type: state.type, variant: t.variants ? $("botVar").value : t.defVariant,
+      stake: round2(num("botStake")), tp: round2(num("botTp")), sl: round2(num("botSl")), mult: Math.round(num("botMult") * 100) / 100,
+    };
   }
+  function formSpec() { var s = readSettings(); return makeSpec(s.type, s.variant); }
+
+  /** The form's numbers into this type's memory (only the ones that are numbers). */
+  function saveForm() {
+    var s = readSettings(), ts = typeState(s.type);
+    if (s.stake > 0) ts.stake = s.stake;
+    if (s.tp > 0) ts.tp = s.tp;
+    if (s.sl > 0) ts.sl = s.sl;
+    if (s.mult >= 1) ts.mult[formVariant || s.variant] = s.mult;
+    ts.variant = s.variant;
+    store.set(STATE_KEY, state);
+  }
+  function multFor(type, variant) {
+    var v = typeState(type).mult[variant];
+    return v >= 1 ? v : TYPES[type].defMult(variant);
+  }
+  function loadForm() {
+    var type = state.type, t = TYPES[type], ts = typeState(type);
+    $("botStake").value = (ts.stake >= FALLBACK_MIN ? ts.stake : DEFAULTS.stake).toFixed(2);
+    $("botTp").value = String(ts.tp > 0 ? ts.tp : DEFAULTS.tp);
+    $("botSl").value = String(ts.sl > 0 ? ts.sl : DEFAULTS.sl);
+    paintVariants();
+    formVariant = t.variants ? $("botVar").value : t.defVariant;
+    $("botMult").value = String(multFor(type, formVariant));
+  }
+  function paintVariants() {
+    var t = TYPES[state.type], ts = typeState(state.type);
+    $("botVarWrap").hidden = !t.variants;
+    if (!t.variants) return;
+    $("botVarLabel").textContent = T(t.variantLabel);
+    var cur = $("botVar").value || ts.variant;
+    if (t.variants.indexOf(cur) < 0) cur = ts.variant;
+    if (t.variants.indexOf(cur) < 0) cur = t.defVariant;
+    $("botVar").innerHTML = t.variants.map(function (v) { return '<option value="' + v + '">' + esc(t.variantText(v)) + "</option>"; }).join("");
+    $("botVar").value = cur;
+  }
+  function paintType() {
+    Array.prototype.forEach.call(document.querySelectorAll(".bot-type"), function (b) {
+      var on = b.getAttribute("data-type") === state.type;
+      b.hidden = ENABLED.indexOf(b.getAttribute("data-type")) < 0;
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+      b.tabIndex = on ? 0 : -1;
+    });
+    $("botLede").textContent = T(TYPES[state.type].lede);
+  }
+  function setType(type) {
+    if (type === state.type || ENABLED.indexOf(type) < 0 || (run && run.active)) return;
+    saveForm();
+    state.type = type;
+    $("botVar").value = "";
+    loadForm();
+    paintType();
+    store.set(STATE_KEY, state);
+    say("");
+  }
+  function onVariant() {
+    var s = readSettings(), ts = typeState(s.type);
+    var m = num("botMult");
+    if (formVariant && m >= 1) ts.mult[formVariant] = Math.round(m * 100) / 100;
+    formVariant = s.variant;
+    ts.variant = s.variant;
+    $("botMult").value = String(multFor(s.type, s.variant));
+    store.set(STATE_KEY, state);
+  }
+
   function validate(s) {
     if (!(s.stake > 0)) return T("Enter a stake.");
     if (s.stake < hub.minStake - 1e-9) return fill(T("The smallest stake Deriv accepts is {min}."), { min: money(hub.minStake, hub.currency) });
     if (!(s.tp > 0)) return T("Enter a take profit above zero.");
     if (!(s.sl > 0)) return T("Enter a stop loss above zero.");
-    if (!(s.mult >= 1 && s.mult <= 10)) return T("Martingale must be between 1 (off) and 10.");
+    if (!(s.mult >= 1 && s.mult <= MULT_MAX)) return fill(T("Martingale must be between 1 (off) and {max}."), { max: MULT_MAX });
     return "";
   }
   function paintMin() {
@@ -336,9 +549,12 @@
     var c = D.current();
     if (!c) return;
     var s = readSettings();
+    var spec = makeSpec(s.type, s.variant);
+    saveForm();
     say("");
     var token = ++scanToken;
     bar.shown = 0; bar.target = 0;
+    $("bmTitle").textContent = T(spec.t.title);
     setProgress(0, T("Connecting to the markets…"));
     openModal("bmScan");
     var t0 = Date.now();
@@ -346,20 +562,20 @@
       var fresh = hub.account !== c.id || !hub.ready;
       await hubStart(c.id, s.stake, function (done, total, step) {
         if (token === scanToken) setProgress(0.08 + 0.72 * (total ? done / total : 0), step);
-      });
+      }, spec);
       if (token !== scanToken) return;
       var err = validate(s);
       if (err) throw new Error(err);
       if (!fresh) {
-        // Already live: price again at this stake and read the patterns now.
-        setProgress(0.35, fill(T("Pricing Even and Odd on {n} markets…"), { n: hub.order.length }));
-        var n = 0, total = hub.order.length;
-        await price(c.id, s.stake, hub.gen, function () { if (token === scanToken) setProgress(0.35 + 0.45 * (++n / total)); });
+        // Already live: price this type again at this stake and read the patterns now.
+        setProgress(0.35, fill(spec.t.pricing(spec.variant), { n: hub.order.length }));
+        var n = 0, total = hub.order.length * spec.prices.length;
+        await price(c.id, s.stake, hub.gen, function () { if (token === scanToken) setProgress(0.35 + 0.45 * (++n / total)); }, spec);
       }
       if (token !== scanToken) return;
       setProgress(0.9, T("Finding the strongest pattern…"));
       var pick = null;
-      for (var i = 0; i < 20 && !pick; i++) { pick = choose(); if (!pick) await sleep(300); }
+      for (var i = 0; i < 20 && !pick; i++) { pick = choose(spec); if (!pick) await sleep(300); }
       if (!pick) throw new Error(T("Deriv did not price any market just now. Try again."));
       var spent = Date.now() - t0;
       if (spent < 1600) await sleep(1600 - spent);
@@ -368,8 +584,8 @@
       await sleep(350);
       if (token !== scanToken) return;
 
-      pending = { account: c.id, settings: s, pick: null };
-      showPick(pick);
+      pending = { account: c.id, settings: s, spec: spec, pick: null };
+      showPick(choose(spec) || pick);
       $("bmStake").textContent = money(s.stake, hub.currency);
       $("bmMult").textContent = "×" + s.mult;
       $("bmTp").textContent = money(s.tp, hub.currency);
@@ -386,16 +602,16 @@
   /** The popup's result, and what Start will trade. While the popup is open
    *  it follows the ticks, so the first trade is always what is on screen. */
   function showPick(p) {
-    pending.pick = { sym: p.m.sym, side: p.side, at: Date.now() };
+    pending.pick = { sym: p.m.sym, side: p.side.key, at: Date.now() };
     $("bmMarket").textContent = p.m.name;
-    $("bmSide").textContent = sideName(p.side);
-    $("bmSide").className = "bm-pick-side bm-pick-side--" + p.side;
+    $("bmSide").textContent = p.side.label();
+    $("bmSide").className = "bm-pick-side bm-pick-side--" + p.side.tone;
     $("bmShare").textContent = fill(T("{p}% of the last {n} ticks"), { p: Math.round(p.share * 100), n: WINDOW });
-    dots($("bmDots"), p.digits);
+    dots($("bmDots"), p, pending.spec);
   }
   function paintPick() {
     if (modal.view !== "bmDone" || !pending || hub.account !== pending.account) return;
-    var p = choose();
+    var p = choose(pending.spec);
     if (p) showPick(p);
   }
 
@@ -403,9 +619,9 @@
 
   var run = null;
 
-  function newRun(account, s) {
+  function newRun(account, s, spec) {
     return {
-      account: account, active: true, stopping: false, ended: null,
+      account: account, active: true, stopping: false, ended: null, spec: spec,
       stake0: s.stake, stake: s.stake, tp: s.tp, sl: s.sl, mult: s.mult,
       pl: 0, n: 0, won: 0, lost: 0, streak: 0, errors: 0,
       log: [], ids: {}, currency: hub.currency, startedAt: Math.floor(Date.now() / 1000) - 1,
@@ -415,13 +631,13 @@
   function startRun() {
     if (!pending || (run && run.active)) return;
     var c = D.accountOf(pending.account);
-    var s = pending.settings, first = pending.pick;
+    var s = pending.settings, spec = pending.spec, first = pending.pick;
     pending = null;
     closeModal();
     if (!c) return;
-    store.set(SETTINGS_KEY, s);
+    saveForm();
     // A fresh start: nothing from the last run carries over.
-    run = newRun(c.id, s);
+    run = newRun(c.id, s, spec);
     run.first = first;
     $("botLog").innerHTML = "";
     paintRun();
@@ -455,10 +671,8 @@
     var f = r.first;
     if (!f || r.n || Date.now() - f.at > 60000) return null;
     r.first = null;
-    var m = hub.markets[f.sym];
-    if (!m || !m.ratio || m.digits.length < WINDOW || Date.now() - m.at > 20000) return null;
-    var even = m.digits.filter(function (d) { return d % 2 === 0; }).length / m.digits.length;
-    return { m: m, side: f.side, share: f.side === "even" ? even : 1 - even, digits: m.digits.slice() };
+    var sd = r.spec.sides.filter(function (x) { return x.key === f.side; })[0];
+    return sd ? candidate(hub.markets[f.sym], sd) : null;
   }
 
   async function loop(r) {
@@ -470,15 +684,15 @@
       var acc = D.accountOf(r.account);
       if (acc && acc.balance != null && r.stake > acc.balance + 1e-9) return end(r, "balance");
 
-      if (Date.now() - hub.pricedAt > 5 * 60000 && hub.ready && hub.account === r.account) {
-        try { await price(r.account, r.stake0, hub.gen); } catch (e) {}
+      if (hub.ready && hub.account === r.account && (Date.now() - hub.pricedAt > 5 * 60000 || hub.pricedSpec !== r.spec.key)) {
+        try { await price(r.account, r.stake0, hub.gen, null, r.spec); } catch (e) {}
       }
 
-      var pick = hub.ready && hub.account === r.account ? (firstPick(r) || choose()) : null;
+      var pick = hub.ready && hub.account === r.account ? (firstPick(r) || choose(r.spec)) : null;
       if (!pick) {
         if (!waitedSince) waitedSince = Date.now();
         if (Date.now() - waitedSince > 60000) return end(r, "nodata");
-        if (!hub.ready && !hub.starting && !recovering) hubStart(r.account, r.stake0).catch(function () {});
+        if (!hub.ready && !hub.starting && !recovering) hubStart(r.account, r.stake0, null, r.spec).catch(function () {});
         paintRun(T("Waiting for live prices…"));
         await sleep(400);
         continue;
@@ -510,7 +724,9 @@
     r.n++;
     r.pl = round2(r.pl + res.pl);
     if (res.won) { r.won++; r.streak = 0; } else { r.lost++; r.streak++; }
-    var row = { id: res.id, at: res.at || Date.now(), market: what.market, side: what.side, share: what.share, stake: res.stake, pl: res.pl, won: res.won, total: r.pl, late: !!what.late };
+    var label = what.side ? what.side.label() : what.label;
+    var tone = what.side ? what.side.tone : "a";
+    var row = { id: res.id, at: res.at || Date.now(), market: what.market, side: what.side ? what.side.key : "", label: label, share: what.share, stake: res.stake, pl: res.pl, won: res.won, total: r.pl, late: !!what.late };
     r.log.unshift(row);
     if (run !== r) return;
     var el = document.createElement("li");
@@ -518,7 +734,7 @@
     el.innerHTML =
       '<span class="br-t">' + esc(new Date(row.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" })) + "</span>" +
       '<span class="br-m">' + esc(row.market) + "</span>" +
-      '<span class="br-s"><span class="b-chip b-chip--' + row.side + '">' + esc(sideName(row.side)) + (row.share != null ? " " + Math.round(row.share * 100) + "%" : "") + "</span></span>" +
+      '<span class="br-s"><span class="b-chip b-chip--' + tone + '">' + esc(label) + (row.share != null ? " " + Math.round(row.share * 100) + "%" : "") + "</span></span>" +
       '<span class="br-k">' + esc(money(row.stake, r.currency)) + "</span>" +
       '<span class="br-p">' + esc(signed(row.pl, r.currency)) + "</span>" +
       '<span class="br-c">' + esc(signed(row.total, r.currency)) + "</span>";
@@ -533,23 +749,24 @@
    *  the page did not see settle (a contract still open at the stop, a line
    *  that dropped) is added now — the log matches Deriv, last trade included. */
   async function finalSync(r) {
+    var mine = function (x) { return r.spec.contracts.indexOf(kindOf(x)) >= 0; };
     for (var attempt = 0; attempt < 4; attempt++) {
       try {
         await D.whenOpenOn(r.account, 6000);
-        var pt = await D.askOn(r.account, { profit_table: 1, limit: 100, sort: "DESC", description: 1, contract_type: ["DIGITEVEN", "DIGITODD"], date_from: String(r.startedAt) }, 10000);
+        var pt = await D.askOn(r.account, { profit_table: 1, limit: 100, sort: "DESC", description: 1, contract_type: r.spec.contracts, date_from: String(r.startedAt) }, 10000);
         var rows = ((pt.profit_table && pt.profit_table.transactions) || []).filter(function (x) {
-          return x.contract_id && Number(x.purchase_time) >= r.startedAt && Number(x.purchase_time) <= r.ended.at &&
-            /^DIGIT(EVEN|ODD)$/.test(kindOf(x)) && !r.ids[x.contract_id];
+          return x.contract_id && Number(x.purchase_time) >= r.startedAt && Number(x.purchase_time) <= r.ended.at && mine(x) && !r.ids[x.contract_id];
         });
         rows.reverse().forEach(function (x) {
           var sym = symOf(x), m = hub.markets[sym];
+          var sd = sideOf(r.spec, kindOf(x), barrierOf(x));
           var pl = round2(Number(x.sell_price) - Number(x.buy_price));
-          record(r, { market: (m && m.name) || sym, sym: sym, side: kindOf(x) === "DIGITEVEN" ? "even" : "odd", share: null, late: true },
+          record(r, { market: (m && m.name) || sym, sym: sym, side: sd, label: kindOf(x), share: null, late: true },
             { id: x.contract_id, won: pl > 0, pl: pl, stake: Number(x.buy_price), at: Number(x.sell_time || x.purchase_time) * 1000 });
         });
         var pf = await D.askOn(r.account, { portfolio: 1 }, 10000);
         var open = ((pf.portfolio && pf.portfolio.contracts) || []).some(function (x) {
-          return Number(x.purchase_time) >= r.startedAt && /^DIGIT(EVEN|ODD)$/.test(kindOf(x)) && !r.ids[x.contract_id];
+          return Number(x.purchase_time) >= r.startedAt && mine(x) && !r.ids[x.contract_id];
         });
         if (!open) break;
       } catch (e) { /* the line is coming back */ }
@@ -560,8 +777,8 @@
 
   /** One contract, one tick. Resolves { won, pl, stake, id, at, final }.
    *
-   *  A 1-tick Even/Odd contract is decided by its exit tick, and Deriv says so
-   *  at once (is_expired, is_settleable, the exit spot and the final profit);
+   *  A 1-tick digit contract is decided by its exit tick, and Deriv says so at
+   *  once (is_expired, is_settleable, the exit spot and the final profit);
    *  booking it as sold follows 1 to 7 seconds later. The bot moves on at the
    *  exit tick — but only when the exit spot's own last digit agrees with the
    *  profit — and keeps listening until Deriv books it: `final` resolves with
@@ -569,7 +786,7 @@
    *  itself on the rare chance the two differ. */
   function buyOnce(r, pick) {
     return new Promise(function (resolve, reject) {
-      var type = pick.side === "even" ? "DIGITEVEN" : "DIGITODD";
+      var sd = pick.side, type = sd.ct;
       var stake = r.stake;
       var started = Math.floor(Date.now() / 1000) - 2;
       var settled = false, closed = false, bought = null, subId = null, handle = null, tail = 0;
@@ -613,8 +830,7 @@
         if (c.exit_spot == null || c.exit_spot === "" || c.profit == null || c.profit === "") return false;
         var m = hub.markets[pick.m.sym];
         var spot = m && isFinite(m.dec) ? Number(c.exit_spot).toFixed(m.dec) : String(c.exit_spot);
-        var even = Number(spot.charAt(spot.length - 1)) % 2 === 0;
-        return (even === (type === "DIGITEVEN")) === (Number(c.profit) > 0);
+        return sd.wins(Number(spot.charAt(spot.length - 1))) === (Number(c.profit) > 0);
       }
       async function lost() {
         if (settled) return;
@@ -642,10 +858,9 @@
         }
       }
 
-      handle = D.streamOn(r.account, {
-        buy: 1, price: stake, subscribe: 1,
-        parameters: { contract_type: type, underlying_symbol: pick.m.sym, duration: 1, duration_unit: "t", basis: "stake", amount: stake, currency: r.currency },
-      }, function (m) {
+      var params = { contract_type: type, underlying_symbol: pick.m.sym, duration: 1, duration_unit: "t", basis: "stake", amount: stake, currency: r.currency };
+      if (sd.barrier != null) params.barrier = String(sd.barrier);
+      handle = D.streamOn(r.account, { buy: 1, price: stake, subscribe: 1, parameters: params }, function (m) {
         if (closed) return;
         var c = m.msg_type === "proposal_open_contract" && m.proposal_open_contract;
         if (settled) {
@@ -679,6 +894,7 @@
   function correct(r, id, f) {
     var row = r.log.filter(function (x) { return x.id === id; })[0];
     if (!row || (row.pl === f.pl && row.won === f.won)) return;
+    r.corrections = (r.corrections || 0) + 1;
     r.pl = round2(r.pl - row.pl + f.pl);
     if (row.won !== f.won) {
       if (f.won) { r.won++; r.lost--; } else { r.lost++; r.won--; }
@@ -743,7 +959,9 @@
     b.disabled = !!(running && run.stopping) || !c;
     $("botGoText").textContent = running ? (run.stopping ? T("Stopping…") : T("Stop")) : T("Scan & start");
     b.classList.toggle("is-real", !running && !!(c && c.type === "real"));
-    ["botStake", "botTp", "botSl", "botMult"].forEach(function (id) { $(id).disabled = running; });
+    ["botStake", "botTp", "botSl", "botMult", "botVar"].forEach(function (id) { $(id).disabled = running; });
+    $("botTypes").classList.toggle("is-locked", running);
+    Array.prototype.forEach.call(document.querySelectorAll(".bot-type"), function (t) { t.disabled = running && !t.classList.contains("is-on"); });
     if (running) {
       var acc = D.accountOf(run.account);
       $("botOn").textContent = acc ? fill(T("Trading on {account} {id}"), { account: acc.type === "real" ? T("Real") : T("Demo"), id: acc.id }) : "";
@@ -776,12 +994,24 @@
     }
   }
 
-  var saved = store.get(SETTINGS_KEY) || {};
-  $("botStake").value = (saved.stake >= FALLBACK_MIN ? saved.stake : DEFAULTS.stake).toFixed(2);
-  $("botTp").value = String(saved.tp > 0 ? saved.tp : DEFAULTS.tp);
-  $("botSl").value = String(saved.sl > 0 ? saved.sl : DEFAULTS.sl);
-  $("botMult").value = String(saved.mult >= 1 ? saved.mult : DEFAULTS.mult);
+  loadForm();
+  paintType();
 
+  $("botTypes").addEventListener("click", function (e) {
+    var b = e.target.closest(".bot-type");
+    if (b) setType(b.getAttribute("data-type"));
+  });
+  $("botTypes").addEventListener("keydown", function (e) {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    var tabs = Array.prototype.filter.call(document.querySelectorAll(".bot-type"), function (b) { return !b.hidden && !b.disabled; });
+    var i = tabs.indexOf(document.activeElement);
+    if (i < 0) return;
+    var next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+    setType(next.getAttribute("data-type"));
+    next.focus();
+    e.preventDefault();
+  });
+  $("botVar").addEventListener("change", onVariant);
   $("botGo").addEventListener("click", function () {
     if (run && run.active) return stop();
     var s = readSettings();
@@ -794,7 +1024,7 @@
   $("bmRoot").addEventListener("click", function (e) { if (e.target.closest("[data-bm-close]")) closeModal(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("bmRoot").hidden) closeModal(); });
   global.addEventListener("shalo:account", onAccount);
-  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); });
+  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); paintType(); paintVariants(); });
   global.addEventListener("beforeunload", function (e) { if (run && run.active) { e.preventDefault(); e.returnValue = ""; } });
 
   // The column heads line up with the rows whatever the scrollbar takes.
@@ -808,5 +1038,9 @@
 
   paintRun();
   onAccount();
-  global.ShaloBot = { run: function () { return run; }, hub: hub, choose: choose };
+  global.ShaloBot = {
+    run: function () { return run; }, hub: hub, types: TYPES, makeSpec: makeSpec,
+    spec: formSpec, choose: function (spec) { return choose(spec || formSpec()); },
+    candidate: candidate, state: function () { return state; },
+  };
 })(window);
