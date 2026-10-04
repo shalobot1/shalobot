@@ -462,6 +462,7 @@ ul, ol, dl { margin: 0; padding: 0; list-style: none; }
 
 .brand { display: inline-flex; align-items: center; gap: 10px; }
 .brand-mark { display: block; width: 30px; height: 30px; flex: none; }
+.brand-mark svg { display: block; width: 100%; height: 100%; }
 .brand-name { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
 
 .nav-cta { display: flex; gap: 8px; margin-left: auto; }
