@@ -521,14 +521,14 @@
     return ts;
   }
 
-  /* Starting figures, until the user types their own: a 0.35 stake on every account (never
-     under the smallest stake Deriv accepts), a take profit of 3% of the account's balance (a
-     cent at the least, so it is never zero), and a 1,000 stop loss. Each Martingale has its
-     own tested default (TYPES). */
-  var DEFAULT_STAKE = 0.35, DEFAULT_TP_SHARE = 0.03, DEFAULT_SL = 1000;
+  /* Starting figures, until the user types their own (any figure, above or below these): a
+     0.35 stake on every account (never under the smallest stake Deriv accepts), a take profit
+     of 3% of the account's balance but never under 3 USD, and a 1,000 stop loss. Each
+     Martingale has its own tested default (TYPES). */
+  var DEFAULT_STAKE = 0.35, DEFAULT_TP_SHARE = 0.03, DEFAULT_TP_MIN = 3, DEFAULT_SL = 1000;
   function defaultsFor(balance) {
     var tp = balance > 0 ? round2(balance * DEFAULT_TP_SHARE) : 0;
-    return { stake: Math.max(hub.minStake || FALLBACK_MIN, DEFAULT_STAKE), tp: Math.max(0.01, tp), sl: DEFAULT_SL };
+    return { stake: Math.max(hub.minStake || FALLBACK_MIN, DEFAULT_STAKE), tp: Math.max(DEFAULT_TP_MIN, tp), sl: DEFAULT_SL };
   }
   function balanceOf(id) {
     var acc = id && D.accountOf(id);

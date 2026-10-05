@@ -81,54 +81,108 @@
 
   var SETUP = "shalo_ui_p";
   function setup() {
-    var d = { real: 1000, demo: 10000, mode: "none", count: 3, firstLoss: false, ids: null };
+    var d = { real: 1000, demo: 10000, mode: "none", streak: [1, 3], gap: [3, 10], per10: [1, 3], apart: true, firstLoss: false, ids: null };
+    var raw = null;
     try {
-      var raw = JSON.parse(localStorage.getItem(SETUP) || "null");
+      raw = JSON.parse(localStorage.getItem(SETUP) || "null");
       if (raw) Object.keys(d).forEach(function (k) { if (raw[k] !== undefined && raw[k] !== null) d[k] = raw[k]; });
     } catch (e) {}
+    // A setup saved before the ranges had one count: it becomes a range of one.
+    if (raw && raw.count != null && raw.streak == null) {
+      var n = Math.round(Number(raw.count) || 0);
+      d.streak = [clamp(n, 1, 10), clamp(n, 1, 10)];
+      d.per10 = [clamp(n, 0, 10), clamp(n, 0, 10)];
+    }
+    d.streak = range(d.streak, 1, 10, [1, 3]);
+    d.gap = range(d.gap, 1, 100, [3, 10]);
+    d.per10 = range(d.per10, 0, 10, [1, 3]);
     // Made once per device and kept; they say what they are.
     if (!d.ids || !/^SIM/.test(d.ids.real)) d.ids = { real: "SIM" + digits(8), demo: "SIMD" + digits(7) };
     return d;
   }
   function save(c) { try { localStorage.setItem(SETUP, JSON.stringify(c)); } catch (e) {} }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  /** A [from, to] pair of whole numbers inside lo…hi, the smaller first. */
+  function range(r, lo, hi, dflt) {
+    if (!r || r.length !== 2 || !isFinite(Number(r[0])) || !isFinite(Number(r[1]))) r = dflt;
+    var a = clamp(Math.round(Number(r[0])), lo, hi), b = clamp(Math.round(Number(r[1])), lo, hi);
+    return a <= b ? [a, b] : [b, a];
+  }
   var cfg = setup();
   save(cfg);
 
-  /* Which trades lose — the same scheduler as Evie's: none; a run of `count`
-     in a row at a different point each session; or about `count` in every 10,
-     never two together; and the first trade can be made to lose on top. */
-  function spread(mean) { return mean > 0 ? Math.floor(-Math.log(1 - Math.random()) * mean) : 0; }
-  function Plan(c) {
-    this.c = c; this.n = 0;
-    var per10 = Math.max(0, Math.min(5, Math.round(c.count || 0)));
-    this.rate = per10;
-    this.tail = Math.max(0.35, (per10 > 0 ? 10 / per10 : 0) - 2);
-    if (c.firstLoss) { this.nextAt = 3 + spread(this.tail); this.runAt = 1; }
-    else {
-      var lead = this.tail + 1;
-      this.nextAt = 2 + Math.max(spread(lead), spread(lead));
-      this.runAt = 2 + Math.max(spread(2.5), spread(2.5));
-    }
-    this.runLeft = 0; this.runDone = false;
-    if (c.firstLoss && c.mode === "consecutive") { this.runDone = true; this.runLeft = Math.max(0, (c.count || 0) - 1); }
+  /* Which trades lose, worked out afresh for every run of the bot, the way a
+     real run has its own luck — nothing to set again between runs:
+       None      every trade wins.
+       In a row  losing streaks, each as long as a number drawn from its range
+                 (1–3 say), with a drawn number of wins before each, again
+                 and again until the run ends.
+       Random    in every 10 trades a drawn number of losses (1–3 say) at
+                 random places — never two together, unless that is allowed.
+     "First trade loses" opens every run with a loss (In a row: with a whole
+     streak); off, the first trade of a run always wins. A run's plan is kept
+     for the tab (sessionStorage), so a run that resumes after a reload goes on
+     where it was rather than starting over. */
+  var PLAN = "shalo_ui_r";
+  function draw(r) { return r[0] + Math.floor(Math.random() * (r[1] - r[0] + 1)); }
+  function Plan(c, key) {
+    this.c = c; this.key = key;
+    this.n = 0;               // trades so far in this run
+    this.losing = false;      // In a row: in a streak (else in the wins before one)
+    this.left = 0;            // In a row: trades left in the current stretch
+    this.block = -1;          // Random: which ten
+    this.marks = [];          // Random: the trades of that ten that lose
+    this.lastLoss = 0;
   }
   Plan.prototype.loses = function () {
-    var c = this.c, t = ++this.n;
-    if (t === 1 && c.firstLoss) return true;
+    var c = this.c, t = ++this.n, lose;
     if (c.mode === "consecutive") {
-      if (this.runLeft > 0) { this.runLeft--; return true; }
-      if (this.runDone || !(c.count > 0)) return false;
-      if (t >= this.runAt) { this.runDone = true; this.runLeft = Math.max(0, c.count - 1); return true; }
-      return false;
-    }
-    if (c.mode === "random") {
-      if (this.rate <= 0 || t < this.nextAt) return false;
-      this.nextAt = t + 2 + spread(this.tail);
-      return true;
-    }
-    return false;
+      if (t === 1) { this.losing = !!c.firstLoss; this.left = draw(this.losing ? c.streak : c.gap); }
+      else if (this.left <= 0) { this.losing = !this.losing; this.left = draw(this.losing ? c.streak : c.gap); }
+      this.left--;
+      lose = this.losing;
+    } else if (c.mode === "random") {
+      var b = Math.floor((t - 1) / 10);
+      if (b !== this.block) { this.block = b; this.marks = this.place(b); }
+      lose = (t === 1 && !!c.firstLoss) || this.marks.indexOf(t) >= 0;
+    } else lose = t === 1 && !!c.firstLoss;
+    if (lose) this.lastLoss = t;
+    return lose;
   };
-  var plan = new Plan(cfg);
+  /** Random: the losing trades among 10b+1 … 10b+10 — exactly the number
+   *  drawn (as many as fit, apart: five), every arrangement equally likely.
+   *  Trade 1 is the first trade's own: it loses only for "First trade loses",
+   *  and then counts as one of the first ten. */
+  Plan.prototype.place = function (b) {
+    var c = this.c, apart = c.apart !== false, from = 10 * b + 1, to = from + 9, want = draw(c.per10);
+    if (b === 0) { from = 2; if (c.firstLoss) { want--; if (apart) from = 3; } }
+    else if (apart && this.lastLoss === from - 1) from++;           // not straight after the last ten's last loss
+    var n = to - from + 1, k = Math.max(0, Math.min(want, apart ? Math.ceil(n / 2) : n));
+    // k of n places; apart, k of n - k + 1 then spread out one each, which keeps them apart
+    var m = apart ? n - k + 1 : n, pool = [];
+    for (var i = 0; i < m; i++) pool.push(i);
+    for (i = 0; i < k; i++) { var j = i + Math.floor(Math.random() * (m - i)), x = pool[i]; pool[i] = pool[j]; pool[j] = x; }
+    return pool.slice(0, k).sort(function (p, q) { return p - q; }).map(function (q, i) { return from + q + (apart ? i : 0); });
+  };
+  var plan = null;
+  /** The plan of the run that is buying (by its account and start), restored after a reload. */
+  function planNow() {
+    var r = null;
+    try { r = global.ShaloBot && global.ShaloBot.run(); } catch (e) {}
+    var key = r && r.active ? r.account + "@" + r.startedAt : "";
+    if (plan && plan.key === key) return plan;
+    plan = new Plan(cfg, key);
+    try {
+      var s = JSON.parse(sessionStorage.getItem(PLAN) || "null");
+      if (key && s && s.key === key) ["n", "losing", "left", "block", "marks", "lastLoss"].forEach(function (f) { plan[f] = s[f]; });
+    } catch (e) {}
+    return plan;
+  }
+  function keepPlan() {
+    try {
+      sessionStorage.setItem(PLAN, JSON.stringify({ key: plan.key, n: plan.n, losing: plan.losing, left: plan.left, block: plan.block, marks: plan.marks, lastLoss: plan.lastLoss }));
+    } catch (e) {}
+  }
 
   /* ── the markets ───────────────────────────────────────────────────── */
 
@@ -523,9 +577,10 @@
         sym: m.sym, ct: prm.contract_type, barrier: b, stake: amount, payout: q.payout, t: t,
         longcode: longcode(m, prm.contract_type, b), shortcode: shortcode(m, prm.contract_type, b, q.payout, t),
         spotNow: last.quote, spotTime: last.epoch, entry: null, exit: null,
-        won: !plan.loses(),     // decided at the buy: what settles it is already known
+        won: !planNow().loses(),   // decided at the buy: what settles it is already known
         listening: !!req.subscribe, sold: false, replyAt: Date.now() + back,
       };
+      keepPlan();
       acct.balance = round2(acct.balance - amount);
       open.push(c);
       keepBalances();
@@ -716,6 +771,11 @@
 
   function card() {
     var c = setup();
+    /* Two whole numbers, from and to: each streak, gap or ten draws its own from between them. */
+    function pair(id, lo, hi) {
+      var f = function (s) { return '<input class="sim-i" id="' + id + s + '" type="number" min="' + lo + '" max="' + hi + '" step="1" inputmode="numeric" />'; };
+      return '<span class="sim-pair">' + f("a") + '<span class="sim-to">to</span>' + f("b") + "</span>";
+    }
     var wrap = document.createElement("div");
     wrap.className = "sim-setup";
     wrap.hidden = true;
@@ -731,8 +791,11 @@
             '<button class="sim-sb" type="button" role="radio" data-mode="none">None</button>' +
             '<button class="sim-sb" type="button" role="radio" data-mode="consecutive">In a row</button>' +
             '<button class="sim-sb" type="button" role="radio" data-mode="random">Random</button></div></div>' +
-          '<label class="sim-f" id="simCountF"><span class="sim-fk" id="simCountK">How many in a row</span><input class="sim-i" id="simCount" type="number" min="0" max="10" step="1" inputmode="numeric" /></label>' +
-          '<div class="sim-f sim-row"><span class="sim-fk">First trade loses</span><button class="sim-tog" id="simFirst" type="button" role="switch" aria-checked="false" aria-label="First trade loses"><i></i></button></div>' +
+          '<div class="sim-f" data-for="consecutive"><span class="sim-fk">Losses in a row</span>' + pair("simS", 1, 10) + '</div>' +
+          '<div class="sim-f" data-for="consecutive"><span class="sim-fk">Wins before each streak</span>' + pair("simG", 1, 100) + '</div>' +
+          '<div class="sim-f" data-for="random"><span class="sim-fk">Losses in every 10 trades</span>' + pair("simR", 0, 10) + '</div>' +
+          '<div class="sim-f sim-row" data-for="random"><span class="sim-fk">Never two in a row</span><button class="sim-tog" id="simApart" type="button" role="switch" aria-checked="true" aria-label="Never two in a row"><i></i></button></div>' +
+          '<div class="sim-f sim-row"><span class="sim-fk">First trade of each run loses</span><button class="sim-tog" id="simFirst" type="button" role="switch" aria-checked="false" aria-label="First trade of each run loses"><i></i></button></div>' +
         '</div>' +
         '<p class="sim-say" id="simSay"></p>' +
         '<button class="btn btn-blue btn-lg sim-go" id="simGo" type="button">Start simulation</button>' +
@@ -742,18 +805,25 @@
     var $ = function (id) { return document.getElementById(id); };
     var mode = c.mode;
 
+    function on(id) { return $(id).getAttribute("aria-checked") === "true"; }
+    function readPair(id, lo, hi, dflt) { return range([Number($(id + "a").value), Number($(id + "b").value)], lo, hi, dflt); }
+    function writePair(id, r) { $(id + "a").value = r[0]; $(id + "b").value = r[1]; }
+    function span(r) { return r[0] === r[1] ? String(r[0]) : r[0] + " to " + r[1]; }
+    function count(r, one, many) { return span(r) + " " + (r[1] === 1 ? one : many); }
     function describe() {
-      var n = Math.max(0, Math.round(Number($("simCount").value) || 0));
-      var first = $("simFirst").getAttribute("aria-checked") === "true";
-      if (mode === "none") return first ? "The first trade loses. Every trade after it wins." : "Every trade wins.";
+      var first = on("simFirst");
+      var opener = first ? " The first trade of each run loses." : " The first trade of each run wins.";
+      if (mode === "none") return first ? "The first trade of each run loses; every other trade wins." : "Every trade wins.";
       if (mode === "consecutive") {
-        if (!n) return first ? "The first trade loses. Everything else wins." : "Every trade wins.";
-        return (first ? "Starting with the first trade, " : "After a few wins, ") + n + " trade" + (n === 1 ? "" : "s") +
-          " in a row lose — at a different point each run. Everything after that wins.";
+        var s = readPair("simS", 1, 10, [1, 3]), g = readPair("simG", 1, 100, [3, 10]);
+        return (first ? "Each run opens with " + count(s, "loss", "losses in a row") + ", then " + count(g, "win", "wins") + ", then another streak — "
+          : "Each run: " + count(g, "win", "wins") + ", then " + count(s, "loss", "losses in a row") + ", and again — ") +
+          "every streak and every gap draws its own number from the range, until the run ends.";
       }
-      var capped = Math.min(5, n);
-      return (first ? "The first trade loses, then about " : "About ") + capped + " in every 10 lose, spread at random and never two together" +
-        (n > 5 ? " (five is the most that fits)" : "") + "." + (first ? "" : " The first trade always wins.");
+      var r = readPair("simR", 0, 10, [1, 3]), apart = on("simApart");
+      if (r[1] === 0) return "Every trade wins." + (first ? " Only the first trade of each run loses." : "");
+      return "In every 10 trades, " + count(r, "loses", "lose") + " at random places" +
+        (apart ? ", never two in a row" + (r[1] > 5 ? " (five is the most that fits)" : "") : ", and they can come together") + "." + opener;
     }
     function refresh() {
       Array.prototype.forEach.call($("simMode").children, function (b) {
@@ -761,22 +831,23 @@
         b.classList.toggle("is-on", on);
         b.setAttribute("aria-checked", String(on));
       });
-      $("simCountF").hidden = mode === "none";
-      $("simCountK").textContent = mode === "random" ? "How many in every 10" : "How many in a row";
-      $("simCount").max = mode === "random" ? "5" : "10";
+      Array.prototype.forEach.call(wrap.querySelectorAll("[data-for]"), function (f) { f.hidden = f.getAttribute("data-for") !== mode; });
       $("simSay").textContent = describe();
     }
     function fillIn() {
       var c2 = setup();
       $("simReal").value = Number(c2.real).toFixed(2);
-      $("simCount").value = c2.count;
+      writePair("simS", c2.streak); writePair("simG", c2.gap); writePair("simR", c2.per10);
       mode = c2.mode;
+      $("simApart").setAttribute("aria-checked", String(c2.apart !== false));
       $("simFirst").setAttribute("aria-checked", String(!!c2.firstLoss));
       refresh();
     }
     $("simMode").addEventListener("click", function (e) { var b = e.target.closest(".sim-sb"); if (b) { mode = b.getAttribute("data-mode"); refresh(); } });
-    $("simFirst").addEventListener("click", function () { this.setAttribute("aria-checked", String(this.getAttribute("aria-checked") !== "true")); refresh(); });
-    $("simCount").addEventListener("input", refresh);
+    ["simFirst", "simApart"].forEach(function (id) {
+      $(id).addEventListener("click", function () { this.setAttribute("aria-checked", String(!on(id))); refresh(); });
+    });
+    Array.prototype.forEach.call(wrap.querySelectorAll(".sim-pair input"), function (i) { i.addEventListener("input", refresh); });
     // A balance that looks like somebody's actual account, not a round thousand.
     Array.prototype.forEach.call(wrap.querySelectorAll("[data-rand]"), function (b) {
       b.addEventListener("click", function () {
@@ -791,10 +862,12 @@
       if (!isFinite(real) || real < 0) { $("simSay").textContent = "Give the account a balance to start with."; return; }
       var c2 = setup();
       c2.real = round2(real); c2.mode = mode;
-      c2.count = Math.max(0, Math.round(Number($("simCount").value) || 0));
-      c2.firstLoss = $("simFirst").getAttribute("aria-checked") === "true";
+      c2.streak = readPair("simS", 1, 10, [1, 3]); c2.gap = readPair("simG", 1, 100, [3, 10]); c2.per10 = readPair("simR", 0, 10, [1, 3]);
+      c2.apart = on("simApart");
+      c2.firstLoss = on("simFirst");
+      delete c2.count;
       save(c2);
-      try { sessionStorage.removeItem(LEDGER); } catch (e) {}
+      try { sessionStorage.removeItem(LEDGER); sessionStorage.removeItem(PLAN); } catch (e) {}
       global.location.reload();
     });
 
