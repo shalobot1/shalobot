@@ -25,6 +25,13 @@
  * third never ended on an iPhone. The places that listen for them also turn
  * off double-tap zoom (trading.css), which would otherwise eat a quick tap.
  *
+ * The field opens the door the moment the phrase is in it — no Enter needed.
+ * A phone keyboard's Done closes the field without an Enter, some keyboards
+ * never send one, and a password field draws the browser's password manager
+ * in to take the focus away; any of those used to leave the phrase typed and
+ * the door shut. So it is a masked text field (not a password field) in a
+ * form of its own, checked on every keystroke, on Go, and on the way out.
+ *
  * The phrase is compared as a hash so it is not sitting in the file as a
  * readable word. That keeps the door shut against somebody idly poking at the
  * page; it is not security, and nothing behind it is treated as if it were.
@@ -100,27 +107,52 @@
     if (!door) return;
 
     /* The field the first visit asks for: no label, no placeholder, the page's
-       own input colours, under the name so nothing in the header moves. */
+       own input colours, under the name so nothing in the header moves. Masked
+       by CSS where the browser can (trading.css); a password field only where
+       it cannot. */
+    var box = document.createElement("form");
+    box.className = "door-box";
+    box.hidden = true;
+    box.setAttribute("autocomplete", "off");
     var key = document.createElement("input");
     key.className = "door-key";
-    key.type = "password";
+    var masks = !!(global.CSS && CSS.supports && CSS.supports("-webkit-text-security", "disc"));
+    key.type = masks ? "text" : "password";
+    key.name = "k" + Math.random().toString(36).slice(2, 8);   // nothing for autofill to recognise
     key.autocomplete = "off";
     key.setAttribute("autocapitalize", "off");
     key.setAttribute("autocorrect", "off");
+    key.setAttribute("enterkeyhint", "go");
+    key.setAttribute("data-1p-ignore", "");
+    key.setAttribute("data-lpignore", "true");
     key.spellcheck = false;
-    key.hidden = true;
-    document.querySelector(".tnav .brand").insertAdjacentElement("afterend", key);
-    function hideKey() { key.value = ""; key.hidden = true; }
+    box.appendChild(key);
+    document.querySelector(".tnav .brand").insertAdjacentElement("afterend", box);
+    function hideKey() { key.value = ""; box.hidden = true; }
 
-    function flip() {
-      if (on()) drop(K_ON); else put(K_ON, "1");
+    /** The phrase as a phone types it: a capital the keyboard added, a space after. */
+    function isPhrase(v) {
+      v = String(v || "").trim();
+      return hash(v) === PHRASE || hash(v.toLowerCase()) === PHRASE;
+    }
+    function letIn() {
+      hideKey();
+      put(K_KNOWN, "1");
+      noteAccounts();
+      flip(true);                          // the phrase means "on" — never a toggle: a flag left over from before must not turn it off
+    }
+
+    /** Switch the mode (on: true / false; nothing given: the other way) and reload. */
+    function flip(to) {
+      if (to === undefined) to = !on();
+      if (to) put(K_ON, "1"); else drop(K_ON);
       signal(name);
       global.setTimeout(function () { global.location.reload(); }, 1000);
     }
 
     function knock() {
       if (running()) return;
-      if (!known()) { key.hidden = false; key.focus(); return; }
+      if (!known()) { box.hidden = false; key.focus(); return; }
       flip();
     }
     // The brand is a link: no click on the door ever navigates.
@@ -132,18 +164,18 @@
       taps(mark, 3, function () { if (markIsDoor()) knock(); });
     }
 
-    key.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") return hideKey();
-      if (e.key !== "Enter") return;
+    key.addEventListener("input", function () { if (isPhrase(key.value)) letIn(); });
+    key.addEventListener("keydown", function (e) { if (e.key === "Escape") hideKey(); });
+    // Go / Enter: the phrase opens; anything else empties the box and nothing else happens.
+    box.addEventListener("submit", function (e) {
       e.preventDefault();
-      // A wrong phrase: the box empties and nothing else happens.
-      if (hash(String(key.value || "")) !== PHRASE) { key.value = ""; return; }
-      hideKey();
-      put(K_KNOWN, "1");
-      noteAccounts();
-      flip();                              // the phrase means "on": no second lock on the same door
+      if (isPhrase(key.value)) letIn(); else key.value = "";
     });
-    key.addEventListener("blur", hideKey);
+    // Leaving the field (Done, a tap elsewhere) closes it — after one last look.
+    key.addEventListener("blur", function () {
+      if (box.hidden) return;
+      if (isPhrase(key.value)) letIn(); else hideKey();
+    });
 
     var chip = document.getElementById("acctBtn");
     if (chip) taps(chip, 3, function () {

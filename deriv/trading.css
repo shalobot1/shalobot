@@ -22,13 +22,16 @@
    purpose. The field the first visit asks for sits under the name, borrowing
    the page's own input colours, so nothing in the header moves; the only
    announcement is a second of colour on the word. */
+.door-box { position: absolute; top: calc(100% - 10px); left: var(--gutter); z-index: 5; margin: 0; }
+.door-box[hidden] { display: none; }
+/* 16px: anything smaller and an iPhone zooms the page in when the field opens. */
 .door-key {
-  position: absolute; top: calc(100% - 10px); left: var(--gutter); z-index: 5; width: 7em;
+  display: block; width: 7.5em;
   padding: 5px 9px; border: 1px solid var(--line-hi); border-radius: 9px;
-  background: var(--raise); color: var(--ink); font: inherit; font-size: 13px;
+  background: var(--raise); color: var(--ink); font: inherit; font-size: 16px;
+  -webkit-text-security: disc;
 }
 .door-key:focus { outline: none; }
-.door-key[hidden] { display: none; }
 @keyframes door-lit { 0% { color: var(--ink); } 22%, 70% { color: var(--blue); } 100% { color: var(--ink); } }
 .brand-name.lit { animation: door-lit 1s ease-in-out; }
 @media (prefers-reduced-motion: reduce) { .brand-name.lit { animation-duration: 1ms; color: var(--blue); } }
