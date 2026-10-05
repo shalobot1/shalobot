@@ -521,13 +521,14 @@
     return ts;
   }
 
-  /* Starting figures that fit the balance, until the user types their own: up to 10, a 0.35
-     stake and 1 take profit; up to 100, 1 and 10; above that 10 and 100, whatever the balance.
-     Stop loss 1,000 for everyone. */
+  /* Starting figures, until the user types their own: a 0.35 stake on every account (never
+     under the smallest stake Deriv accepts), a take profit of 3% of the account's balance (a
+     cent at the least, so it is never zero), and a 1,000 stop loss. Each Martingale has its
+     own tested default (TYPES). */
+  var DEFAULT_STAKE = 0.35, DEFAULT_TP_SHARE = 0.03, DEFAULT_SL = 1000;
   function defaultsFor(balance) {
-    var top = 10;
-    while (top < balance && top < 1000) top *= 10;
-    return { stake: Math.max(hub.minStake || FALLBACK_MIN, top / 100), tp: top / 10, sl: 1000 };
+    var tp = balance > 0 ? round2(balance * DEFAULT_TP_SHARE) : 0;
+    return { stake: Math.max(hub.minStake || FALLBACK_MIN, DEFAULT_STAKE), tp: Math.max(0.01, tp), sl: DEFAULT_SL };
   }
   function balanceOf(id) {
     var acc = id && D.accountOf(id);
@@ -566,7 +567,8 @@
     var ts = typeState(state.type), c = D.current(), d = defaultsFor(balanceOf(c && c.id));
     Object.keys(FIGURES).forEach(function (id) {
       var k = FIGURES[id], v = ts.own[k] && ts[k] > 0 ? ts[k] : d[k];
-      $(id).value = k === "stake" ? v.toFixed(2) : String(v);
+      // Money in cents (0.35, 302.32); a whole figure stays whole (1000).
+      $(id).value = k === "stake" || v % 1 ? v.toFixed(2) : String(v);
     });
   }
   /** A figure typed by the user is theirs from then on (a balance change no longer moves it). */

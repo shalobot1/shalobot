@@ -257,9 +257,11 @@
 
   /* ── the accounts ──────────────────────────────────────────────────── */
 
+  /* The second account trades the user's actual Deriv demo balance (fetched
+     below, with the real session) and is named like the first: Sim. */
   var accounts = {
     real: { id: cfg.ids.real, type: "real", label: "Sim", title: "Simulation account", balance: round2(Number(cfg.real) || 0) },
-    demo: { id: cfg.ids.demo, type: "demo", label: "Sim demo", title: "Simulation demo account", balance: round2(Number(cfg.demo) || 0) },
+    demo: { id: cfg.ids.demo, type: "demo", label: "Sim", title: "Simulation account", balance: round2(Number(cfg.demo) || 0) },
   };
   function byId(id) { return accounts.real.id === id ? accounts.real : accounts.demo.id === id ? accounts.demo : null; }
   var ACCOUNT_NO = 60000000 + Math.floor(Math.random() * 9000000);
@@ -660,20 +662,52 @@
     };
   }
   var realFetch = global.fetch ? global.fetch.bind(global) : null;
+
+  /* The demo balance is the actual one. At every load it is read from our own
+     server with the real session (the fetch kept above, before it is swapped)
+     and the first answer this page gives waits for it, up to a few seconds.
+     Not while a run is still going on that account: a reload mid-run must not
+     move the money under the bot. Not connected, or Deriv not answering: the
+     last actual balance stays. */
+  function demoBusy() {
+    try {
+      var r = JSON.parse(sessionStorage.getItem("shalo_bot_run") || "null");   // the bot's own key, renamed into sim.*
+      return !!(r && r.account === accounts.demo.id);
+    } catch (e) { return false; }
+  }
+  var demoReady = (function () {
+    if (!realFetch || demoBusy()) return Promise.resolve();
+    var read = realFetch("/api/deriv/session", { credentials: "same-origin", cache: "no-store" })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (s) {
+        var list = (s && s.connected && s.accounts) || [];
+        var demo = list.filter(function (a) { return a.type === "demo" && a.status === "active"; })[0] ||
+          list.filter(function (a) { return a.type === "demo"; })[0];
+        var b = demo ? Number(demo.balance) : NaN;
+        if (!isFinite(b) || b < 0 || demoBusy()) return;
+        accounts.demo.balance = round2(b);
+        keepBalances();
+      })
+      .catch(function () {});
+    return Promise.race([read, new Promise(function (resolve) { setTimeout(resolve, 4000); })]);
+  })();
+
   global.fetch = function (input, init) {
     var u;
     try { u = new URL(typeof input === "string" ? input : input.url, global.location.href); } catch (e) { u = null; }
     if (!u || u.origin !== global.location.origin || u.pathname.indexOf("/api/deriv/") !== 0) return realFetch(input, init);
     var body = {}, path = u.pathname;
     try { body = init && init.body ? JSON.parse(init.body) : {}; } catch (e) {}
-    var out;
-    if (path === "/api/deriv/session") out = sessionFor(u.searchParams.get("otp") === "1");
-    else if (path === "/api/deriv/otp") { var a = byId(body.account); out = a ? { url: wsUrl(a) } : { error: "unknown_account" }; }
-    else out = { ok: true };
-    return new Promise(function (resolve) {
-      setTimeout(function () {
-        resolve(new Response(JSON.stringify(out), { status: 200, headers: { "Content-Type": "application/json" } }));
-      }, latency(110, 260));
+    return demoReady.then(function () {
+      var out;
+      if (path === "/api/deriv/session") out = sessionFor(u.searchParams.get("otp") === "1");
+      else if (path === "/api/deriv/otp") { var a = byId(body.account); out = a ? { url: wsUrl(a) } : { error: "unknown_account" }; }
+      else out = { ok: true };
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve(new Response(JSON.stringify(out), { status: 200, headers: { "Content-Type": "application/json" } }));
+        }, latency(110, 260));
+      });
     });
   };
   global.WebSocket = FakeSocket;
@@ -693,8 +727,6 @@
         '<div class="sim-body">' +
           '<label class="sim-f"><span class="sim-fk">Simulation account balance (USD)</span><span class="sim-with"><input class="sim-i" id="simReal" type="number" min="0" step="0.01" inputmode="decimal" />' +
             '<button class="btn btn-line sim-rand" type="button" data-rand="simReal">Random</button></span></label>' +
-          '<label class="sim-f"><span class="sim-fk">Simulation demo balance (USD)</span><span class="sim-with"><input class="sim-i" id="simDemo" type="number" min="0" step="0.01" inputmode="decimal" />' +
-            '<button class="btn btn-line sim-rand" type="button" data-rand="simDemo">Random</button></span></label>' +
           '<div class="sim-f"><span class="sim-fk">Losses</span><div class="sim-seg" id="simMode" role="radiogroup" aria-label="Losses">' +
             '<button class="sim-sb" type="button" role="radio" data-mode="none">None</button>' +
             '<button class="sim-sb" type="button" role="radio" data-mode="consecutive">In a row</button>' +
@@ -737,7 +769,6 @@
     function fillIn() {
       var c2 = setup();
       $("simReal").value = Number(c2.real).toFixed(2);
-      $("simDemo").value = Number(c2.demo).toFixed(2);
       $("simCount").value = c2.count;
       mode = c2.mode;
       $("simFirst").setAttribute("aria-checked", String(!!c2.firstLoss));
@@ -756,10 +787,10 @@
     wrap.addEventListener("click", function (e) { if (e.target === wrap || e.target.closest("[data-sim-close]")) close(); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !wrap.hidden) close(); });
     $("simGo").addEventListener("click", function () {
-      var real = Number($("simReal").value), demo = Number($("simDemo").value);
-      if (!isFinite(real) || real < 0 || !isFinite(demo) || demo < 0) { $("simSay").textContent = "Give each account a balance to start with."; return; }
+      var real = Number($("simReal").value);
+      if (!isFinite(real) || real < 0) { $("simSay").textContent = "Give the account a balance to start with."; return; }
       var c2 = setup();
-      c2.real = round2(real); c2.demo = round2(demo); c2.mode = mode;
+      c2.real = round2(real); c2.mode = mode;
       c2.count = Math.max(0, Math.round(Number($("simCount").value) || 0));
       c2.firstLoss = $("simFirst").getAttribute("aria-checked") === "true";
       save(c2);
@@ -773,9 +804,8 @@
       fillIn();
       wrap.hidden = false;
     }
-    /* Three clicks on the chip's green dot. Its clicks are its own here — they
-       neither open the account list nor count towards the chip's three clicks
-       (which show or hide the demo account, deriv/door.js). */
+    /* Three clicks on the chip's green dot. Its clicks are its own here: they
+       do not open the account list. */
     var dot = document.getElementById("acctLive");
     if (dot) {
       dot.addEventListener("click", function (e) { e.stopPropagation(); });

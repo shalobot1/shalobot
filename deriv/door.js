@@ -14,11 +14,8 @@
  * cannot be swapped under itself; a bot that is running has to be stopped
  * first, and until then the three clicks do nothing.
  *
- * The demo account. People trade on real accounts, so the page keeps a demo
- * account out of sight (trading.js). On a device that has been through the
- * door, three clicks on the balance chip show it in the list for this visit,
- * and three more hide it again — in the simulation as on the real page. In
- * the simulation the chip's green dot is the way to the setup card instead.
+ * In the simulation, three clicks on the chip's green dot open its setup card
+ * (sim.js).
  *
  * Three clicks are counted here, not read from the click event: iPhone
  * Safari reports every tap as a first click (detail 1), so waiting for a
@@ -175,14 +172,6 @@
     key.addEventListener("blur", function () {
       if (box.hidden) return;
       if (isPhrase(key.value)) letIn(); else hideKey();
-    });
-
-    var chip = document.getElementById("acctBtn");
-    if (chip) taps(chip, 3, function () {
-      if (!known() || running()) return;
-      var D = global.ShaloDeriv;
-      if (!D || !D.demo) return;
-      D.demo(!D.demo());                   // the list is open after the third click: it shows the change
     });
   }
 
