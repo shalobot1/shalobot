@@ -194,6 +194,37 @@
     return spec.sides.filter(function (sd) { return sd.ct === ct && (sd.barrier == null || sd.barrier === b); })[0] || null;
   }
 
+  /* ── recovery, when the balance cannot pay the Martingale ─────────── */
+
+  /* Differs and Over 0 pay about 6% a win, so their Martingale is x17.7 and a small
+     balance soon cannot pay the next stake. Rather than stop there, the run wins the
+     streak back with an Over/Under that pays more and so needs a far smaller stake: the
+     likeliest one (Over 1 · 80%, then Over 2 · 70%, Over 3 · 60%, Over 4 · 50%) whose
+     stake the balance covers, sized to bring back what the streak lost plus the profit of
+     one ordinary win. Never below an even chance: a 10% contract on the last cents is a
+     lottery ticket, not a recovery. The Martingale is untouched — it keeps counting, and
+     the next win puts the stake back to the start. When no stake fits, the run stops for
+     the balance as before. Differs and Over/Under 0–3 recover this way: the others'
+     Martingales are small. */
+  var RECOVER_CTS = ["DIGITOVER", "DIGITUNDER"], RECOVER_LAST = 4;   // Over 4 / Under 5 · 50%
+  function winChance(spec) {
+    if (spec.type === "matchdiff") return spec.variant === "diff" ? 0.9 : 0.1;
+    if (spec.type === "overunder") return (9 - Number(spec.variant)) / 10;
+    return 0;
+  }
+  function recovers(spec) { return winChance(spec) > 0.5; }
+  /** The contract types a run can hold: its own, and the recovery's. */
+  function runContracts(spec) {
+    return recovers(spec) ? spec.contracts.concat(RECOVER_CTS.filter(function (c) { return spec.contracts.indexOf(c) < 0; })) : spec.contracts;
+  }
+  /** A contract of the run, back as a side: the type's own, else a recovery Over/Under. */
+  function runSide(spec, ct, barrier) {
+    var sd = sideOf(spec, ct, barrier);
+    if (sd || !recovers(spec) || RECOVER_CTS.indexOf(ct) < 0 || barrier == null || barrier === "") return sd;
+    var b = Number(barrier);
+    return sideOf(makeSpec("overunder", String(ct === "DIGITOVER" ? b : 9 - b)), ct, b);
+  }
+
   /** A contract's type, market and barrier, from its own fields, else its short code. */
   function kindOf(x) {
     if (x.contract_type) return String(x.contract_type);
@@ -875,19 +906,21 @@
     // What settled while the page was gone, oldest first; then wait out anything still open.
     for (var attempt = 0; attempt < 20; attempt++) {
       try {
-        var pt = await D.askOn(r.account, { profit_table: 1, limit: 100, sort: "DESC", description: 1, contract_type: spec.contracts, date_from: String(r.startedAt) }, 10000);
+        var cts = runContracts(spec);
+        var pt = await D.askOn(r.account, { profit_table: 1, limit: 100, sort: "DESC", description: 1, contract_type: cts, date_from: String(r.startedAt) }, 10000);
         ((pt.profit_table && pt.profit_table.transactions) || []).filter(function (x) {
-          return x.contract_id && Number(x.purchase_time) >= r.startedAt && !r.ids[x.contract_id] && spec.contracts.indexOf(kindOf(x)) >= 0;
+          return x.contract_id && Number(x.purchase_time) >= r.startedAt && !r.ids[x.contract_id] && cts.indexOf(kindOf(x)) >= 0;
         }).reverse().forEach(function (x) {
-          var sym = symOf(x), m = hub.markets[sym], sd = sideOf(spec, kindOf(x), barrierOf(x));
+          var sym = symOf(x), m = hub.markets[sym], own = sideOf(spec, kindOf(x), barrierOf(x)), sd = own || runSide(spec, kindOf(x), barrierOf(x));
           var pl = round2(Number(x.sell_price) - Number(x.buy_price));
           record(r, { market: (m && m.name) || sym, sym: sym, side: sd, label: kindOf(x), share: null, late: true },
             { id: x.contract_id, won: pl > 0, pl: pl, stake: Number(x.buy_price), at: Number(x.sell_time || x.purchase_time) * 1000 });
-          r.stake = pl > 0 ? r.stake0 : round2(Number(x.buy_price) * r.mult);
+          // A recovery trade stood in for one Martingale step: a loss moves the Martingale on from where it was.
+          r.stake = pl > 0 ? r.stake0 : round2((own ? Number(x.buy_price) : r.stake) * r.mult);
         });
         var pf = await D.askOn(r.account, { portfolio: 1 }, 10000);
         var open = ((pf.portfolio && pf.portfolio.contracts) || []).some(function (x) {
-          return Number(x.purchase_time) >= r.startedAt && spec.contracts.indexOf(kindOf(x)) >= 0 && !r.ids[x.contract_id];
+          return Number(x.purchase_time) >= r.startedAt && cts.indexOf(kindOf(x)) >= 0 && !r.ids[x.contract_id];
         });
         if (!open) break;
       } catch (e) { /* the line is coming back */ }
@@ -957,17 +990,24 @@
       if (r.stopping) return end(r, "user");
       if (r.pl >= r.tp - 1e-9) return end(r, "tp");
       if (-r.pl >= r.sl - 1e-9) return end(r, "sl");
-      var acc = D.accountOf(r.account);
+      var acc = D.accountOf(r.account), rec = null, live = hub.ready && hub.account === r.account;
       if (acc && acc.balance != null && r.stake > acc.balance + 1e-9) {
         if (await covered(r) || r.stopping) continue;
-        return end(r, "balance");
+        // The Martingale stake is more than the balance: recover with a contract that pays more —
+        // once the prices are in (after a reload they come a moment later: wait, as for any trade).
+        var canRecover = recovers(r.spec) && owed(r) > 0;
+        if (canRecover && live) {
+          try { rec = await recovery(r, Number(D.accountOf(r.account).balance)); } catch (e) { rec = null; }
+          if (r.stopping) continue;
+        }
+        if (!rec && (!canRecover || live)) return end(r, "balance");
       }
 
-      if (hub.ready && hub.account === r.account && (Date.now() - hub.pricedAt > 5 * 60000 || hub.pricedSpec !== r.spec.key)) {
+      if (!rec && hub.ready && hub.account === r.account && (Date.now() - hub.pricedAt > 5 * 60000 || hub.pricedSpec !== r.spec.key)) {
         try { await price(r.account, r.stake0, hub.gen, null, r.spec); } catch (e) {}
       }
 
-      var pick = hub.ready && hub.account === r.account ? (firstPick(r) || choose(r.spec)) : null;
+      var pick = rec ? rec.pick : live ? (firstPick(r) || choose(r.spec)) : null;
       if (!pick) {
         // Only time with the line up and the page on screen counts: a phone
         // that froze the page, or Deriv being away, never ends a run.
@@ -984,8 +1024,10 @@
       waited = 0; lastWait = 0;
 
       var res;
-      try { res = await buyOnce(r, pick); }
+      if (rec) { r.showStake = rec.stake; paintRun(fill(T("Recovering with {side}"), { side: pick.side.label() })); }
+      try { res = await buyOnce(r, pick, rec ? rec.stake : null); }
       catch (e) {
+        r.showStake = null;
         if (e.wait) {
           // Not connected: nothing was bought. Wait for the line, do not count it.
           paintRun(T("Reconnecting to Deriv…"));
@@ -1004,6 +1046,7 @@
         continue;
       }
       r.errors = 0;
+      r.showStake = null;
       record(r, { market: pick.m.name, sym: pick.m.sym, side: pick.side, share: pick.share }, res);
       // A win decided at its exit tick is paid out when Deriv books it.
       var pay = res.won ? round2(res.stake + res.pl) : 0;
@@ -1030,6 +1073,52 @@
       paintRun(T("Waiting for Deriv to pay out the last trade…"));
       await sleep(250);
     }
+  }
+
+  /** What the losing streak has cost so far: the stakes since the last win. */
+  function owed(r) {
+    var s = 0;
+    for (var i = 0; i < r.log.length && !r.log[i].won; i++) s += Number(r.log[i].stake) || 0;
+    return round2(s);
+  }
+  async function payoutOf(account, sym, ct, barrier, amount) {
+    var q = await D.askOn(account, { proposal: 1, amount: amount, basis: "stake", currency: hub.currency, underlying_symbol: sym,
+      contract_type: ct, duration: 1, duration_unit: "t", barrier: String(barrier) }, 10000);
+    return q.error ? null : Number(q.proposal.payout);
+  }
+  /** The recovery trade ({ pick, stake }), or null when no contract's stake fits the balance. */
+  async function recovery(r, balance) {
+    var debt = owed(r);
+    if (!(debt > 0) || !recovers(r.spec) || !(balance >= hub.minStake)) return null;
+    var main = choose(r.spec);
+    var need = round2(debt + (main ? Math.max(0, r.stake0 * (main.ratio - 1)) : 0));
+    var from = Math.round(9 - 10 * winChance(r.spec)) + 1;     // less likely than the type's own: pays more
+    var syms = main ? [main.m.sym] : [];
+    hub.order.forEach(function (s) { if (syms.indexOf(s) < 0) syms.push(s); });
+    var ref = Math.max(PRICE_REF, hub.minStake), tried = 0;
+    for (var i = 0; i < syms.length && tried < 3; i++) {
+      var m = hub.markets[syms[i]];
+      if (!m || m.digits.length < WINDOW || Date.now() - m.at > 20000) continue;
+      tried++;
+      for (var n = from; n <= RECOVER_LAST; n++) {
+        var p = await payoutOf(r.account, m.sym, "DIGITOVER", n, ref);
+        if (!p) { if (n === from) break; continue; }             // this market does not sell Over/Under
+        var stake = Math.max(hub.minStake, Math.ceil(need / (p / ref - 1) * 100) / 100);
+        if (!(p > ref) || stake > balance + 1e-9) continue;
+        // Deriv's price at this very stake rounds to cents: make sure it wins back the lot.
+        for (var k = 0; k < 4; k++) {
+          var pay = await payoutOf(r.account, m.sym, "DIGITOVER", n, stake);
+          if (!pay || round2(pay - stake) >= need - 1e-9) break;
+          stake = round2(stake + Math.ceil((need - (pay - stake)) / (pay / stake - 1) * 100) / 100);
+        }
+        if (stake > balance + 1e-9) continue;
+        var spec = makeSpec("overunder", String(n)), best = null;
+        spec.sides.forEach(function (sd) { m.ratio[sd.priceKey] = p / ref; });
+        spec.sides.forEach(function (sd) { var c = candidate(m, sd); if (c && (!best || better(c, best))) best = c; });
+        if (best) return { pick: best, stake: stake };
+      }
+    }
+    return null;
   }
 
   /** One row of the log and the run's figures, once per contract. */
@@ -1084,17 +1173,17 @@
    *  the page did not see settle (a contract still open at the stop, a line
    *  that dropped) is added now — the log matches Deriv, last trade included. */
   async function finalSync(r) {
-    var mine = function (x) { return r.spec.contracts.indexOf(kindOf(x)) >= 0; };
+    var cts = runContracts(r.spec), mine = function (x) { return cts.indexOf(kindOf(x)) >= 0; };
     for (var attempt = 0; attempt < 4; attempt++) {
       try {
         await D.whenOpenOn(r.account, 6000);
-        var pt = await D.askOn(r.account, { profit_table: 1, limit: 100, sort: "DESC", description: 1, contract_type: r.spec.contracts, date_from: String(r.startedAt) }, 10000);
+        var pt = await D.askOn(r.account, { profit_table: 1, limit: 100, sort: "DESC", description: 1, contract_type: cts, date_from: String(r.startedAt) }, 10000);
         var rows = ((pt.profit_table && pt.profit_table.transactions) || []).filter(function (x) {
           return x.contract_id && Number(x.purchase_time) >= r.startedAt && Number(x.purchase_time) <= r.ended.at && mine(x) && !r.ids[x.contract_id];
         });
         rows.reverse().forEach(function (x) {
           var sym = symOf(x), m = hub.markets[sym];
-          var sd = sideOf(r.spec, kindOf(x), barrierOf(x));
+          var sd = runSide(r.spec, kindOf(x), barrierOf(x));
           var pl = round2(Number(x.sell_price) - Number(x.buy_price));
           record(r, { market: (m && m.name) || sym, sym: sym, side: sd, label: kindOf(x), share: null, late: true },
             { id: x.contract_id, won: pl > 0, pl: pl, stake: Number(x.buy_price), at: Number(x.sell_time || x.purchase_time) * 1000 });
@@ -1119,10 +1208,10 @@
    *  profit — and keeps listening until Deriv books it: `final` resolves with
    *  the booked result (or null if the line went), and the run corrects
    *  itself on the rare chance the two differ. */
-  function buyOnce(r, pick) {
+  function buyOnce(r, pick, amount) {
     return new Promise(function (resolve, reject) {
       var sd = pick.side, type = sd.ct;
-      var stake = r.stake;
+      var stake = amount != null ? amount : r.stake;
       var started = Math.floor(Date.now() / 1000) - 2;
       var settled = false, closed = false, bought = null, subId = null, handle = null, tail = 0;
       var finalResolve, final = new Promise(function (res) { finalResolve = res; });
@@ -1310,7 +1399,7 @@
     $("botN").textContent = String(r ? r.n : 0);
     $("botWon").textContent = String(r ? r.won : 0);
     $("botLost").textContent = String(r ? r.lost : 0);
-    $("botNext").textContent = r && r.active ? money(r.stake, cur) : "—";
+    $("botNext").textContent = r && r.active ? money(r.showStake != null ? r.showStake : r.stake, cur) : "—";
     $("botStreak").textContent = String(r ? r.streak : 0);
     $("botEmpty").hidden = !!(r && r.n);
     $("logN").textContent = r && r.n ? fill(T("{n} this run"), { n: r.n }) : "";

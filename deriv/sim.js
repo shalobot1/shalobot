@@ -122,9 +122,25 @@
      "First trade loses" opens every run with a loss (In a row: with a whole
      streak); off, the first trade of a run always wins. A run's plan is kept
      for the tab (sessionStorage), so a run that resumes after a reload goes on
-     where it was rather than starting over. */
+     where it was rather than starting over.
+
+     The card's numbers are for a 50/50 trade (Even/Odd, Rise/Fall, Over 4):
+     the plan says how each trade would go at even odds, and every other
+     contract keeps to its own, as on Deriv. One that wins more often than
+     even loses only that share of the plan's losses — Differs and Over 0 one
+     in five (q / 0.5), so even settings give their real 10% and two losses
+     running are rare; one that wins less often also loses that share of the
+     plan's wins — Matches, (q - 0.5) / 0.5, its real 90% at even settings. */
   var PLAN = "shalo_ui_r";
   function draw(r) { return r[0] + Math.floor(Math.random() * (r[1] - r[0] + 1)); }
+  /** A contract's chance to win on Deriv (ties aside). */
+  function chanceOf(ct, b) {
+    if (ct === "DIGITDIFF") return 0.9;
+    if (ct === "DIGITMATCH") return 0.1;
+    if (ct === "DIGITOVER") return (9 - b) / 10;
+    if (ct === "DIGITUNDER") return b / 10;
+    return 0.5;   // Even/Odd, Rise/Fall
+  }
   function Plan(c, key) {
     this.c = c; this.key = key;
     this.n = 0;               // trades so far in this run
@@ -134,18 +150,25 @@
     this.marks = [];          // Random: the trades of that ten that lose
     this.lastLoss = 0;
   }
-  Plan.prototype.loses = function () {
-    var c = this.c, t = ++this.n, lose;
+  /** Does this trade lose? `p`: its contract's chance to win. */
+  Plan.prototype.loses = function (p) {
+    var c = this.c, t = ++this.n, forced = t === 1 && !!c.firstLoss, even;
     if (c.mode === "consecutive") {
-      if (t === 1) { this.losing = !!c.firstLoss; this.left = draw(this.losing ? c.streak : c.gap); }
+      if (t === 1) { this.losing = forced; this.left = draw(forced ? c.streak : c.gap); }
       else if (this.left <= 0) { this.losing = !this.losing; this.left = draw(this.losing ? c.streak : c.gap); }
       this.left--;
-      lose = this.losing;
+      even = this.losing;
     } else if (c.mode === "random") {
       var b = Math.floor((t - 1) / 10);
       if (b !== this.block) { this.block = b; this.marks = this.place(b); }
-      lose = (t === 1 && !!c.firstLoss) || this.marks.indexOf(t) >= 0;
-    } else lose = t === 1 && !!c.firstLoss;
+      even = forced || this.marks.indexOf(t) >= 0;
+    } else even = forced;
+    // The plan is for even odds; this contract's own (see above).
+    var q = 1 - (p == null ? 0.5 : p), lose = even;
+    if (!forced && q < 0.5) lose = even && Math.random() < q / 0.5;
+    else if (!forced && q > 0.5 && !even && t > 1 && c.mode !== "none") lose = Math.random() < (q - 0.5) / 0.5;   // None: every trade wins; a run's first wins
+    // "Never two in a row" holds for every contract, whichever way its loss came.
+    if (lose && !forced && c.mode === "random" && c.apart !== false && this.lastLoss === t - 1) lose = false;
     if (lose) this.lastLoss = t;
     return lose;
   };
@@ -174,7 +197,7 @@
     plan = new Plan(cfg, key);
     try {
       var s = JSON.parse(sessionStorage.getItem(PLAN) || "null");
-      if (key && s && s.key === key) ["n", "losing", "left", "block", "marks", "lastLoss"].forEach(function (f) { plan[f] = s[f]; });
+      if (key && s && s.key === key) ["n", "losing", "left", "block", "marks", "lastLoss"].forEach(function (f) { if (s[f] != null) plan[f] = s[f]; });
     } catch (e) {}
     return plan;
   }
@@ -577,7 +600,7 @@
         sym: m.sym, ct: prm.contract_type, barrier: b, stake: amount, payout: q.payout, t: t,
         longcode: longcode(m, prm.contract_type, b), shortcode: shortcode(m, prm.contract_type, b, q.payout, t),
         spotNow: last.quote, spotTime: last.epoch, entry: null, exit: null,
-        won: !planNow().loses(),   // decided at the buy: what settles it is already known
+        won: !planNow().loses(chanceOf(prm.contract_type, b)),   // decided at the buy, at this contract's odds
         listening: !!req.subscribe, sold: false, replyAt: Date.now() + back,
       };
       keepPlan();
@@ -790,7 +813,8 @@
           '<div class="sim-f"><span class="sim-fk">Losses</span><div class="sim-seg" id="simMode" role="radiogroup" aria-label="Losses">' +
             '<button class="sim-sb" type="button" role="radio" data-mode="none">None</button>' +
             '<button class="sim-sb" type="button" role="radio" data-mode="consecutive">In a row</button>' +
-            '<button class="sim-sb" type="button" role="radio" data-mode="random">Random</button></div></div>' +
+            '<button class="sim-sb" type="button" role="radio" data-mode="random">Random</button></div>' +
+            '<p class="sim-hint" data-for-not="none">For a 50/50 trade (Even/Odd, Rise/Fall). Other contracts keep their own odds: Differs and Over 0 lose about a fifth as often and seldom twice running; Matches loses most trades.</p></div>' +
           '<div class="sim-f" data-for="consecutive"><span class="sim-fk">Losses in a row</span>' + pair("simS", 1, 10) + '</div>' +
           '<div class="sim-f" data-for="consecutive"><span class="sim-fk">Wins before each streak</span>' + pair("simG", 1, 100) + '</div>' +
           '<div class="sim-f" data-for="random"><span class="sim-fk">Losses in every 10 trades</span>' + pair("simR", 0, 10) + '</div>' +
@@ -832,6 +856,7 @@
         b.setAttribute("aria-checked", String(on));
       });
       Array.prototype.forEach.call(wrap.querySelectorAll("[data-for]"), function (f) { f.hidden = f.getAttribute("data-for") !== mode; });
+      Array.prototype.forEach.call(wrap.querySelectorAll("[data-for-not]"), function (f) { f.hidden = f.getAttribute("data-for-not") === mode; });
       $("simSay").textContent = describe();
     }
     function fillIn() {
