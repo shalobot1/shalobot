@@ -1336,14 +1336,6 @@
     ["botStake", "botTp", "botSl", "botMult", "botVar"].forEach(function (id) { $(id).disabled = running; });
     $("botTypes").classList.toggle("is-locked", running);
     Array.prototype.forEach.call(document.querySelectorAll(".bot-type"), function (t) { t.disabled = running && !t.classList.contains("is-on"); });
-    if (running) {
-      var acc = D.accountOf(run.account);
-      $("botOn").textContent = acc ? fill(T("Trading on {account} {id}"), { account: acc.title || (acc.type === "real" ? T("Real") : T("Demo")), id: acc.id }) : "";
-      $("botOn").hidden = false;
-    } else if (c) {
-      $("botOn").textContent = fill(T("Will trade on {account} {id}"), { account: c.title || (c.type === "real" ? T("Real") : T("Demo")), id: c.id });
-      $("botOn").hidden = false;
-    } else $("botOn").hidden = true;
   }
 
   function say(text, kind) {

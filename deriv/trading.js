@@ -696,7 +696,7 @@
   function current() {
     var a = account(picked);
     var f = a && feeds[a.id];
-    return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live), title: a.title } : null;
+    return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live) } : null;
   }
   function feedOfCurrent() {
     var a = account(picked);
@@ -728,7 +728,7 @@
        the chip mid-run never moves its trades to the other account. */
     accountOf: function (id) {
       var a = account(id), f = a && feeds[a.id];
-      return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live), title: a.title } : null;
+      return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live) } : null;
     },
     askOn: function (id, req, ms) {
       var f = feeds[id];
