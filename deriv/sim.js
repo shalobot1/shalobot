@@ -29,10 +29,9 @@
  * ── It says what it is ──────────────────────────────────────────────────────
  *
  * The accounts are labelled — SIM on the chip, "Simulation account" in the
- * list and on the line under Scan & start, ids that start SIM — a badge reading
- * "Simulation · not real money" sits in the header (at the top of the page on
- * a phone), and the tab title starts with Simulation. Practice and testing
- * need the real page's behaviour, not a page that passes for real money.
+ * list, ids that start SIM — and the tab title starts with Simulation.
+ * Practice and testing need the real page's behaviour, not a page that passes
+ * for real money.
  *
  * ── How an outcome is arranged ──────────────────────────────────────────────
  *
@@ -782,27 +781,6 @@
       e.stopPropagation();
       if (e.detail === 3) openCard();
     });
-
-    /* The badge: what the page is, in the header beside the name where there
-       is room, at the top of the page where there is not (as the MT5 button). */
-    function badge(where, cls) {
-      if (!where) return;
-      var el = document.createElement("span");
-      el.className = "sim-badge " + cls;
-      el.setAttribute("data-i18n-skip", "");
-      el.innerHTML = '<i aria-hidden="true"></i><b>Simulation</b><span>not real money</span>';
-      where.parentNode.insertBefore(el, where.nextSibling);
-    }
-    badge(document.querySelector(".tnav .brand"), "sim-badge--nav");
-    // On a phone: one row, the MT5 button and the badge side by side.
-    var top = document.querySelector(".tmt5--top");
-    if (top) {
-      var row = document.createElement("div");
-      row.className = "sim-toprow";
-      top.parentNode.insertBefore(row, top);
-      row.appendChild(top);
-      badge(top, "sim-badge--top");
-    }
 
     function title() { if (document.title.indexOf("Simulation · ") !== 0) document.title = "Simulation · " + document.title; }
     title();

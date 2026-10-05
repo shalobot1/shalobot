@@ -1,4 +1,5 @@
-/* SHALOBOT — the simulation's own few styles: the setup card, nothing else.
+/* SHALOBOT — the simulation's own few styles: the setup card and the green
+   dot that opens it, nothing else.
    Everything on the page behind it is styles.css, trading.css and bot.css,
    unchanged — the point is that it looks and behaves like the real page. */
 
@@ -61,33 +62,10 @@
 .sim-go { width: 100%; justify-content: center; border-radius: 14px; }
 .sim-note { margin: 14px 0 0; font-size: 12px; line-height: 1.55; color: var(--ink-faint); }
 
-/* What this page is: in the header beside the name, or at the top of the
-   page on a narrow screen. */
-.sim-badge {
-  display: inline-flex; align-items: center; gap: 7px; flex: none; height: 30px; padding: 0 12px 0 10px;
-  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); border-radius: 999px;
-  background: color-mix(in srgb, var(--amber) 14%, var(--raise)); color: var(--ink);
-  font-size: 12px; line-height: 1; white-space: nowrap; user-select: none; -webkit-user-select: none;
-}
-.sim-badge i { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); flex: none; }
-.sim-badge b { font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--amber); }
-.sim-badge span { color: var(--ink-muted); font-weight: 600; }
-
 /* The chip's green dot opens the card: the dot stays 7 px, its target is
    wider so three taps land on a phone. */
 #acctLive { position: relative; }
 #acctLive::before { content: ""; position: absolute; inset: -9px; }
-.sim-badge--top { display: none; }
-.sim-toprow { display: contents; }
-@media (max-width: 1099px) { .sim-badge--nav span { display: none; } }
-@media (max-width: 759px) {
-  .sim-badge--nav { display: none; }
-  .sim-toprow { display: flex; align-self: center; align-items: center; justify-content: center; gap: 8px; max-width: 100%; margin: 0 0 12px; }
-  .sim-toprow .tmt5--top { margin: 0; }
-  .sim-badge--top { display: inline-flex; height: 34px; padding: 0 11px 0 9px; font-size: 11px; }
-}
-/* Too narrow for the words: the badge says SIMULATION, the chip SIM. */
-@media (max-width: 359px) { .sim-badge--top span { display: none; } }
 
 @media (max-width: 420px) {
   .sim-card { padding: 18px 16px; border-radius: 18px; }

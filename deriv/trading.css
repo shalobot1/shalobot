@@ -33,7 +33,19 @@
 .brand-name.lit { animation: door-lit 1s ease-in-out; }
 @media (prefers-reduced-motion: reduce) { .brand-name.lit { animation-duration: 1ms; color: var(--blue); } }
 
-.tnav-end { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.tnav-end { margin-left: auto; display: flex; flex: none; align-items: center; gap: 10px; }
+.tnav-end > * { flex: none; }
+.tnav .brand { flex: none; }
+
+/* What the header gives up, in order, when it cannot fit everything (trading.js
+   fitNav): the name beside the mark, then the little arrows, then the words of
+   the MT5 logo — its mark stays, so the button is always there. */
+.nav-inner.is-short .brand-name { display: none; }
+.nav-inner.is-snug .lang-caret, .nav-inner.is-snug .tbal-caret { display: none; }
+.nav-inner.is-snug .tnav-lang .lang-btn { padding: 0 8px; }
+.nav-inner.is-snug .tbal-chip { padding-right: 12px; }
+.nav-inner.is-tight .tmt5 { width: 38px; padding: 0; justify-content: center; }
+.nav-inner.is-tight .tmt5 img { width: 19px; height: 18px; object-fit: cover; object-position: left center; }
 
 /* The MetaTrader 5 button: the full logo on a chip like the ones beside it. */
 .tmt5 {
@@ -49,12 +61,6 @@
 .tmt5 .lt { display: none; }
 :root[data-theme="light"] .tmt5 .dk { display: none; }
 :root[data-theme="light"] .tmt5 .lt { display: block; }
-.tmt5--top { display: none; }
-@media (max-width: 759px) {
-  .tmt5--nav { display: none; }
-  .tmt5--top { display: inline-flex; align-self: center; height: 34px; padding: 0 12px; margin: 0 0 12px; }
-  .tmt5--top img { height: 15px; }
-}
 
 /* The language switch, matched to the chip beside it. */
 .tnav-lang:empty { display: none; }
@@ -194,6 +200,10 @@
   .tnav-lang .lang-btn { height: 36px; }
   .tbal-chip { height: 36px; gap: 7px; padding: 0 9px 0 11px; }
   .tbal-amt { font-size: 14px; }
+  .tmt5 { height: 36px; padding: 0 9px; }
+  .tmt5 img { height: 13px; }
+  .nav-inner.is-tight .tmt5 { width: 36px; }
+  .nav-inner.is-tight .tmt5 img { width: 18px; height: 17px; }
   .tbal-menu { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; }
 }
 @media (max-width: 380px) {
@@ -201,6 +211,8 @@
   .tnav-end { gap: 6px; }
   .tnav-lang .lang-btn { padding: 0 8px; }
   .tbal-chip { gap: 6px; padding: 0 8px 0 10px; }
+  .tmt5 { padding: 0 8px; }
+  .tmt5 img { height: 12px; }
   .tbal-kind { font-size: 10px; letter-spacing: .07em; }
   .tbal-amt { font-size: 13.5px; }
 }

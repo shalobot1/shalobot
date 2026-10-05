@@ -678,8 +678,39 @@
     });
   }, 30000);
 
+  /* ── the header fits ───────────────────────────────────────────────── */
+
+  /* The brand, the MT5 button, the language and the chip share one row at
+     every width. When they do not fit — a narrow phone, a long balance, a
+     longer word for Real — the header gives things up one at a time until
+     they do (trading.css): the name beside the mark, the little arrows, the
+     words of the MT5 logo. Re-checked whenever any of them changes size. */
+  var NAV_STEPS = ["is-short", "is-snug", "is-tight"];
+  function fitNav() {
+    var nav = document.querySelector(".tnav .nav-inner");
+    var end = nav && nav.querySelector(".tnav-end");
+    if (!end) return;
+    NAV_STEPS.forEach(function (c) { nav.classList.remove(c); });
+    var room = function () {
+      var pad = parseFloat(global.getComputedStyle(nav).paddingRight) || 0;
+      return end.getBoundingClientRect().right <= nav.getBoundingClientRect().right - pad + 0.5;
+    };
+    for (var i = 0; i < NAV_STEPS.length && !room(); i++) nav.classList.add(NAV_STEPS[i]);
+  }
+  function watchNav() {
+    var nav = document.querySelector(".tnav .nav-inner");
+    if (!nav) return;
+    fitNav();
+    if (!global.ResizeObserver) { global.addEventListener("resize", fitNav); return; }
+    var ro = new global.ResizeObserver(function () { fitNav(); });
+    // The row itself, and the things in it whose size changes on their own.
+    [nav, nav.querySelector(".tnav-lang"), $("acctKind"), $("acctAmt"), nav.querySelector(".brand-name")]
+      .forEach(function (el) { if (el) ro.observe(el); });
+  }
+
   /* ── go ────────────────────────────────────────────────────────────── */
 
+  watchNav();
   bindSwitcher();
   global.addEventListener("online", function () { revive(); probeAll(); });
   global.addEventListener("offline", function () { paint(); });
