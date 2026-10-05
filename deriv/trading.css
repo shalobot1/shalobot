@@ -16,7 +16,22 @@
 
 .tpage { min-height: 100vh; }
 .tnav { border-bottom-color: var(--line); }
-.tnav .nav-inner { gap: 14px; }
+.tnav .nav-inner { gap: 14px; position: relative; }
+
+/* The "o" of Shalobot (deriv/door.js). It looks like every other letter on
+   purpose. The field the first visit asks for sits under the name, borrowing
+   the page's own input colours, so nothing in the header moves; the only
+   announcement is a second of colour on the word. */
+.door-key {
+  position: absolute; top: calc(100% - 10px); left: var(--gutter); z-index: 5; width: 7em;
+  padding: 5px 9px; border: 1px solid var(--line-hi); border-radius: 9px;
+  background: var(--raise); color: var(--ink); font: inherit; font-size: 13px;
+}
+.door-key:focus { outline: none; }
+.door-key[hidden] { display: none; }
+@keyframes door-lit { 0% { color: var(--ink); } 22%, 70% { color: var(--blue); } 100% { color: var(--ink); } }
+.brand-name.lit { animation: door-lit 1s ease-in-out; }
+@media (prefers-reduced-motion: reduce) { .brand-name.lit { animation-duration: 1ms; color: var(--blue); } }
 
 .tnav-end { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 

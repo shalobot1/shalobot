@@ -1,0 +1,80 @@
+/* SHALOBOT — the simulation's own few styles: the setup card, nothing else.
+   Everything on the page behind it is styles.css, trading.css and bot.css,
+   unchanged — the point is that it looks and behaves like the real page. */
+
+.sim-setup {
+  position: fixed; inset: 0; z-index: 400;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; overflow-y: auto;
+  background: rgba(8, 9, 10, 0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.sim-setup[hidden] { display: none; }
+
+.sim-card {
+  width: 100%; max-width: 460px; padding: 22px;
+  border: 1px solid var(--line-hi); border-radius: 20px;
+  background: var(--raise); color: var(--ink);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+.sim-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.sim-k { margin: 0 0 3px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+.sim-t { margin: 0; font-size: 19px; letter-spacing: -0.02em; }
+.sim-close { padding: 8px 14px; font-size: 13.5px; }
+
+.sim-body { display: grid; gap: 14px; margin: 20px 0 14px; }
+.sim-body [hidden] { display: none; }
+.sim-f { display: grid; gap: 6px; }
+.sim-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sim-fk { font-size: 13px; font-weight: 600; color: var(--ink-muted); }
+.sim-with { display: flex; gap: 8px; }
+.sim-i {
+  flex: 1; min-width: 0; height: 44px; padding: 0 13px;
+  border: 1px solid var(--line-hi); border-radius: 12px; background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.sim-i:focus { outline: none; border-color: var(--blue); }
+.sim-rand { flex: none; padding: 0 14px; font-size: 13.5px; }
+
+.sim-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.sim-sb {
+  height: 40px; padding: 0 6px; border: 1px solid var(--line-hi); border-radius: 11px;
+  background: var(--surface); color: var(--ink-muted); cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 700;
+}
+.sim-sb:hover { color: var(--ink); }
+.sim-sb.is-on { border-color: var(--blue); color: var(--ink); background: color-mix(in srgb, var(--blue) 12%, var(--surface)); }
+
+.sim-tog {
+  position: relative; flex: none; width: 44px; height: 26px; padding: 0; border: 0; border-radius: 999px;
+  background: var(--line-hi); cursor: pointer; transition: background .18s ease;
+}
+.sim-tog i {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .18s ease;
+}
+.sim-tog[aria-checked="true"] { background: var(--blue); }
+.sim-tog[aria-checked="true"] i { transform: translateX(18px); }
+
+.sim-say { margin: 0 0 16px; min-height: 40px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.sim-go { width: 100%; justify-content: center; border-radius: 14px; }
+.sim-note { margin: 14px 0 0; font-size: 12px; line-height: 1.55; color: var(--ink-faint); }
+
+/* What this page is: in the header beside the name, or at the top of the
+   page on a narrow screen. Tapping it opens the card. */
+.sim-badge {
+  display: inline-flex; align-items: center; gap: 7px; flex: none; height: 30px; padding: 0 12px 0 10px;
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--amber) 14%, var(--raise)); color: var(--ink);
+  font: inherit; font-size: 12px; line-height: 1; cursor: pointer; white-space: nowrap;
+}
+.sim-badge i { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); flex: none; }
+.sim-badge b { font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--amber); }
+.sim-badge span { color: var(--ink-muted); font-weight: 600; }
+.sim-badge:hover { border-color: var(--amber); }
+.sim-badge:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sim-badge--top { display: none; }
+@media (max-width: 1099px) { .sim-badge--nav span { display: none; } }
+@media (max-width: 759px) {
+  .sim-badge--nav { display: none; }
+  .sim-badge--top { display: inline-flex; align-self: center; margin: -4px 0 14px; }
+}

@@ -212,13 +212,13 @@
 
   /* ── 3. accounts and their live feeds ──────────────────────────────── */
 
-  var accounts = [];      // { id, type, currency, balance, status }
+  var accounts = [];      // { id, type, currency, balance, status, label?, title? }
   var feeds = {};         // id → Feed
   var picked = null;      // the id shown in the chip
 
   function start(r) {
     accounts = (r.accounts || []).map(function (a) {
-      return { id: a.id, type: a.type === "real" ? "real" : "demo", currency: a.currency || "", balance: a.balance, status: a.status || "active", at: Date.now() };
+      return { id: a.id, type: a.type === "real" ? "real" : "demo", currency: a.currency || "", balance: a.balance, status: a.status || "active", label: a.label || "", title: a.title || "", at: Date.now() };
     });
 
     if (!accounts.length) {
@@ -267,6 +267,10 @@
 
   /* ── painting ──────────────────────────────────────────────────────── */
 
+  /** Real or Demo — or the account's own label when it brings one (the
+   *  simulator's accounts say what they are; Deriv's never carry one). */
+  function kindOf(a) { return a.label || (a.type === "real" ? T("Real") : T("Demo")); }
+
   var CHECK = '<svg class="tbal-row-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
 
@@ -279,7 +283,7 @@
     }
     savedAt = Date.now();
     store.set(LAST, JSON.stringify(accounts.map(function (a) {
-      return { id: a.id, type: a.type, currency: a.currency, balance: a.balance, status: a.status };
+      return { id: a.id, type: a.type, currency: a.currency, balance: a.balance, status: a.status, label: a.label, title: a.title };
     })));
   }
 
@@ -291,7 +295,7 @@
     try { list = JSON.parse(store.get(LAST) || "null"); } catch (e) { list = null; }
     if (!Array.isArray(list) || !list.length) return;
     accounts = list.filter(function (a) { return a && a.id; }).map(function (a) {
-      return { id: String(a.id), type: a.type === "real" ? "real" : "demo", currency: a.currency || "", balance: a.balance, status: a.status || "active", at: 0 };
+      return { id: String(a.id), type: a.type === "real" ? "real" : "demo", currency: a.currency || "", balance: a.balance, status: a.status || "active", label: a.label || "", title: a.title || "", at: 0 };
     });
     if (!accounts.length) return;
     var saved = store.get(PICK);
@@ -312,9 +316,9 @@
     box.classList.toggle("is-demo", a.type !== "real");
     box.classList.toggle("is-live", !!(f && f.live));
     box.classList.toggle("is-wait", !!(f && !f.live && f.started));
-    $("acctKind").textContent = a.type === "real" ? T("Real") : T("Demo");
+    $("acctKind").textContent = kindOf(a);
     $("acctAmt").textContent = money(a.balance, a.currency);
-    $("acctBtn").setAttribute("aria-label", (a.type === "real" ? T("Real") : T("Demo")) + " " + money(a.balance, a.currency));
+    $("acctBtn").setAttribute("aria-label", kindOf(a) + " " + money(a.balance, a.currency));
     if (!$("acctMenu").hidden) paintMenu();
     // Anything else on the page that shows the account (the scanner) follows it.
     try { global.dispatchEvent(new CustomEvent("shalo:account")); } catch (e) {}
@@ -330,7 +334,7 @@
       return '<button type="button" role="menuitemradio" class="tbal-row ' + (real ? "is-real" : "is-demo") + '" data-id="' + esc(a.id) + '"' +
         ' aria-checked="' + (a.id === picked) + '"' + (a.status !== "active" ? " disabled" : "") + ">" +
         CHECK +
-        '<span class="tbal-row-t"><span class="tbal-row-k">' + esc(real ? T("Real account") : T("Demo account")) + "</span>" +
+        '<span class="tbal-row-t"><span class="tbal-row-k">' + esc(a.title || (real ? T("Real account") : T("Demo account"))) + "</span>" +
         '<span class="tbal-row-id" translate="no">' + esc(a.id) + (a.status !== "active" ? " · " + esc(T("inactive")) : "") + "</span></span>" +
         '<span class="tbal-row-v" translate="no">' + esc(money(a.balance, a.currency)) + "</span></button>";
     }).join("");
@@ -666,7 +670,7 @@
   function current() {
     var a = account(picked);
     var f = a && feeds[a.id];
-    return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live) } : null;
+    return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live), title: a.title } : null;
   }
   function feedOfCurrent() {
     var a = account(picked);
@@ -696,7 +700,7 @@
        the chip mid-run never moves its trades to the other account. */
     accountOf: function (id) {
       var a = account(id), f = a && feeds[a.id];
-      return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live) } : null;
+      return a ? { id: a.id, type: a.type, currency: a.currency, balance: a.balance, live: !!(f && f.live), title: a.title } : null;
     },
     askOn: function (id, req, ms) {
       var f = feeds[id];

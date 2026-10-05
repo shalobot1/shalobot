@@ -25,7 +25,7 @@
  * under /api is ever cached, and neither is any other origin.
  */
 
-const VERSION = "shalo-shell-v25";
+const VERSION = "shalo-shell-v26";
 const NET_TIMEOUT_MS = 2500;
 
 /* What the launch screen is waiting on. The start page and everything it
@@ -36,6 +36,7 @@ const SHELL = [
   "/dashboard",
   "/trading",
   "/deriv/trading.css",
+  "/deriv/door.js",
   "/deriv/trading.js",
   "/deriv/bot.css",
   "/deriv/bot.js",

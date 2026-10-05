@@ -1338,10 +1338,10 @@
     Array.prototype.forEach.call(document.querySelectorAll(".bot-type"), function (t) { t.disabled = running && !t.classList.contains("is-on"); });
     if (running) {
       var acc = D.accountOf(run.account);
-      $("botOn").textContent = acc ? fill(T("Trading on {account} {id}"), { account: acc.type === "real" ? T("Real") : T("Demo"), id: acc.id }) : "";
+      $("botOn").textContent = acc ? fill(T("Trading on {account} {id}"), { account: acc.title || (acc.type === "real" ? T("Real") : T("Demo")), id: acc.id }) : "";
       $("botOn").hidden = false;
     } else if (c) {
-      $("botOn").textContent = fill(T("Will trade on {account} {id}"), { account: c.type === "real" ? T("Real") : T("Demo"), id: c.id });
+      $("botOn").textContent = fill(T("Will trade on {account} {id}"), { account: c.title || (c.type === "real" ? T("Real") : T("Demo")), id: c.id });
       $("botOn").hidden = false;
     } else $("botOn").hidden = true;
   }
