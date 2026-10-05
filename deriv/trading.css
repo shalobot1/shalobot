@@ -36,6 +36,8 @@
 .tnav-end { margin-left: auto; display: flex; flex: none; align-items: center; gap: 10px; }
 .tnav-end > * { flex: none; }
 .tnav .brand { flex: none; }
+/* Three quick taps open things here (door.js): no double-tap zoom to eat one. */
+.tnav .brand, .tbal-chip { touch-action: manipulation; }
 
 /* What the header gives up, in order, when it cannot fit everything (trading.js
    fitNav): the name beside the mark, then the little arrows, then the words of

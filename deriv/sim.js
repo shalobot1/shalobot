@@ -777,10 +777,10 @@
        neither open the account list nor count towards the chip's three clicks
        (which show or hide the demo account, deriv/door.js). */
     var dot = document.getElementById("acctLive");
-    if (dot) dot.addEventListener("click", function (e) {
-      e.stopPropagation();
-      if (e.detail === 3) openCard();
-    });
+    if (dot) {
+      dot.addEventListener("click", function (e) { e.stopPropagation(); });
+      if (global.ShaloTaps) global.ShaloTaps(dot, 3, openCard);   // counted in door.js, iPhones included
+    }
 
     function title() { if (document.title.indexOf("Simulation · ") !== 0) document.title = "Simulation · " + document.title; }
     title();

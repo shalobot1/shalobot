@@ -20,6 +20,11 @@
  * and three more hide it again — in the simulation as on the real page. In
  * the simulation the chip's green dot is the way to the setup card instead.
  *
+ * Three clicks are counted here, not read from the click event: iPhone
+ * Safari reports every tap as a first click (detail 1), so waiting for a
+ * third never ended on an iPhone. The places that listen for them also turn
+ * off double-tap zoom (trading.css), which would otherwise eat a quick tap.
+ *
  * The phrase is compared as a hash so it is not sitting in the file as a
  * readable word. That keeps the door shut against somebody idly poking at the
  * page; it is not security, and nothing behind it is treated as if it were.
@@ -51,6 +56,19 @@
 
   // Before anything else on the page runs: with the mode on, Deriv is the simulator.
   if (on()) document.write('<link rel="stylesheet" href="/deriv/sim.css" /><script src="/deriv/sim.js"><\/script>');
+
+  /** Calls fn on the n-th click or tap on el, each within GAP ms of the last. */
+  var GAP = 600;
+  function taps(el, n, fn) {
+    var count = 0, last = 0;
+    el.addEventListener("click", function (e) {
+      var now = Date.now();
+      count = now - last <= GAP ? count + 1 : 1;
+      last = now;
+      if (count >= n) { count = 0; fn(e); }
+    });
+  }
+  global.ShaloTaps = taps;   // sim.js counts the green dot's the same way
 
   function running() {
     try { var r = global.ShaloBot && global.ShaloBot.run(); return !!(r && r.active); } catch (e) { return false; }
@@ -100,17 +118,19 @@
       global.setTimeout(function () { global.location.reload(); }, 1000);
     }
 
-    function knock(e) {
-      e.preventDefault();                  // the brand is a link: the "o" never navigates
-      if (e.detail < 3 || running()) return;
+    function knock() {
+      if (running()) return;
       if (!known()) { key.hidden = false; key.focus(); return; }
       flip();
     }
-    door.addEventListener("click", knock);
-    if (mark) mark.addEventListener("click", function (e) {
-      if (global.getComputedStyle(name).display !== "none") return;   // the name is there: it is the door
-      knock(e);
-    });
+    // The brand is a link: no click on the door ever navigates.
+    door.addEventListener("click", function (e) { e.preventDefault(); });
+    taps(door, 3, knock);
+    if (mark) {
+      var markIsDoor = function () { return global.getComputedStyle(name).display === "none"; };   // no name: the mark is the door
+      mark.addEventListener("click", function (e) { if (markIsDoor()) e.preventDefault(); });
+      taps(mark, 3, function () { if (markIsDoor()) knock(); });
+    }
 
     key.addEventListener("keydown", function (e) {
       if (e.key === "Escape") return hideKey();
@@ -126,8 +146,8 @@
     key.addEventListener("blur", hideKey);
 
     var chip = document.getElementById("acctBtn");
-    if (chip) chip.addEventListener("click", function (e) {
-      if (e.detail !== 3 || !known() || running()) return;
+    if (chip) taps(chip, 3, function () {
+      if (!known() || running()) return;
       var D = global.ShaloDeriv;
       if (!D || !D.demo) return;
       D.demo(!D.demo());                   // the list is open after the third click: it shows the change
