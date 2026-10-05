@@ -14,6 +14,12 @@
  * cannot be swapped under itself; a bot that is running has to be stopped
  * first, and until then the three clicks do nothing.
  *
+ * The demo account. People trade on real accounts, so the page keeps a demo
+ * account out of sight (trading.js). On a device that has been through the
+ * door, three clicks on the balance chip show it in the list for this visit,
+ * and three more hide it again — in the simulation as on the real page. In
+ * the simulation the chip's green dot is the way to the setup card instead.
+ *
  * The phrase is compared as a hash so it is not sitting in the file as a
  * readable word. That keeps the door shut against somebody idly poking at the
  * page; it is not security, and nothing behind it is treated as if it were.
@@ -118,6 +124,14 @@
       flip();                              // the phrase means "on": no second lock on the same door
     });
     key.addEventListener("blur", hideKey);
+
+    var chip = document.getElementById("acctBtn");
+    if (chip) chip.addEventListener("click", function (e) {
+      if (e.detail !== 3 || !known() || running()) return;
+      var D = global.ShaloDeriv;
+      if (!D || !D.demo) return;
+      D.demo(!D.demo());                   // the list is open after the third click: it shows the change
+    });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);

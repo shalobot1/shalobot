@@ -365,7 +365,6 @@
 "Scan markets":"Varrer mercados",
 "Scan again":"Varrer de novo",
 "Scanning…":"Varrendo…",
-"Smallest stake Deriv accepts: 0.35 USD.":"Menor valor que a Deriv aceita: 0.35 USD.",
 "Finding the markets…":"Buscando os mercados…",
 "Checked {done} of {total} markets…":"{done} de {total} mercados verificados…",
 "Best pick":"Melhor escolha",
@@ -430,7 +429,6 @@
 "Running":"Em execução",
 "Scan & start":"Escanear e iniciar",
 "Scanning Even/Odd markets":"Escaneando mercados Par/Ímpar",
-"Smallest stake Deriv accepts: {min}.":"Menor valor que a Deriv aceita: {min}.",
 "Smart Scan bot":"Bot Smart Scan",
 "Starting…":"Iniciando…",
 "Stop loss reached.":"Stop loss atingido.",
@@ -487,7 +485,7 @@
 "Your session was resumed after the page reloaded.":"Sua sessão foi retomada depois que a página recarregou.",
 "The bot is already running in another tab or window. Stop it there first.":"O bot já está rodando em outra aba ou janela. Pare-o lá primeiro.",
 "Waiting for Deriv to pay out the last trade…":"Aguardando a Deriv pagar a última operação…",
-"Save settings":"Salvar configurações",
+"Save settings":"Salvar ajustes",
 "Stop loss reached":"Stop loss atingido",
 "The bot stopped at your limit.":"O bot parou no seu limite.",
 "Top up to keep trading":"Recarregue para continuar operando",
@@ -495,5 +493,7 @@
 "Top up or reset your demo balance on Deriv.":"Recarregue ou redefina seu saldo demo na Deriv.",
 "Deposit on Deriv":"Depositar na Deriv",
 "Go to Deriv":"Ir para a Deriv",
-"Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.":"Já depositou e não aparece aqui? Na Deriv, toque em Transferir e mova o dinheiro para Opções."
+"Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.":"Já depositou e não aparece aqui? Na Deriv, toque em Transferir e mova o dinheiro para Opções.",
+"This Deriv login has no real account yet. Open one on Deriv, then come back here.":"Este login da Deriv ainda não tem uma conta real. Abra uma na Deriv e volte aqui.",
+"Smallest stake: {min}":"Valor mínimo: {min}"
 }

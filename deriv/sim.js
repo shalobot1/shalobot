@@ -41,8 +41,8 @@
  * on Differs 3 really lands on a 3, in the same feed the scan is reading, so
  * the digits, the pattern, the payout and the balance all agree with each
  * other. Which trades lose is the plan set on the card (three clicks on the
- * balance chip, or one on the badge): none, a run in a row, or at random,
- * and whether the first trade loses.
+ * green dot in the balance chip): none, a run in a row, or at random, and
+ * whether the first trade loses.
  *
  * ── Kept apart from the real page ───────────────────────────────────────────
  *
@@ -679,7 +679,7 @@
   };
   global.WebSocket = FakeSocket;
 
-  /* ── the card: three clicks on the balance chip ────────────────────── */
+  /* ── the card: three clicks on the green dot in the balance chip ───── */
 
   function card() {
     var c = setup();
@@ -774,32 +774,35 @@
       fillIn();
       wrap.hidden = false;
     }
-    /* Three clicks on the balance chip — the chip's own clicks open and close
-       its list, so the third closes it again and the card opens instead. */
-    var chip = document.getElementById("acctBtn");
-    if (chip) chip.addEventListener("click", function (e) {
-      if (e.detail < 3) return;
-      var menu = document.getElementById("acctMenu");
-      if (menu) { menu.hidden = true; chip.setAttribute("aria-expanded", "false"); }
-      openCard();
+    /* Three clicks on the chip's green dot. Its clicks are its own here — they
+       neither open the account list nor count towards the chip's three clicks
+       (which show or hide the demo account, deriv/door.js). */
+    var dot = document.getElementById("acctLive");
+    if (dot) dot.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (e.detail === 3) openCard();
     });
 
-    /* The badge, and the way to the card: in the header beside the name where
-       there is room, at the top of the page where there is not (as the MT5
-       button does). */
+    /* The badge: what the page is, in the header beside the name where there
+       is room, at the top of the page where there is not (as the MT5 button). */
     function badge(where, cls) {
       if (!where) return;
-      var el = document.createElement("button");
-      el.type = "button";
+      var el = document.createElement("span");
       el.className = "sim-badge " + cls;
       el.setAttribute("data-i18n-skip", "");
-      el.setAttribute("aria-label", "Simulation, not real money — set it up");
       el.innerHTML = '<i aria-hidden="true"></i><b>Simulation</b><span>not real money</span>';
-      el.addEventListener("click", openCard);
       where.parentNode.insertBefore(el, where.nextSibling);
     }
     badge(document.querySelector(".tnav .brand"), "sim-badge--nav");
-    badge(document.querySelector(".tmt5--top") || document.getElementById("tmain"), "sim-badge--top");
+    // On a phone: one row, the MT5 button and the badge side by side.
+    var top = document.querySelector(".tmt5--top");
+    if (top) {
+      var row = document.createElement("div");
+      row.className = "sim-toprow";
+      top.parentNode.insertBefore(row, top);
+      row.appendChild(top);
+      badge(top, "sim-badge--top");
+    }
 
     function title() { if (document.title.indexOf("Simulation · ") !== 0) document.title = "Simulation · " + document.title; }
     title();

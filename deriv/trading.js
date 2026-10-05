@@ -228,26 +228,53 @@
         : "This Deriv login has no trading accounts yet. Open one on Deriv, then come back here.");
     }
 
-    var saved = store.get(PICK);
-    var active = accounts.filter(function (a) { return a.status === "active"; });
-    var byId = function (id) { return accounts.filter(function (a) { return a.id === id; })[0]; };
-    picked = (saved && byId(saved) && saved) ||
-      ((active.filter(function (a) { return a.type === "real"; })[0] || active[0] || accounts[0]).id);
-
-    clearState();
-    $("acct").hidden = false;
-    painted = true;
-    paint();
-
+    // Every account's feed opens, a hidden demo's too, so revealing it is instant.
     (r.accounts || []).forEach(function (a) {
       if (a.status !== "active") return;
       var f = feeds[a.id] || (feeds[a.id] = new Feed(a.id));
       if (a.ws) f.open(a.ws); else f.retry();
     });
     startPolling();
+
+    picked = pickShown();
+    if (!picked) {
+      $("acct").hidden = true;
+      return showNote("This Deriv login has no real account yet. Open one on Deriv, then come back here.");
+    }
+    clearState();
+    $("acct").hidden = false;
+    painted = true;
+    paint();
   }
 
   function account(id) { return accounts.filter(function (a) { return a.id === id; })[0] || null; }
+
+  /* People trade on real accounts. A demo account is kept — its feed stays
+     open — but out of the chip and the list unless revealed for this visit
+     (deriv/door.js, on a device that has been through the door). */
+  var showDemo = false;
+  function shown(a) { return a.type === "real" || showDemo; }
+  /** The account the chip shows: the last one picked if it is still shown,
+   *  else the first active real one (or demo, when revealed). */
+  function pickShown() {
+    var list = accounts.filter(shown), saved = store.get(PICK);
+    if (saved && list.some(function (a) { return a.id === saved; })) return saved;
+    var active = list.filter(function (a) { return a.status === "active"; });
+    var a = active.filter(function (x) { return x.type === "real"; })[0] || active[0] || list[0];
+    return a ? a.id : null;
+  }
+  function setDemo(on) {
+    if (!accounts.some(function (a) { return a.type === "demo"; })) return false;
+    showDemo = !!on;
+    var cur = account(picked);
+    if (!cur || !shown(cur)) picked = pickShown();
+    if (!picked) return true;
+    clearState();
+    $("acct").hidden = false;
+    painted = true;
+    paint();
+    return true;
+  }
 
   /* ── money ─────────────────────────────────────────────────────────── */
 
@@ -298,9 +325,8 @@
       return { id: String(a.id), type: a.type === "real" ? "real" : "demo", currency: a.currency || "", balance: a.balance, status: a.status || "active", label: a.label || "", title: a.title || "", at: 0 };
     });
     if (!accounts.length) return;
-    var saved = store.get(PICK);
-    picked = (saved && account(saved) && saved) ||
-      ((accounts.filter(function (a) { return a.type === "real" && a.status === "active"; })[0] || accounts[0]).id);
+    picked = pickShown();
+    if (!picked) return;
     $("acct").hidden = false;
     painted = true;
     paint();
@@ -325,7 +351,7 @@
   }
 
   function paintMenu() {
-    var order = accounts.slice().sort(function (x, y) {
+    var order = accounts.filter(shown).sort(function (x, y) {
       if (x.type !== y.type) return x.type === "real" ? -1 : 1;
       return (y.balance || 0) - (x.balance || 0);
     });
@@ -681,6 +707,8 @@
 
   global.ShaloDeriv = {
     accounts: function () { return accounts; },
+    /** Whether the demo is shown; with an argument, show or hide it (false when there is none). */
+    demo: function (on) { return on === undefined ? showDemo : setDemo(on); },
     feeds: feeds,
     revive: revive,
     current: current,

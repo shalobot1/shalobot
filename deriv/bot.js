@@ -633,7 +633,7 @@
     return "";
   }
   function paintMin() {
-    $("botMin").textContent = fill(T("Smallest stake Deriv accepts: {min}."), { min: money(hub.minStake, hub.currency) });
+    $("botMin").textContent = fill(T("Smallest stake: {min}"), { min: money(hub.minStake, hub.currency) });
     Array.prototype.forEach.call(document.querySelectorAll("[data-bot-cur]"), function (e) { e.textContent = hub.currency; });
   }
 
@@ -1372,6 +1372,7 @@
 
   loadForm();
   paintType();
+  paintMin();
 
   $("botTypes").addEventListener("click", function (e) {
     var b = e.target.closest(".bot-type");

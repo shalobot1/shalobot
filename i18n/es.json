@@ -365,7 +365,6 @@
 "Scan markets":"Escanear mercados",
 "Scan again":"Escanear de nuevo",
 "Scanning…":"Escaneando…",
-"Smallest stake Deriv accepts: 0.35 USD.":"La inversión mínima que acepta Deriv: 0.35 USD.",
 "Finding the markets…":"Buscando los mercados…",
 "Checked {done} of {total} markets…":"Revisados {done} de {total} mercados…",
 "Best pick":"Mejor opción",
@@ -430,7 +429,6 @@
 "Running":"En marcha",
 "Scan & start":"Escanear e iniciar",
 "Scanning Even/Odd markets":"Escaneando mercados Par/Impar",
-"Smallest stake Deriv accepts: {min}.":"La inversión mínima que acepta Deriv: {min}.",
 "Smart Scan bot":"Bot Smart Scan",
 "Starting…":"Iniciando…",
 "Stop loss reached.":"Stop loss alcanzado.",
@@ -495,5 +493,7 @@
 "Top up or reset your demo balance on Deriv.":"Recarga o restablece tu saldo demo en Deriv.",
 "Deposit on Deriv":"Depositar en Deriv",
 "Go to Deriv":"Ir a Deriv",
-"Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.":"¿Ya depositaste y no lo ves aquí? En Deriv, toca Transferir y pasa el dinero a Opciones."
+"Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.":"¿Ya depositaste y no lo ves aquí? En Deriv, toca Transferir y pasa el dinero a Opciones.",
+"This Deriv login has no real account yet. Open one on Deriv, then come back here.":"Este inicio de sesión de Deriv aún no tiene una cuenta real. Abre una en Deriv y vuelve aquí.",
+"Smallest stake: {min}":"Inversión mín.: {min}"
 }

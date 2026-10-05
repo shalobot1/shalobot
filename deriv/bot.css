@@ -332,11 +332,25 @@
 @media (max-width: 640px) {
   .bot { margin-top: 10px; }
   .bot-card { padding: 15px; border-radius: 16px; }
-  .bot-set h1 { font-size: 21px; }
+  /* Each tab as wide as its words need: the longest label takes two lines, not three. */
+  .bot-types { grid-auto-columns: auto; }
+  .bot-type { min-width: auto; padding: 5px 4px; }
+  .bot-set h1 { margin: 10px 0 4px; font-size: 20px; }
+  .bot-lede { font-size: 13px; line-height: 1.5; }
+  .bot-fields { gap: 9px; margin-top: 14px; }
+  .bot-in { height: 44px; }
+  .bot-go { height: 48px; margin-top: 12px; }
+  .bot-on { font-size: 11.5px; }
   .bot-pl-v { font-size: 26px; }
   .bot-now-side { font-size: 22px; }
   .bot-now-p b { font-size: 26px; }
   .bot-dots i { width: 24px; height: 24px; border-radius: 7px; font-size: 12px; }
+}
+@media (max-width: 380px) {
+  .bot-card { padding: 12px; }
+  .bot-type { font-size: 11.5px; }
+  .bot-note { gap: 4px 10px; }
+  .bot-min, .bot-keep { font-size: 11.5px; }
 }
 
 /* ══ the popups ═══════════════════════════════════════════════════════ */

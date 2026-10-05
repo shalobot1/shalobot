@@ -52,8 +52,8 @@
 .tmt5--top { display: none; }
 @media (max-width: 759px) {
   .tmt5--nav { display: none; }
-  .tmt5--top { display: inline-flex; align-self: center; height: 36px; margin: 2px 0 14px; }
-  .tmt5--top img { height: 16px; }
+  .tmt5--top { display: inline-flex; align-self: center; height: 34px; padding: 0 12px; margin: 0 0 12px; }
+  .tmt5--top img { height: 15px; }
 }
 
 /* The language switch, matched to the chip beside it. */
@@ -195,4 +195,12 @@
   .tbal-chip { height: 36px; gap: 7px; padding: 0 9px 0 11px; }
   .tbal-amt { font-size: 14px; }
   .tbal-menu { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; }
+}
+@media (max-width: 380px) {
+  :root { --gutter: 16px; }
+  .tnav-end { gap: 6px; }
+  .tnav-lang .lang-btn { padding: 0 8px; }
+  .tbal-chip { gap: 6px; padding: 0 8px 0 10px; }
+  .tbal-kind { font-size: 10px; letter-spacing: .07em; }
+  .tbal-amt { font-size: 13.5px; }
 }

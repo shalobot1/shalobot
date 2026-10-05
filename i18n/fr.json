@@ -365,7 +365,6 @@
 "Scan markets":"Scanner les marchés",
 "Scan again":"Scanner à nouveau",
 "Scanning…":"Scan en cours…",
-"Smallest stake Deriv accepts: 0.35 USD.":"Mise minimale acceptée par Deriv : 0.35 USD.",
 "Finding the markets…":"Recherche des marchés…",
 "Checked {done} of {total} markets…":"{done} marchés vérifiés sur {total}…",
 "Best pick":"Meilleur choix",
@@ -430,7 +429,6 @@
 "Running":"En cours",
 "Scan & start":"Scanner et démarrer",
 "Scanning Even/Odd markets":"Scan des marchés Pair/Impair",
-"Smallest stake Deriv accepts: {min}.":"Mise minimale acceptée par Deriv : {min}.",
 "Smart Scan bot":"Bot Smart Scan",
 "Starting…":"Démarrage…",
 "Stop loss reached.":"Stop loss atteint.",
@@ -487,7 +485,7 @@
 "Your session was resumed after the page reloaded.":"Votre session a repris après le rechargement de la page.",
 "The bot is already running in another tab or window. Stop it there first.":"Le bot tourne déjà dans un autre onglet ou une autre fenêtre. Arrêtez-le d’abord là-bas.",
 "Waiting for Deriv to pay out the last trade…":"En attente du paiement de la dernière opération par Deriv…",
-"Save settings":"Enregistrer les réglages",
+"Save settings":"Garder les réglages",
 "Stop loss reached":"Stop loss atteint",
 "The bot stopped at your limit.":"Le bot s’est arrêté à votre limite.",
 "Top up to keep trading":"Rechargez pour continuer à trader",
@@ -495,5 +493,7 @@
 "Top up or reset your demo balance on Deriv.":"Rechargez ou réinitialisez votre solde démo sur Deriv.",
 "Deposit on Deriv":"Déposer sur Deriv",
 "Go to Deriv":"Aller sur Deriv",
-"Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.":"Déjà déposé mais vous ne le voyez pas ici ? Sur Deriv, touchez Transférer et envoyez l’argent vers Options."
+"Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.":"Déjà déposé mais vous ne le voyez pas ici ? Sur Deriv, touchez Transférer et envoyez l’argent vers Options.",
+"This Deriv login has no real account yet. Open one on Deriv, then come back here.":"Cette connexion Deriv n’a pas encore de compte réel. Ouvrez-en un sur Deriv, puis revenez ici.",
+"Smallest stake: {min}":"Mise min. : {min}"
 }
