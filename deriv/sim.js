@@ -28,10 +28,13 @@
  *
  * ── It says what it is ──────────────────────────────────────────────────────
  *
- * The accounts are labelled — SIM on the chip, "Simulation account" in the
- * list, ids that start SIM — and the tab title starts with Simulation.
- * Practice and testing need the real page's behaviour, not a page that passes
- * for real money.
+ * A badge reading "Simulation · not real money" sits in the header (at the
+ * top of the page on a phone), the chip says SIM, and the tab title starts
+ * with Simulation. Behind those, the account list reads like the real page's
+ * — Real account, Demo account, with the user's own account numbers (read
+ * with the real session) — and the demo holds the actual demo balance; the
+ * real one's balance is the card's. Practice and testing need the real
+ * page's behaviour, not a page that passes for real money.
  *
  * ── How an outcome is arranged ──────────────────────────────────────────────
  *
@@ -97,7 +100,8 @@
     d.gap = range(d.gap, 1, 100, [3, 10]);
     d.per10 = range(d.per10, 0, 10, [1, 3]);
     // Made once per device and kept; they say what they are.
-    if (!d.ids || !/^SIM/.test(d.ids.real)) d.ids = { real: "SIM" + digits(8), demo: "SIMD" + digits(7) };
+    // Made once per device until the real session gives the accounts' own numbers (see adoptIds).
+    if (!d.ids || !d.ids.real || !d.ids.demo) d.ids = { real: "SIM" + digits(8), demo: "SIMD" + digits(7) };
     return d;
   }
   function save(c) { try { localStorage.setItem(SETUP, JSON.stringify(c)); } catch (e) {} }
@@ -334,11 +338,13 @@
 
   /* ── the accounts ──────────────────────────────────────────────────── */
 
-  /* The second account trades the user's actual Deriv demo balance (fetched
-     below, with the real session) and is named like the first: Sim. */
+  /* The chip says SIM for both; the list gives the real page's own names (no title:
+     "Real account", "Demo account", in the visitor's language) and, once the real session
+     has answered, the accounts' own numbers (below). The demo trades the actual demo
+     balance; the real one the card's balance. */
   var accounts = {
-    real: { id: cfg.ids.real, type: "real", label: "Sim", title: "Simulation account", balance: round2(Number(cfg.real) || 0) },
-    demo: { id: cfg.ids.demo, type: "demo", label: "Sim", title: "Simulation account", balance: round2(Number(cfg.demo) || 0) },
+    real: { id: cfg.ids.real, type: "real", label: "Sim", title: "", balance: round2(Number(cfg.real) || 0) },
+    demo: { id: cfg.ids.demo, type: "demo", label: "Sim", title: "", balance: round2(Number(cfg.demo) || 0) },
   };
   function byId(id) { return accounts.real.id === id ? accounts.real : accounts.demo.id === id ? accounts.demo : null; }
   var ACCOUNT_NO = 60000000 + Math.floor(Math.random() * 9000000);
@@ -747,20 +753,38 @@
      Not while a run is still going on that account: a reload mid-run must not
      move the money under the bot. Not connected, or Deriv not answering: the
      last actual balance stays. */
-  function demoBusy() {
-    try {
-      var r = JSON.parse(sessionStorage.getItem("shalo_bot_run") || "null");   // the bot's own key, renamed into sim.*
-      return !!(r && r.account === accounts.demo.id);
-    } catch (e) { return false; }
+  function savedRun() {
+    try { return JSON.parse(sessionStorage.getItem("shalo_bot_run") || "null"); }   // the bot's own key, renamed into sim.*
+    catch (e) { return null; }
+  }
+  function demoBusy() { var r = savedRun(); return !!(r && r.account === accounts.demo.id); }
+  /** The accounts' own numbers. Not while a run is going (it trades under the numbers it
+   *  started with); the trades this tab has on record move to the new numbers with them. */
+  function adoptIds(realId, demoId) {
+    var was = { real: accounts.real.id, demo: accounts.demo.id };
+    if (realId) accounts.real.id = String(realId);
+    if (demoId) accounts.demo.id = String(demoId);
+    if (was.real === accounts.real.id && was.demo === accounts.demo.id) return;
+    ledger.forEach(function (x) {
+      if (x.account === was.real) x.account = accounts.real.id;
+      else if (x.account === was.demo) x.account = accounts.demo.id;
+    });
+    keepLedger();
+    var c = setup();
+    c.ids = { real: accounts.real.id, demo: accounts.demo.id };
+    save(c);
   }
   var demoReady = (function () {
-    if (!realFetch || demoBusy()) return Promise.resolve();
+    if (!realFetch) return Promise.resolve();
     var read = realFetch("/api/deriv/session", { credentials: "same-origin", cache: "no-store" })
       .then(function (res) { return res.ok ? res.json() : null; })
       .then(function (s) {
         var list = (s && s.connected && s.accounts) || [];
-        var demo = list.filter(function (a) { return a.type === "demo" && a.status === "active"; })[0] ||
-          list.filter(function (a) { return a.type === "demo"; })[0];
+        var pick = function (type) {
+          return list.filter(function (a) { return a.type === type && a.status === "active"; })[0] || list.filter(function (a) { return a.type === type; })[0];
+        };
+        var real = pick("real"), demo = pick("demo");
+        if (!savedRun()) adoptIds(real && real.id, demo && demo.id);   // numbers only: the real balance stays the card's
         var b = demo ? Number(demo.balance) : NaN;
         if (!isFinite(b) || b < 0 || demoBusy()) return;
         accounts.demo.balance = round2(b);
@@ -909,6 +933,19 @@
       dot.addEventListener("click", function (e) { e.stopPropagation(); });
       if (global.ShaloTaps) global.ShaloTaps(dot, 3, openCard);   // counted in door.js, iPhones included
     }
+
+    /* The badge: what the page is — in the header beside the name where there
+       is room, at the top of the page on a phone. */
+    function badge(cls) {
+      var el = document.createElement("span");
+      el.className = "sim-badge " + cls;
+      el.setAttribute("data-i18n-skip", "");
+      el.innerHTML = '<i aria-hidden="true"></i><b>Simulation</b><span>not real money</span>';
+      return el;
+    }
+    var brand = document.querySelector(".tnav .brand"), main = document.getElementById("tmain");
+    if (brand) brand.parentNode.insertBefore(badge("sim-badge--nav"), brand.nextSibling);
+    if (main) main.insertBefore(badge("sim-badge--top"), main.firstChild);
 
     function title() { if (document.title.indexOf("Simulation · ") !== 0) document.title = "Simulation · " + document.title; }
     title();
