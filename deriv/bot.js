@@ -574,24 +574,37 @@
     return raw && isFinite(v) ? v : NaN;
   }
   function readSettings() {
-    var t = TYPES[state.type];
+    var t = TYPES[state.type], variant = t.variants ? $("botVar").value : t.defVariant;
     return {
-      type: state.type, variant: t.variants ? $("botVar").value : t.defVariant,
-      stake: round2(num("botStake")), tp: round2(num("botTp")), sl: round2(num("botSl")), mult: Math.round(num("botMult") * 100) / 100,
+      type: state.type, variant: variant,
+      stake: round2(num("botStake")), tp: round2(num("botTp")), sl: round2(num("botSl")),
+      mult: dynamicMult(state.type, variant) ? multFor(state.type, variant) : Math.round(num("botMult") * 100) / 100,
     };
   }
   function formSpec() { var s = readSettings(); return makeSpec(s.type, s.variant); }
 
   /** The form's Martingale and prediction into this type's memory (the figures are kept as they are typed). */
   function saveForm() {
-    var s = readSettings(), ts = typeState(s.type);
-    if (s.mult >= 1) ts.mult[formVariant || s.variant] = s.mult;
+    var s = readSettings(), ts = typeState(s.type), v = formVariant || s.variant;
+    if (s.mult >= 1 && !dynamicMult(s.type, v)) ts.mult[v] = s.mult;
     ts.variant = s.variant;
     persist();
   }
   function multFor(type, variant) {
     var v = typeState(type).mult[variant];
     return v >= 1 ? v : TYPES[type].defMult(variant);
+  }
+  /* Differs and Over/Under 0–3: when the balance cannot pay the Martingale's stake a
+     recovery takes over (see recovery), so their Martingale is dynamic and the field says
+     so instead of a figure. The figure (multFor: the tested default, or one saved before)
+     still steps the stake after each loss, exactly as before; the field just cannot be
+     typed into for these. */
+  function dynamicMult(type, variant) { return recovers(makeSpec(type, variant)); }
+  function paintMult(type, variant) {
+    var dyn = dynamicMult(type, variant), f = $("botMult");
+    f.readOnly = dyn;
+    if (f.parentNode && f.parentNode.classList) f.parentNode.classList.toggle("is-dynamic", dyn);
+    f.value = dyn ? T("Dynamic") : String(multFor(type, variant));
   }
   /** Each figure: the user's own for this type, or the balance's default. */
   function paintFigures() {
@@ -614,7 +627,7 @@
     paintFigures();
     paintVariants();
     formVariant = t.variants ? $("botVar").value : t.defVariant;
-    $("botMult").value = String(multFor(type, formVariant));
+    paintMult(type, formVariant);
   }
   function paintVariants() {
     var t = TYPES[state.type], ts = typeState(state.type);
@@ -650,10 +663,10 @@
   function onVariant() {
     var s = readSettings(), ts = typeState(s.type);
     var m = num("botMult");
-    if (formVariant && m >= 1) ts.mult[formVariant] = Math.round(m * 100) / 100;
+    if (formVariant && m >= 1 && !dynamicMult(s.type, formVariant)) ts.mult[formVariant] = Math.round(m * 100) / 100;
     formVariant = s.variant;
     ts.variant = s.variant;
-    $("botMult").value = String(multFor(s.type, s.variant));
+    paintMult(s.type, s.variant);
     persist();
   }
 
@@ -773,7 +786,7 @@
       pending = { account: c.id, settings: s, spec: spec, pick: null };
       showPick(choose(spec) || pick);
       $("bmStake").textContent = money(s.stake, hub.currency);
-      $("bmMult").textContent = "×" + s.mult;
+      $("bmMult").textContent = dynamicMult(s.type, s.variant) ? T("Dynamic") : "×" + s.mult;
       $("bmTp").textContent = money(s.tp, hub.currency);
       $("bmSl").textContent = money(s.sl, hub.currency);
       openModal("bmDone");
@@ -1489,7 +1502,7 @@
   $("bmRoot").addEventListener("click", function (e) { if (e.target.closest("[data-bm-close]")) closeModal(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("bmRoot").hidden) closeModal(); });
   global.addEventListener("shalo:account", onAccount);
-  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); paintType(); paintVariants(); });
+  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); paintType(); paintVariants(); if (dynamicMult(state.type, formVariant)) paintMult(state.type, formVariant); });   // the word, in the new language; a typed figure stays
   global.addEventListener("beforeunload", function (e) { if (run && run.active) { e.preventDefault(); e.returnValue = ""; } });
 
   // The column heads line up with the rows whatever the scrollbar takes.

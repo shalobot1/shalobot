@@ -493,5 +493,6 @@
 "Go to Deriv":"Ir para a Deriv",
 "Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.":"Já depositou e não aparece aqui? Na Deriv, toque em Transferir e mova o dinheiro para Opções.",
 "Smallest stake: {min}":"Valor mínimo: {min}",
-"Recovering with {side}":"Recuperando com {side}"
+"Recovering with {side}":"Recuperando com {side}",
+"Dynamic":"Dinâmica"
 }
