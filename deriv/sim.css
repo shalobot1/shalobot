@@ -81,7 +81,13 @@
 @media (max-width: 1099px) { .sim-badge--nav span { display: none; } }
 @media (max-width: 759px) {
   .sim-badge--nav { display: none; }
-  .sim-badge--top { display: inline-flex; align-self: center; margin: 0 0 12px; font-size: 11px; }
+  /* Pinned under the fixed header while the page scrolls: the chip says REAL or DEMO
+     as on the real page, so this is what keeps the page saying what it is. */
+  .sim-badge--top {
+    display: inline-flex; align-self: center; margin: 0 0 12px; font-size: 11px;
+    position: sticky; top: calc(var(--sim-nav-h, 60px) + 6px); z-index: 40;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
 }
 /* Too narrow for the words: the badge says SIMULATION, the chip SIM. */
 @media (max-width: 359px) { .sim-badge--top span { display: none; } }

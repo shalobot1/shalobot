@@ -28,13 +28,14 @@
  *
  * ── It says what it is ──────────────────────────────────────────────────────
  *
- * A badge reading "Simulation · not real money" sits in the header (at the
- * top of the page on a phone), the chip says SIM, and the tab title starts
- * with Simulation. Behind those, the account list reads like the real page's
- * — Real account, Demo account, with the user's own account numbers (read
- * with the real session) — and the demo holds the actual demo balance; the
- * real one's balance is the card's. Practice and testing need the real
- * page's behaviour, not a page that passes for real money.
+ * A badge reading "Simulation · not real money" is always on screen: in the
+ * header, and on a phone pinned under it while the page scrolls. That badge
+ * (and the setup card) are where the simulation says so; everything else
+ * reads exactly like the real page — REAL / DEMO on the chip, Real account
+ * and Demo account in the list with the user's own account numbers (read with
+ * the real session), the demo holding the actual demo balance and the real
+ * one the card's. Practice and testing need the real page's behaviour, not a
+ * page that passes for real money: the badge is what keeps it from that.
  *
  * ── How an outcome is arranged ──────────────────────────────────────────────
  *
@@ -338,13 +339,13 @@
 
   /* ── the accounts ──────────────────────────────────────────────────── */
 
-  /* The chip says SIM for both; the list gives the real page's own names (no title:
-     "Real account", "Demo account", in the visitor's language) and, once the real session
-     has answered, the accounts' own numbers (below). The demo trades the actual demo
-     balance; the real one the card's balance. */
+  /* No label or title of their own: the chip and the list give the real page's words
+     (REAL / DEMO, Real account / Demo account, in the visitor's language) and, once the
+     real session has answered, the accounts' own numbers (below). The demo trades the
+     actual demo balance; the real one the card's balance. The badge says what it is. */
   var accounts = {
-    real: { id: cfg.ids.real, type: "real", label: "Sim", title: "", balance: round2(Number(cfg.real) || 0) },
-    demo: { id: cfg.ids.demo, type: "demo", label: "Sim", title: "", balance: round2(Number(cfg.demo) || 0) },
+    real: { id: cfg.ids.real, type: "real", label: "", title: "", balance: round2(Number(cfg.real) || 0) },
+    demo: { id: cfg.ids.demo, type: "demo", label: "", title: "", balance: round2(Number(cfg.demo) || 0) },
   };
   function byId(id) { return accounts.real.id === id ? accounts.real : accounts.demo.id === id ? accounts.demo : null; }
   var ACCOUNT_NO = 60000000 + Math.floor(Math.random() * 9000000);
@@ -935,7 +936,7 @@
     }
 
     /* The badge: what the page is — in the header beside the name where there
-       is room, at the top of the page on a phone. */
+       is room, on a phone pinned under the header (sim.css), always in sight. */
     function badge(cls) {
       var el = document.createElement("span");
       el.className = "sim-badge " + cls;
@@ -946,10 +947,12 @@
     var brand = document.querySelector(".tnav .brand"), main = document.getElementById("tmain");
     if (brand) brand.parentNode.insertBefore(badge("sim-badge--nav"), brand.nextSibling);
     if (main) main.insertBefore(badge("sim-badge--top"), main.firstChild);
+    // How far down the phone badge pins: just under the fixed header, whatever its height.
+    var nav = document.querySelector(".tnav");
+    function navHeight() { if (nav) document.documentElement.style.setProperty("--sim-nav-h", nav.offsetHeight + "px"); }
+    navHeight();
+    global.addEventListener("resize", navHeight);
 
-    function title() { if (document.title.indexOf("Simulation · ") !== 0) document.title = "Simulation · " + document.title; }
-    title();
-    global.addEventListener("langchange", function () { setTimeout(title, 0); });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", card);
   else card();
