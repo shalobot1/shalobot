@@ -815,6 +815,18 @@
 
   var run = null;
 
+  /** A resumed run's own settings on the form: its type, its prediction and the figures
+   *  it trades with (the reload painted the defaults), kept as this type's own for after it. */
+  function showRun(sv) {
+    var t = TYPES[sv.type], ts = typeState(sv.type), s = sv.settings || {}, v = makeSpec(sv.type, sv.variant).variant;
+    state.type = sv.type;
+    if (t.variants) ts.variant = v;
+    ["stake", "tp", "sl"].forEach(function (k) { if (s[k] > 0) { ts[k] = s[k]; ts.own[k] = 1; } });
+    if (s.mult >= 1 && !dynamicMult(sv.type, v)) ts.mult[v] = s.mult;
+    $("botVar").value = "";
+    loadForm();
+    paintType();
+  }
   function newRun(account, s, spec) {
     return {
       account: account, active: true, stopping: false, ended: null, spec: spec,
@@ -905,6 +917,7 @@
     r.startedAt = sv.startedAt; r.currency = sv.currency || r.currency; r.resumed = true;
     sv.ids.forEach(function (id) { r.ids[id] = 1; });
     run = r;
+    showRun(sv);
     $("botLog").innerHTML = "";
     sv.log.slice().reverse().forEach(function (x) {
       var row = Object.assign({}, x);
