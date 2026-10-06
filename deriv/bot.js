@@ -833,7 +833,26 @@
       stake0: s.stake, stake: s.stake, tp: s.tp, sl: s.sl, mult: s.mult,
       pl: 0, n: 0, won: 0, lost: 0, streak: 0, errors: 0, unpaid: 0, bookedAt: 0,
       log: [], ids: {}, currency: hub.currency, startedAt: Math.floor(Date.now() / 1000) - 1,
+      bought: {}, pending: null,
     };
+  }
+
+  /** Is this contract one of this run's? Its id came back from a buy this run made, or it
+   *  is the one buy whose answer the line lost: the same contract, market and stake, bought
+   *  after it was sent (claimed once). The account may be trading elsewhere at the same time
+   *  — another device, another bot, Deriv's own site — and none of that is this run's.
+   *  A run saved before the run kept its buys (bought: null) takes what it finds, as then. */
+  function ours(r, x) {
+    if (!r.bought) return true;
+    var id = String(x.contract_id);
+    if (r.bought[id]) return true;
+    var p = r.pending;
+    if (p && Number(x.purchase_time) >= p.at && kindOf(x) === p.type && symOf(x) === p.sym && Math.abs(Number(x.buy_price) - p.stake) < 0.005) {
+      r.bought[id] = 1;
+      r.pending = null;
+      return true;
+    }
+    return false;
   }
 
   /* ── a run that survives the page ──────────────────────────────────── */
@@ -861,6 +880,7 @@
       settings: { stake: r.stake0, tp: r.tp, sl: r.sl, mult: r.mult }, stake: r.stake,
       pl: r.pl, n: r.n, won: r.won, lost: r.lost, streak: r.streak, startedAt: r.startedAt, currency: r.currency,
       ids: Object.keys(r.ids), savedAt: Date.now(),
+      bought: r.bought ? Object.keys(r.bought).filter(function (id) { return !r.ids[id]; }) : null, pending: r.pending || null,
       log: r.log.slice(0, 300).map(function (x) { return { id: x.id, at: x.at, market: x.market, label: x.label, tone: x.tone, share: x.share, stake: x.stake, pl: x.pl, won: x.won, total: x.total }; }),
     });
   }
@@ -916,6 +936,9 @@
     r.stake = sv.stake; r.pl = sv.pl; r.n = sv.n; r.won = sv.won; r.lost = sv.lost; r.streak = sv.streak;
     r.startedAt = sv.startedAt; r.currency = sv.currency || r.currency; r.resumed = true;
     sv.ids.forEach(function (id) { r.ids[id] = 1; });
+    r.bought = null;
+    if (Array.isArray(sv.bought)) { r.bought = {}; sv.bought.forEach(function (id) { r.bought[String(id)] = 1; }); }
+    r.pending = sv.pending || null;
     run = r;
     showRun(sv);
     $("botLog").innerHTML = "";
@@ -935,7 +958,7 @@
         var cts = runContracts(spec);
         var pt = await D.askOn(r.account, { profit_table: 1, limit: 100, sort: "DESC", description: 1, contract_type: cts, date_from: String(r.startedAt) }, 10000);
         ((pt.profit_table && pt.profit_table.transactions) || []).filter(function (x) {
-          return x.contract_id && Number(x.purchase_time) >= r.startedAt && !r.ids[x.contract_id] && cts.indexOf(kindOf(x)) >= 0;
+          return x.contract_id && Number(x.purchase_time) >= r.startedAt && !r.ids[x.contract_id] && cts.indexOf(kindOf(x)) >= 0 && ours(r, x);
         }).reverse().forEach(function (x) {
           var sym = symOf(x), m = hub.markets[sym], own = sideOf(spec, kindOf(x), barrierOf(x)), sd = own || runSide(spec, kindOf(x), barrierOf(x));
           var pl = round2(Number(x.sell_price) - Number(x.buy_price));
@@ -946,7 +969,7 @@
         });
         var pf = await D.askOn(r.account, { portfolio: 1 }, 10000);
         var open = ((pf.portfolio && pf.portfolio.contracts) || []).some(function (x) {
-          return Number(x.purchase_time) >= r.startedAt && cts.indexOf(kindOf(x)) >= 0 && !r.ids[x.contract_id];
+          return Number(x.purchase_time) >= r.startedAt && cts.indexOf(kindOf(x)) >= 0 && !r.ids[x.contract_id] && ours(r, x);
         });
         if (!open) break;
       } catch (e) { /* the line is coming back */ }
@@ -1205,7 +1228,7 @@
         await D.whenOpenOn(r.account, 6000);
         var pt = await D.askOn(r.account, { profit_table: 1, limit: 100, sort: "DESC", description: 1, contract_type: cts, date_from: String(r.startedAt) }, 10000);
         var rows = ((pt.profit_table && pt.profit_table.transactions) || []).filter(function (x) {
-          return x.contract_id && Number(x.purchase_time) >= r.startedAt && Number(x.purchase_time) <= r.ended.at && mine(x) && !r.ids[x.contract_id];
+          return x.contract_id && Number(x.purchase_time) >= r.startedAt && Number(x.purchase_time) <= r.ended.at && mine(x) && !r.ids[x.contract_id] && ours(r, x);
         });
         rows.reverse().forEach(function (x) {
           var sym = symOf(x), m = hub.markets[sym];
@@ -1216,7 +1239,7 @@
         });
         var pf = await D.askOn(r.account, { portfolio: 1 }, 10000);
         var open = ((pf.portfolio && pf.portfolio.contracts) || []).some(function (x) {
-          return Number(x.purchase_time) >= r.startedAt && mine(x) && !r.ids[x.contract_id];
+          return Number(x.purchase_time) >= r.startedAt && mine(x) && !r.ids[x.contract_id] && ours(r, x);
         });
         if (!open) break;
       } catch (e) { /* the line is coming back */ }
@@ -1293,7 +1316,7 @@
         paintRun(T("Checking the trade with Deriv…"));
         var match = function (x) {
           return (bought && Number(x.contract_id) === Number(bought.contract_id)) ||
-            (!bought && Number(x.purchase_time) >= started && kindOf(x) === type && symOf(x) === pick.m.sym);
+            (!bought && Number(x.purchase_time) >= started && kindOf(x) === type && symOf(x) === pick.m.sym && Math.abs(Number(x.buy_price) - stake) < 0.005);
         };
         // Ten answers from Deriv, however long the line takes to come back
         // (up to 10 minutes of outage); nothing is bought while it checks.
@@ -1303,11 +1326,11 @@
             await D.whenOpenOn(r.account, 6000);
             var pt = await D.askOn(r.account, { profit_table: 1, limit: 10, sort: "DESC", description: 1, contract_type: [type] }, 10000);
             var hit = ((pt.profit_table && pt.profit_table.transactions) || []).filter(match)[0];
-            if (hit) return settle(result({ buy_price: hit.buy_price, sell_price: hit.sell_price }, hit.contract_id), true);
+            if (hit) { own(hit.contract_id); return settle(result({ buy_price: hit.buy_price, sell_price: hit.sell_price }, hit.contract_id), true); }
             var pf = await D.askOn(r.account, { portfolio: 1 }, 10000);
             answers++;
             var open = ((pf.portfolio && pf.portfolio.contracts) || []).some(match);
-            if (!open && !bought && answers >= 2) return fail(new Error(T("The trade was not placed. Nothing was spent.")));
+            if (!open && !bought && answers >= 2) { r.pending = null; return fail(new Error(T("The trade was not placed. Nothing was spent."))); }
           } catch (x) { if (D.revive) D.revive(); }
           await sleep(2500);
         }
@@ -1319,8 +1342,17 @@
         }
       }
 
+      /** This run bought `id`: kept with the run (a reload keeps it too). */
+      function own(id) {
+        if (r.bought && id != null) r.bought[String(id)] = 1;
+        r.pending = null;
+        saveRun(r);
+      }
       var params = { contract_type: type, underlying_symbol: pick.m.sym, duration: 1, duration_unit: "t", basis: "stake", amount: stake, currency: r.currency };
       if (sd.barrier != null) params.barrier = String(sd.barrier);
+      // Sent but not yet answered: if the line goes now, the contract found for it is this run's.
+      r.pending = { at: started, type: type, sym: pick.m.sym, stake: stake };
+      saveRun(r);
       handle = D.streamOn(r.account, { buy: 1, price: stake, subscribe: 1, parameters: params }, function (m) {
         if (closed) return;
         var c = m.msg_type === "proposal_open_contract" && m.proposal_open_contract;
@@ -1333,6 +1365,7 @@
         if (m.closed) return lost();
         if (m.error) {
           if (bought) return lost();
+          r.pending = null;                // refused: nothing was bought
           var e = new Error(T(m.error.message || "Deriv refused the trade."));
           e.code = m.error.code || "";
           e.fatal = /InsufficientBalance|ContractBuyValidationError|InvalidContract|AuthorizationRequired|PermissionDenied/.test(e.code);
@@ -1340,6 +1373,7 @@
         }
         if (m.msg_type === "buy" && m.buy) {
           bought = m.buy;
+          own(m.buy.contract_id);
           if (m.subscription) subId = m.subscription.id;
         } else if (c) {
           if (m.subscription && !subId) subId = m.subscription.id;
@@ -1348,6 +1382,7 @@
         }
       });
       if (!handle) {
+        r.pending = null;
         clearTimeout(guard); settled = closed = true; finalResolve(null);
         var w = new Error(T("Not connected to Deriv yet. Try again in a moment."));
         w.wait = true;
