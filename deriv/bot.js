@@ -795,16 +795,28 @@
     watchHistory(acc, gen).then(function () {
       if (gen !== hub.gen) return;
       if (!watch.started()) watch.start();
-      else rewindCold();
+      else rewindCold(true);
       watchPrices();
       paintWatch();
     });
   }
-  /** Another account (or a balance that could not pay the stake before): lanes with too few
-   *  paper trades to read replay the ticks the watch holds, with the figures as they are now,
-   *  instead of waiting minutes for live ones. A lane that reads already is left alone. */
-  function rewindCold() {
-    watch.keys().forEach(function (k) { var st = watch.state(k); if (st && st.n < 12) watch.rewind(k); });
+  /** Lanes with too few paper trades to read replay the ticks the watch holds, with the figures
+   *  as they are now, instead of waiting minutes for live ones: when another account comes up
+   *  (always), and when the balance on this one moves (only once it pays the lane's starting
+   *  stake — a deposit, a demo top-up). A lane that reads, one replaying right now (its state
+   *  has no sessions then), and one already replayed with a balance that paid are left alone,
+   *  so balance updates never set off replay after replay. */
+  var coldAt = {};   // lane key → the balance its last such replay ran with
+  function rewindCold(always) {
+    if (!watch || !watch.started()) return;
+    laneSpecs().forEach(function (sp) {
+      var st = watch.state(sp.key);
+      if (!st || !st.sessions || st.n >= 12) return;
+      var f = figuresFor(sp), pays = f.balance >= f.stake;
+      if (!always && (!pays || coldAt[sp.key] >= f.stake)) return;
+      coldAt[sp.key] = f.balance;
+      watch.rewind(sp.key);
+    });
   }
   async function watchHistory(acc, gen) {
     var syms = hub.order.slice();
@@ -1781,6 +1793,8 @@
     // A different chip while idle: the next scan starts on that account.
     if (on && !(run && run.active) && hub.account && hub.account !== c.id) hubStop();
     if (on) idleHub();
+    // The same account, idle, its balance moved: a lane the old balance kept cold may read now.
+    if (on && !(run && run.active) && hub.ready && hub.account === c.id) rewindCold(false);
     if (on && !hub.account) {
       var acc = D.accountOf(c.id);
       if (acc && acc.currency && acc.currency !== hub.currency) { hub.currency = acc.currency; paintMin(); }
