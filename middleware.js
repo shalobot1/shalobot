@@ -16,7 +16,9 @@
  * Nothing here reads, renews or changes the connection itself.
  */
 
-export const config = { matcher: ["/dashboard", "/dashboard.html"] };
+/* The edge runtime: Web Crypto and atob are built in, and it is not one of the Hobby plan's
+   12 serverless functions (as a Node function this would be the 13th and the deploy refused). */
+export const config = { runtime: "edge", matcher: ["/dashboard", "/dashboard.html"] };
 
 const COOKIE = "__Host-shalo_deriv";
 let keyOnce = null;
