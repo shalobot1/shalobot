@@ -300,6 +300,25 @@
 .bot-empty p { margin: 8px 0 0; font-size: 15px; font-weight: 700; color: var(--ink); }
 .bot-empty span { max-width: 280px; font-size: 13px; line-height: 1.5; }
 
+/* Deriv's cashier at the trades' foot, as small buttons on the card's own surfaces;
+   on phones and tablets the MT5 button too (it leaves the header there, below). */
+.bot-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.bot-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 4px 12px;
+  border: 1px solid var(--line-hi); border-radius: 9px; background: var(--surface); color: var(--ink);
+  font-size: 12px; font-weight: 700; line-height: 1.15; white-space: nowrap; text-decoration: none;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.bot-link:hover { background: var(--surface-2); }
+.bot-link:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.bot-link svg { flex: none; }
+.bot-link--dep { color: var(--real); border-color: color-mix(in srgb, var(--real) 45%, transparent); }
+.bot-link--mt5 img { display: block; height: 13px; width: auto; }
+.bot-link--mt5 .lt { display: none; }
+:root[data-theme="light"] .bot-link--mt5 .dk { display: none; }
+:root[data-theme="light"] .bot-link--mt5 .lt { display: block; }
+.bot-link--mt5 { display: none; }   /* wide screens: it is in the header */
+
 /* ── short wide screens: everything a little tighter so it still fits ── */
 
 @media (min-width: 1001px) and (max-height: 860px) {
@@ -355,6 +374,15 @@
 @media (max-width: 1000px) {
   .bot-grid { grid-template-columns: minmax(0, 1fr); }
   .bot-log-wrap { height: min(62vh, 560px); min-height: 280px; flex: none; }
+  /* Phones and tablets: the MT5 button at the trades' foot, not the header; the cards
+     closer together; the trades card a smaller share; room under it for the support button. */
+  .tnav .tmt5 { display: none; }
+  .bot-link--mt5 { display: inline-flex; }
+  .bot-links .bot-link { flex: 1 1 0; }
+  .bot { margin-top: 10px; }
+  .bot-grid, .bot-side, .bot-main { gap: 10px; }
+  .bot-log-wrap { height: min(48vh, 440px); min-height: 220px; }
+  .tmain:has(> .bot:not([hidden])) { padding-bottom: 84px; }
 }
 @media (max-width: 640px) {
   .bot { margin-top: 10px; }

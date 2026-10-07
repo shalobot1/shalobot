@@ -25,6 +25,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 <link rel="stylesheet" href="/styles.css" />
 <link rel="stylesheet" href="/deriv/trading.css" />
 <link rel="stylesheet" href="/deriv/bot.css" />
+<link rel="stylesheet" href="/support.css" />
 </head>
 <body class="tpage">
 
@@ -108,7 +109,8 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
             <button class="bot-type" type="button" role="tab" data-type="matchdiff">Matches / Differs<i class="bot-watch" aria-hidden="true"></i></button>
           </div>
           <h1 id="botTitle">Smart Scan bot</h1>
-          <p class="bot-lede" id="botLede">Finds the best Even/Odd market and side, then trades it one 1-tick contract at a time until your take profit or stop loss.</p>
+          <!-- No description on the card (space): bot.js still writes the line here, never shown. -->
+          <p class="bot-lede" id="botLede" hidden></p>
 
           <div class="bot-fields">
             <label class="bot-f bot-f--wide" id="botVarWrap" hidden><span id="botVarLabel">Prediction</span>
@@ -193,6 +195,13 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
               <span>Press Scan &amp; start. Every new run begins with a clean log.</span>
             </div>
           </div>
+          <!-- Deriv's cashier a tap away; on phones and tablets the MT5 side waits here too,
+               out of the header, so the bot starts higher up. -->
+          <nav class="bot-links" aria-label="Deriv">
+            <a class="bot-link bot-link--mt5" href="/dashboard" title="MetaTrader 5 EA"><img class="dk" src="/logos/metatrader5.svg" alt="MetaTrader 5" width="186" height="32" /><img class="lt" src="/logos/metatrader5-ink.svg" alt="MetaTrader 5" width="186" height="32" /></a>
+            <a class="bot-link bot-link--dep" href="https://home.deriv.com/dashboard/deposit?from=portfolio&amp;depositSheet=1&amp;currency=USD" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></svg><span>Deposit</span></a>
+            <a class="bot-link" href="https://home.deriv.com/dashboard/withdraw/verify?currency=USD&amp;from=portfolio&amp;openWithdraw=1" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/></svg><span>Withdraw</span></a>
+          </nav>
         </div>
       </div>
     </div>
@@ -318,5 +327,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 <script src="/deriv/trading.js"></script>
 <script src="/deriv/watch.js"></script>
 <script src="/deriv/bot.js"></script>
+<script>window.SHALO_SUPPORT_SOURCE = "Shalobot · Trading";</script>
+<script src="/support.js" defer></script>
 </body>
 </html>

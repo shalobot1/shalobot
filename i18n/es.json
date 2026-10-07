@@ -504,5 +504,7 @@
 "Paused — waiting for stable conditions…":"En pausa — esperando condiciones estables…",
 "Stable again — trading resumed.":"Estable de nuevo — operaciones reanudadas.",
 "Win rate":"Aciertos",
-"Running time":"Duración"
+"Running time":"Duración",
+"Deposit":"Depositar",
+"Withdraw":"Retirar"
 }
