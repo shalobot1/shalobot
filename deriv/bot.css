@@ -384,6 +384,15 @@
   .bot-log-wrap { height: min(48vh, 440px); min-height: 220px; }
   .tmain:has(> .bot:not([hidden])) { padding-bottom: 84px; }
 }
+/* A finger on the trades must still move the page. `overscroll-behavior: contain` kept every
+   swipe that started on the list inside it — with few trades, or the list at its end, the
+   swipe moved nothing, and the page could only be scrolled from above or below the card. On
+   phones, tablets and any touch screen the list now hands the swipe to the page at its ends
+   (and passes it straight on when it has nothing to scroll); with a mouse on a wide screen it
+   keeps it, as the one-screen layout wants. */
+@media (max-width: 1000px), (pointer: coarse) {
+  .bot-log-wrap { overscroll-behavior: auto; }
+}
 @media (max-width: 640px) {
   .bot { margin-top: 10px; }
   .bot-card { padding: 15px; border-radius: 16px; }
