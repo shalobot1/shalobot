@@ -46,6 +46,15 @@
  * cover the next trade ends the run with a popup pointing to Deriv to top up.
  * Each new run starts from nothing.
  *
+ * THE WATCH (deriv/watch.js). From the moment an account shows, every type is
+ * traded on paper — the same pick, the same next-tick entry, the user's own
+ * stake, Martingale, recovery, take profit and stop loss — and read, per type,
+ * against its own odds. The type tabs and the start popup show the reading as
+ * colour and a figure; nothing is bought for it. With SAFE on (the default), a
+ * run whose type turns red pauses — only ever after a winning trade, never in
+ * a losing streak — says so, and carries on by itself once its type is green
+ * again, to the take profit. Stop works at any moment, paused or not.
+ *
  * EVERY TRADE IS LOGGED. Each buy is one `buy` with its parameters and
  * subscribe, settled from the contract stream; a line that drops with a trade
  * in flight is reconciled from the profit table and the portfolio before the
@@ -74,6 +83,9 @@
   var PRICE_REF = 10;       // payouts are read at 10 or more: at 0.35 the cent rounding hides the gaps between markets
   var STATE_KEY = "shalo_bot_v2";
   var KEEP_KEY = "shalo_bot_keep";      // 1: "Save settings" is on
+  var SAFE_KEY = "shalo_bot_safe";      // 0: "Safe" is off (it is on unless turned off)
+  var PX_KEY = "shalo_bot_px", PX_TTL = 12 * 3600e3;   // payouts seen, per market and side
+  var WATCH_HIST = 1000;                // ticks per market replayed through the watch
   var DEPOSIT_URL = "https://home.deriv.com/dashboard/portfolio";
   var FALLBACK_MIN = 0.35;
   var LOG_ROWS = 2000;
@@ -293,6 +305,7 @@
       m.lastEpoch = msg.tick.epoch;
       m.times.push(msg.tick.epoch);
       if (m.times.length > 50) m.times.splice(0, m.times.length - 50);
+      if (watch) watch.feed(sym, msg.tick.epoch, q, m.dec, m.name);
       scheduleNow();
     });
     if (s) { hub.subs.push(s); hub.streams[sym] = s; }
@@ -378,6 +391,7 @@
       hub.ready = true;
       hub.starting = null;
       paintMin();
+      setTimeout(afterHub, 0);
     })().catch(function (e) {
       if (gen === hub.gen) { hub.starting = null; hub.account = null; }
       throw e;
@@ -451,8 +465,10 @@
       var m = hub.markets[j[0]];
       if (!r.error) m.ratio[key] = Number(r.proposal.payout) / amount;
       else if (r.error.code !== "RateLimit") m.ratio[key] = null;
+      remember(j[0], key, m.ratio[key]);
       if (onEach) onEach();
     }));
+    savePrices();
     hub.pricedAt = Date.now();
     hub.pricedStake = amount;
     hub.pricedSpec = spec.key;
@@ -469,10 +485,10 @@
     return n / digits.length;
   }
 
-  /** One market and side, read now. Null when its prices or ticks are stale. */
-  function candidate(m, sd) {
-    var ratio = m && m.ratio[sd.priceKey];
-    if (!ratio || m.digits.length < WINDOW || Date.now() - m.at > 20000) return null;
+  /** One market and side, read now (or at `now`, in ms). Null when its prices or ticks are stale. */
+  function candidate(m, sd, now) {
+    var ratio = m && m.ratio && m.ratio[sd.priceKey];
+    if (!ratio || m.digits.length < WINDOW || (now || Date.now()) - m.at > 20000) return null;
     var series = m[sd.series] || [];
     if (series.length < WINDOW) return null;
     var last = series.slice(-WINDOW);
@@ -488,11 +504,12 @@
     return a.speed < b.speed - 0.25;
   }
 
-  /** The one best trade right now for this type. */
-  function choose(spec) {
+  /** The one best trade right now for this type — on the hub's markets, or on `list`
+   *  (the watch's view of them) at the moment `now`. */
+  function choose(spec, list, now) {
     var all = [];
-    hub.order.forEach(function (sym) {
-      spec.sides.forEach(function (sd) { var c = candidate(hub.markets[sym], sd); if (c) all.push(c); });
+    (list || hub.order.map(function (sym) { return hub.markets[sym]; })).forEach(function (m) {
+      spec.sides.forEach(function (sd) { var c = candidate(m, sd, now); if (c) all.push(c); });
     });
     if (!all.length) return null;
     var top = Math.max.apply(null, all.map(function (c) { return c.value; }));
@@ -659,6 +676,7 @@
     paintType();
     persist();
     say("");
+    syncLanes();
   }
   function onVariant() {
     var s = readSettings(), ts = typeState(s.type);
@@ -668,6 +686,7 @@
     ts.variant = s.variant;
     paintMult(s.type, s.variant);
     persist();
+    syncLanes();
   }
 
   function validate(s) {
@@ -683,11 +702,249 @@
     Array.prototype.forEach.call(document.querySelectorAll("[data-bot-cur]"), function (e) { e.textContent = hub.currency; });
   }
 
+  /* ── the watch: every type on paper, all the time (deriv/watch.js) ───── */
+
+  var safe = store.get(SAFE_KEY) !== 0;
+  var pxCache = store.get(PX_KEY) || {};
+  function remember(sym, key, ratio) {
+    (pxCache[sym] || (pxCache[sym] = {}))[key] = [ratio == null ? 0 : ratio, Date.now()];
+  }
+  function savePrices() { store.set(PX_KEY, pxCache); }
+  /** Payouts seen before (in the last 12 hours), for the sides not priced yet. */
+  function applyPrices() {
+    hub.order.forEach(function (sym) {
+      var c = pxCache[sym], m = hub.markets[sym];
+      if (!c || !m) return;
+      Object.keys(c).forEach(function (k) {
+        if (m.ratio[k] === undefined && Date.now() - c[k][1] < PX_TTL) m.ratio[k] = c[k][0] > 0 ? c[k][0] : null;
+      });
+    });
+  }
+
+  /** The figures a lane trades with: the running run's own, else what the form holds for
+   *  that type (the user's own figure, or the balance's default). */
+  function figuresFor(spec) {
+    var c = D.current(), bal = balanceOf(c && c.id), min = hub.minStake || FALLBACK_MIN;
+    if (run && run.active && run.spec.key === spec.key) return { stake: run.stake0, mult: run.mult, tp: run.tp, sl: run.sl, balance: bal, min: min };
+    var ts = typeState(spec.type), d = defaultsFor(bal);
+    var own = function (k) { return ts.own[k] && ts[k] > 0 ? ts[k] : d[k]; };
+    var f = { stake: own("stake"), mult: multFor(spec.type, spec.variant), tp: own("tp"), sl: own("sl"), balance: bal, min: min };
+    if (spec.type === state.type) {
+      var s = readSettings();
+      if (s.variant === spec.variant) {
+        if (s.stake > 0) f.stake = s.stake;
+        if (s.tp > 0) f.tp = s.tp;
+        if (s.sl > 0) f.sl = s.sl;
+        if (s.mult >= 1) f.mult = s.mult;
+      }
+    }
+    return f;
+  }
+  /** The prediction each type's lane trades: the form's for the type on screen, else the type's own. */
+  function laneVariant(type) {
+    if (run && run.active && run.spec.type === type) return run.spec.variant;
+    if (type === state.type && TYPES[type].variants && $("botVar").value) return $("botVar").value;
+    return typeState(type).variant;
+  }
+  function laneSpecs() { return ENABLED.map(function (t) { return makeSpec(t, laneVariant(t)); }); }
+  function laneKey(type) { return makeSpec(type, laneVariant(type)).key; }
+
+  var watch = global.ShaloWatch ? global.ShaloWatch.create({
+    choose: function (spec, list, now) { return choose(spec, list, now); },
+    settings: figuresFor,
+    ratios: function (sym) { var m = hub.markets[sym]; return m ? m.ratio : null; },
+    recovers: recovers,
+    recoverRatio: function (n) {
+      for (var i = 0; i < hub.order.length; i++) { var m = hub.markets[hub.order[i]], r = m && m.ratio["DIGITOVER:" + n]; if (r > 1) return r; }
+      return null;
+    },
+  }) : null;
+
+  /** The lanes the watch keeps: each type as the form has it (and a run's, while it runs). */
+  function syncLanes() {
+    if (!watch) return;
+    var want = {};
+    laneSpecs().forEach(function (sp) { want[sp.key] = 1; watch.track(sp); });
+    watch.keys().forEach(function (k) { if (!want[k]) watch.untrack(k); });
+    pricing.again = true;
+    watchPrices();
+    paintWatch();
+  }
+
+  /** The hub on, while idle too: the watch reads the markets from the moment an account shows. */
+  var idleTimer = 0, idleTries = 0;
+  function idleHub() {
+    if (!watch) return;
+    clearTimeout(idleTimer);
+    var c = D.current();
+    if (!c || $("acct").hidden || (run && run.active) || hub.starting || (hub.ready && hub.account === c.id)) return;
+    if (!lineUp(c.id)) { idleTimer = setTimeout(idleHub, 3000); return; }
+    var s = readSettings();
+    hubStart(c.id, s.stake > 0 ? s.stake : FALLBACK_MIN, null, formSpec()).catch(function () {
+      idleTimer = setTimeout(idleHub, Math.min(60000, 3000 * Math.pow(2, idleTries++)));
+    });
+  }
+  /** A hub just came up (idle, a scan, a rebuild): prices seen before, the lanes, the recent
+   *  ticks of every market — then the watch replays them and follows the live ticks. */
+  function afterHub() {
+    if (!watch || !hub.ready) return;
+    idleTries = 0;
+    applyPrices();
+    syncLanes();
+    var acc = hub.account, gen = hub.gen;
+    watchHistory(acc, gen).then(function () {
+      if (gen !== hub.gen) return;
+      if (!watch.started()) watch.start();
+      watchPrices();
+      paintWatch();
+    });
+  }
+  async function watchHistory(acc, gen) {
+    var syms = hub.order.slice();
+    for (var i = 0; i < syms.length; i += 6) {
+      if (gen !== hub.gen) return;
+      await Promise.all(syms.slice(i, i + 6).map(async function (sym) {
+        try {
+          var h = await D.askOn(acc, { ticks_history: sym, end: "latest", count: WATCH_HIST, style: "ticks" }, 15000);
+          var m = hub.markets[sym];
+          if (!h.error && h.history && h.history.prices && h.history.prices.length) watch.load(sym, h.history.times, h.history.prices, Number(h.pip_size), m && m.name);
+        } catch (e) {}
+      }));
+    }
+  }
+  /** The payouts the lanes need and the hub has not seen: four at a time, never while a run
+   *  trades (its own prices come first); the recovery's Over 1–4 on one market. A lane that
+   *  waited for its prices is replayed once they are in. */
+  var pricing = { busy: false, again: false };
+  async function watchPrices() {
+    if (!watch || pricing.busy || !hub.ready || !hub.account || (run && run.active)) return;
+    pricing.busy = true; pricing.again = false;
+    var acc = hub.account, gen = hub.gen, amount = Math.max(hub.minStake || FALLBACK_MIN, PRICE_REF);
+    var ask = async function (sym, ct, barrier) {
+      var key = ct + (barrier != null ? ":" + barrier : ""), m = hub.markets[sym];
+      if (!m || m.ratio[key] !== undefined) return;
+      var req = { proposal: 1, amount: amount, basis: "stake", currency: hub.currency, underlying_symbol: sym, contract_type: ct, duration: 1, duration_unit: "t" };
+      if (barrier != null) req.barrier = String(barrier);
+      var r = await D.askOn(acc, req, 10000);
+      if (gen !== hub.gen) return;
+      if (!r.error) m.ratio[key] = Number(r.proposal.payout) / amount;
+      else if (r.error.code !== "RateLimit") m.ratio[key] = null;
+      if (m.ratio[key] !== undefined) remember(sym, key, m.ratio[key]);
+    };
+    try {
+      var specs = laneSpecs();
+      for (var s = 0; s < specs.length; s++) {
+        var spec = specs[s], jobs = [];
+        hub.order.forEach(function (sym) { spec.prices.forEach(function (pr) { jobs.push([sym, pr.ct, pr.barrier]); }); });
+        jobs = jobs.filter(function (j) { var m = hub.markets[j[0]]; return m && m.ratio[j[1] + (j[2] != null ? ":" + j[2] : "")] === undefined; });
+        for (var i = 0; i < jobs.length; i += 4) {
+          if (gen !== hub.gen || (run && run.active)) return;
+          await Promise.all(jobs.slice(i, i + 4).map(function (j) { return ask(j[0], j[1], j[2]).catch(function () {}); }));
+          await sleep(150);
+        }
+        if (jobs.length && watch.started()) { var st = watch.state(spec.key); if (st && st.n < 12) watch.rewind(spec.key); }
+      }
+      if (hub.order.length) for (var n = 1; n <= RECOVER_LAST; n++) {
+        if (gen !== hub.gen || (run && run.active)) return;
+        var have = hub.order.some(function (sym) { var m = hub.markets[sym]; return m && m.ratio["DIGITOVER:" + n] > 1; });
+        if (!have) await ask(hub.order[0], "DIGITOVER", n).catch(function () {});
+      }
+    } catch (e) {} finally {
+      pricing.busy = false;
+      savePrices();
+      if (pricing.again) setTimeout(watchPrices, 500);
+    }
+  }
+  setInterval(function () { if (!(run && run.active)) watchPrices(); }, 60000);
+
+  /* The reading, painted: each type's tab, the start popup and the pause popup carry
+     data-watch (green / yellow / red, or warm while it reads, off with no markets) and
+     --watch (0–1); the design lives in the page's CSS. No words, only colour and a figure. */
+  var watchTimer = 0, pendingKey = null;
+  function paintWatch() { if (!watchTimer) watchTimer = setTimeout(function () { watchTimer = 0; drawWatch(); }, 250); }
+  function gauge(el, st) {
+    var on = !!(watch && hub.ready), state = on && st ? st.state : "off";
+    el.setAttribute("data-watch", state);
+    el.style.setProperty("--watch", st && st.pct != null ? (st.pct / 100).toFixed(3) : String(st && st.warm ? st.warm : 0));
+    return state;
+  }
+  function meter(box, key) {
+    if (!box || !watch) return;
+    if (key) box.setAttribute("data-key", key); else key = box.getAttribute("data-key");
+    var st = key ? watch.state(key) : null;
+    gauge(box, st);
+    var pct = box.querySelector(".bm-watch-pct");
+    if (pct) pct.textContent = st && st.pct != null ? Math.round(st.pct) + "%" : "…";
+  }
+  function drawWatch() {
+    if (!watch) return;
+    Array.prototype.forEach.call(document.querySelectorAll(".bot-type"), function (b) {
+      var t = b.getAttribute("data-type");
+      if (!TYPES[t]) return;
+      var st = watch.state(laneKey(t)), mark = b.querySelector(".bot-watch");
+      if (!mark) { mark = document.createElement("i"); mark.className = "bot-watch"; mark.setAttribute("aria-hidden", "true"); b.appendChild(mark); }
+      gauge(b, st);
+      mark.title = st && st.pct != null ? Math.round(st.pct) + "%" : "";
+    });
+    if (modal.view === "bmDone") meter($("bmWatch"));
+    if (modal.view === "bmHold") meter($("bmHoldWatch"));
+  }
+  if (watch) watch.on(function () { paintWatch(); });
+  setInterval(function () { if (watch) drawWatch(); }, 3000);
+
+  /* ── Safe: a run pauses while its type reads red, and carries on when it is green ── */
+
+  /** True while the run waits (the loop goes round again). A pause starts only with no trade
+   *  in a losing streak — after a win, or before the first trade — so nothing is left to
+   *  win back; it ends when the type reads green again, or when Safe is turned off. */
+  async function holding(r) {
+    var st = watch && hub.ready ? watch.state(r.spec.key) : null;
+    if (!r.held) {
+      if (!safe || !st || st.state !== "red") return false;
+      var last = r.log[0];
+      if (last && !last.won) return false;
+      r.held = { at: Date.now(), start: !r.n };
+      saveRun(r);
+      showHold(r);
+    } else if (!safe || (st && st.state === "green")) {
+      r.held = null;
+      saveRun(r);
+      if (modal.view === "bmHold") closeModal();
+      paintRun(T("Stable again — trading resumed."));
+      return false;
+    }
+    paintRun();
+    if (Date.now() - (r.heldSaved || 0) > 30000) { r.heldSaved = Date.now(); saveRun(r); }   // a reload keeps the paused run
+    await sleep(600);
+    return true;
+  }
+  function showHold(r) {
+    var open = function () {
+      if (run !== r || !r.active || !r.held || !($("bmRoot").hidden || modal.view === "bmDone")) return;
+      var secs = Math.max(0, Math.floor(Date.now() / 1000 - r.startedAt));
+      $("bmHoldTitle").textContent = T("Unstable conditions detected");
+      $("bmHoldText").textContent = r.n
+        ? T("The bot paused after a winning trade, with your profit kept. It resumes by itself as soon as conditions are stable again, and carries on to your take profit.")
+        : T("The bot is waiting to place its first trade. It starts by itself as soon as conditions are stable again, and trades on to your take profit.");
+      $("bmHoldPl").textContent = signed(r.pl, r.currency);
+      // Up or down in the page's own colours (each page keeps its own classes on the figure).
+      $("bmHoldPl").classList.toggle("is-up", r.pl > 0);
+      $("bmHoldPl").classList.toggle("is-down", r.pl < 0);
+      $("bmHoldN").textContent = String(r.n);
+      $("bmHoldRate").textContent = r.n ? Math.round(100 * r.won / r.n) + "%" : "—";
+      $("bmHoldTime").textContent = [Math.floor(secs / 3600), Math.floor(secs / 60) % 60, secs % 60].map(function (v) { return (v < 10 ? "0" : "") + v; }).join(":");
+      openModal("bmHold");
+      meter($("bmHoldWatch"), r.spec.key);
+    };
+    // The start popup has the stage for a moment; the pause takes over as it steps aside.
+    if (modal.view === "bmDone") setTimeout(open, 2900); else open();
+  }
+
   /* ── the popup ─────────────────────────────────────────────────────── */
 
   var modal = { view: null, onClose: null, lastFocus: null, glide: false };
   function openModal(view) {
-    ["bmScan", "bmDone", "bmErr", "bmWin", "bmLoss", "bmFund"].forEach(function (id) { $(id).hidden = id !== view; });
+    ["bmScan", "bmDone", "bmErr", "bmWin", "bmLoss", "bmFund", "bmHold"].forEach(function (id) { if ($(id)) $(id).hidden = id !== view; });
     if ($("bmRoot").hidden) {
       modal.lastFocus = document.activeElement;
       $("bmRoot").hidden = false;
@@ -765,8 +1022,8 @@
       if (token !== scanToken) return;
       var err = validate(s);
       if (err) throw new Error(err);
-      if (!fresh) {
-        // Already live: price this type again at this stake and read the patterns now.
+      if (!fresh || hub.pricedSpec !== spec.key) {
+        // Already live (or started for another type): price this type at this stake and read the patterns now.
         setProgress(0.35, fill(spec.t.pricing(spec.variant), { n: hub.order.length }));
         var n = 0, total = hub.order.length * spec.prices.length;
         await price(c.id, s.stake, hub.gen, function () { if (token === scanToken) setProgress(0.35 + 0.45 * (++n / total)); }, spec);
@@ -785,6 +1042,7 @@
 
       pending = { account: c.id, settings: s, spec: spec, pick: null };
       showPick(choose(spec) || pick);
+      if (watch) { watch.track(spec); meter($("bmWatch"), spec.key); }
       $("bmStake").textContent = money(s.stake, hub.currency);
       $("bmMult").textContent = dynamicMult(s.type, s.variant) ? T("Dynamic") : "×" + s.mult;
       $("bmTp").textContent = money(s.tp, hub.currency);
@@ -876,7 +1134,7 @@
   function saveRun(r) {
     if (!r || !r.active) return;
     session.set({
-      v: 1, account: r.account, type: r.spec.type, variant: r.spec.variant, stopping: !!r.stopping,
+      v: 1, account: r.account, type: r.spec.type, variant: r.spec.variant, stopping: !!r.stopping, held: !!r.held,
       settings: { stake: r.stake0, tp: r.tp, sl: r.sl, mult: r.mult }, stake: r.stake,
       pl: r.pl, n: r.n, won: r.won, lost: r.lost, streak: r.streak, startedAt: r.startedAt, currency: r.currency,
       ids: Object.keys(r.ids), savedAt: Date.now(),
@@ -939,8 +1197,10 @@
     r.bought = null;
     if (Array.isArray(sv.bought)) { r.bought = {}; sv.bought.forEach(function (id) { r.bought[String(id)] = 1; }); }
     r.pending = sv.pending || null;
+    if (sv.held) r.held = { at: Date.now(), start: !r.n };
     run = r;
     showRun(sv);
+    syncLanes();
     $("botLog").innerHTML = "";
     sv.log.slice().reverse().forEach(function (x) {
       var row = Object.assign({}, x);
@@ -977,6 +1237,7 @@
     }
     saveRun(r);
     say(T("Your session was resumed after the page reloaded."), "info");
+    if (r.held) showHold(r);
     loop(r);
   }
 
@@ -991,6 +1252,7 @@
     run = newRun(c.id, s, spec);
     run.first = first;
     $("botLog").innerHTML = "";
+    syncLanes();
     holdRun(run);
     paintRun();
     paintButton();
@@ -1010,11 +1272,14 @@
     if (!r.active) return;
     r.active = false;
     r.ended = { reason: reason, detail: detail || "", at: Math.floor(Date.now() / 1000) + 1 };
+    r.held = null;
+    if (modal.view === "bmHold") closeModal();
     releaseRun();
     try { global.dispatchEvent(new CustomEvent("shalo:runend")); } catch (e) {}
     paintRun();
     paintButton();
     paintNow();
+    syncLanes();
     finalSync(r).then(function () {
       // A popup for how it ended — taking over from the start popup, never over a new scan.
       if (run !== r || !($("bmRoot").hidden || modal.view === "bmDone")) return;
@@ -1039,6 +1304,7 @@
       if (r.stopping) return end(r, "user");
       if (r.pl >= r.tp - 1e-9) return end(r, "tp");
       if (-r.pl >= r.sl - 1e-9) return end(r, "sl");
+      if ((r.held || safe) && await holding(r)) continue;
       var acc = D.accountOf(r.account), rec = null, live = hub.ready && hub.account === r.account;
       if (acc && acc.balance != null && r.stake > acc.balance + 1e-9) {
         if (await covered(r) || r.stopping) continue;
@@ -1468,6 +1734,7 @@
     var text, kind;
     if (!r) { text = T("Ready"); kind = "idle"; }
     else if (r.active && r.stopping) { text = T("Stopping after this trade…"); kind = "wait"; }
+    else if (r.active && r.held) { text = T("Paused — waiting for stable conditions…"); kind = "wait"; }
     else if (r.active) { text = note || (r.n ? T("Running") : T("Starting…")); kind = "run"; }
     else {
       text = T(REASONS[r.ended.reason] || "Stopped.");
@@ -1506,6 +1773,7 @@
     paintButton();
     // A different chip while idle: the next scan starts on that account.
     if (on && !(run && run.active) && hub.account && hub.account !== c.id) hubStop();
+    if (on) idleHub();
     if (on && !hub.account) {
       var acc = D.accountOf(c.id);
       if (acc && acc.currency && acc.currency !== hub.currency) { hub.currency = acc.currency; paintMin(); }
@@ -1536,6 +1804,14 @@
   Object.keys(FIGURES).forEach(function (id) { $(id).addEventListener("input", onFigure); });
   $("botKeep").checked = keep;
   $("botKeep").addEventListener("change", function () { setKeep($("botKeep").checked); });
+  if ($("botSafe")) {
+    $("botSafe").checked = safe;
+    $("botSafe").addEventListener("change", function () {
+      safe = $("botSafe").checked;
+      if (safe) store.del(SAFE_KEY); else store.set(SAFE_KEY, 0);
+    });
+  }
+  if ($("bmHoldStop")) $("bmHoldStop").addEventListener("click", function () { stop(); closeModal(); });
   $("botGo").addEventListener("click", function () {
     if (run && run.active) return stop();
     if (lockHolder()) return say(T("The bot is already running in another tab or window. Stop it there first."), "bad");
@@ -1568,5 +1844,6 @@
     run: function () { return run; }, hub: hub, types: TYPES, makeSpec: makeSpec,
     spec: formSpec, choose: function (spec) { return choose(spec || formSpec()); },
     candidate: candidate, state: function () { return state; },
+    watch: watch, laneKey: laneKey, safe: function () { return safe; },
   };
 })(window);

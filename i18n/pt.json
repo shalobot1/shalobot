@@ -494,5 +494,15 @@
 "Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.":"Já depositou e não aparece aqui? Na Deriv, toque em Transferir e mova o dinheiro para Opções.",
 "Smallest stake: {min}":"Valor mínimo: {min}",
 "Recovering with {side}":"Recuperando com {side}",
-"Dynamic":"Dinâmica"
+"Dynamic":"Dinâmica",
+"Safe":"Seguro",
+"Unstable conditions detected":"Condições instáveis detectadas",
+"The bot paused after a winning trade, with your profit kept. It resumes by itself as soon as conditions are stable again, and carries on to your take profit.":"O bot pausou após uma operação vencedora, com o seu lucro mantido. Ele retoma sozinho assim que as condições voltam a ficar estáveis e segue até o seu take profit.",
+"The bot is waiting to place its first trade. It starts by itself as soon as conditions are stable again, and trades on to your take profit.":"O bot está aguardando para fazer a primeira operação. Ele começa sozinho assim que as condições voltam a ficar estáveis e opera até o seu take profit.",
+"Stop trading":"Parar de operar",
+"Keep waiting":"Continuar aguardando",
+"Paused — waiting for stable conditions…":"Em pausa — aguardando condições estáveis…",
+"Stable again — trading resumed.":"Estável novamente — operações retomadas.",
+"Win rate":"Acertos",
+"Running time":"Duração"
 }

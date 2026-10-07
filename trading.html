@@ -102,10 +102,10 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
       <aside class="bot-side">
         <div class="bot-card bot-set">
           <div class="bot-types" id="botTypes" role="tablist" aria-label="Trade type">
-            <button class="bot-type" type="button" role="tab" data-type="evenodd">Even / Odd</button>
-            <button class="bot-type" type="button" role="tab" data-type="risefall">Rise / Fall</button>
-            <button class="bot-type" type="button" role="tab" data-type="overunder">Over / Under</button>
-            <button class="bot-type" type="button" role="tab" data-type="matchdiff">Matches / Differs</button>
+            <button class="bot-type" type="button" role="tab" data-type="evenodd">Even / Odd<i class="bot-watch" aria-hidden="true"></i></button>
+            <button class="bot-type" type="button" role="tab" data-type="risefall">Rise / Fall<i class="bot-watch" aria-hidden="true"></i></button>
+            <button class="bot-type" type="button" role="tab" data-type="overunder">Over / Under<i class="bot-watch" aria-hidden="true"></i></button>
+            <button class="bot-type" type="button" role="tab" data-type="matchdiff">Matches / Differs<i class="bot-watch" aria-hidden="true"></i></button>
           </div>
           <h1 id="botTitle">Smart Scan bot</h1>
           <p class="bot-lede" id="botLede">Finds the best Even/Odd market and side, then trades it one 1-tick contract at a time until your take profit or stop loss.</p>
@@ -125,8 +125,12 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
           </div>
           <div class="bot-note">
             <p class="bot-min" id="botMin" data-i18n-skip>Smallest stake: $0.35</p>
-            <!-- Off: every visit starts from the defaults. On: the settings stay in this browser. -->
-            <label class="bot-keep"><input type="checkbox" id="botKeep" role="switch" /><i aria-hidden="true"></i><span>Save settings</span></label>
+            <span class="bot-toggles">
+              <!-- Safe (on unless turned off): a run whose type turns red pauses after a win and carries on when it is green again. -->
+              <label class="bot-keep bot-safe"><input type="checkbox" id="botSafe" role="switch" checked /><i aria-hidden="true"></i><span>Safe</span></label>
+              <!-- Off: every visit starts from the defaults. On: the settings stay in this browser. -->
+              <label class="bot-keep"><input type="checkbox" id="botKeep" role="switch" /><i aria-hidden="true"></i><span>Save settings</span></label>
+            </span>
           </div>
 
           <button class="btn btn-blue btn-lg bot-go" id="botGo" type="button">
@@ -229,6 +233,8 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
         <div><dt>Take profit</dt><dd id="bmTp" data-i18n-skip></dd></div>
         <div><dt>Stop loss</dt><dd id="bmSl" data-i18n-skip></dd></div>
       </dl>
+      <!-- The watch's reading for this type: a dial, its needle and its figure. -->
+      <div class="bm-watch" id="bmWatch" data-watch="off"><div class="bm-dial" aria-hidden="true"><i></i></div><b class="bm-watch-pct" data-i18n-skip>…</b></div>
       <p class="bm-live"><i aria-hidden="true"></i><span>Trading started</span></p>
     </div>
 
@@ -281,6 +287,27 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
         <a class="btn btn-blue btn-lg" id="bmFundGo" href="https://home.deriv.com/dashboard/portfolio" target="_blank" rel="noopener" data-bm-close data-i18n-skip>Deposit on Deriv</a>
       </div>
     </div>
+
+    <!-- Safe: the run paused while its type reads red — a calm amber badge, the session as
+         it stands, the dial live, and two ways on. -->
+    <div class="bm-view" id="bmHold" hidden>
+      <div class="bm-badge bm-badge--hold" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="5" width="3.5" height="14" rx="1.2"/><rect x="14" y="5" width="3.5" height="14" rx="1.2"/></svg>
+      </div>
+      <h2 id="bmHoldTitle">Unstable conditions detected</h2>
+      <p class="bm-step" id="bmHoldText" data-i18n-skip></p>
+      <div class="bm-amount bm-amount--hold" id="bmHoldPl" data-i18n-skip></div>
+      <dl class="bm-sum bm-sum--hold">
+        <div><dt>Trades</dt><dd id="bmHoldN" data-i18n-skip></dd></div>
+        <div><dt>Win rate</dt><dd id="bmHoldRate" data-i18n-skip></dd></div>
+        <div><dt>Running time</dt><dd id="bmHoldTime" data-i18n-skip></dd></div>
+      </dl>
+      <div class="bm-watch" id="bmHoldWatch" data-watch="off"><div class="bm-dial" aria-hidden="true"><i></i></div><b class="bm-watch-pct" data-i18n-skip>…</b></div>
+      <div class="bm-actions bm-actions--hold">
+        <button class="btn btn-line btn-lg" type="button" id="bmHoldStop">Stop trading</button>
+        <button class="btn btn-blue btn-lg" type="button" data-bm-close>Keep waiting</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -289,6 +316,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
 <script src="/theme.js"></script>
 <script src="/deriv/door.js"></script>
 <script src="/deriv/trading.js"></script>
+<script src="/deriv/watch.js"></script>
 <script src="/deriv/bot.js"></script>
 </body>
 </html>
