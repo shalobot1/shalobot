@@ -795,9 +795,16 @@
     watchHistory(acc, gen).then(function () {
       if (gen !== hub.gen) return;
       if (!watch.started()) watch.start();
+      else rewindCold();
       watchPrices();
       paintWatch();
     });
+  }
+  /** Another account (or a balance that could not pay the stake before): lanes with too few
+   *  paper trades to read replay the ticks the watch holds, with the figures as they are now,
+   *  instead of waiting minutes for live ones. A lane that reads already is left alone. */
+  function rewindCold() {
+    watch.keys().forEach(function (k) { var st = watch.state(k); if (st && st.n < 12) watch.rewind(k); });
   }
   async function watchHistory(acc, gen) {
     var syms = hub.order.slice();
