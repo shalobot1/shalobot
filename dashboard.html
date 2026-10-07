@@ -26,6 +26,11 @@
    Navy is the default when nothing has been chosen. */
 (function(){try{var t=localStorage.getItem("shalo_theme");
 document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();
+/* The installed app opens on /trading. One installed before that may still open here: a
+   launch (the app's own window, nothing before this page) goes to /trading; a tap on the MT5
+   button inside the app has a page before it and stays. */
+(function(){try{var app=(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone===true;
+if(app&&!document.referrer&&history.length<=1)location.replace("/trading");}catch(e){}})();
 </script>
 <link rel="stylesheet" href="/styles.css" />
 <link rel="stylesheet" href="/mt5/mt5.css" />

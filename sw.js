@@ -25,7 +25,7 @@
  * under /api is ever cached, and neither is any other origin.
  */
 
-const VERSION = "shalo-shell-v42";
+const VERSION = "shalo-shell-v43";
 const NET_TIMEOUT_MS = 2500;
 
 /* What the launch screen is waiting on. The start page and everything it
@@ -33,7 +33,6 @@ const NET_TIMEOUT_MS = 2500;
 const SHELL = [
   "/",
   "/",
-  "/dashboard",
   "/trading",
   "/deriv/trading.css",
   "/deriv/door.js",
@@ -95,6 +94,9 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
+  /* The MT5 dashboard is for a connected Deriv account, and the server checks that on every
+     visit (middleware.js): it always comes from the network, never from this cache. */
+  if (url.pathname === "/dashboard" || url.pathname === "/dashboard.html") return;
 
   /* Icons, logos, fonts: served from cache when there, fetched and stored when not. */
   if (isStatic(url)) {
