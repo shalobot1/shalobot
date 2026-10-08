@@ -28,10 +28,13 @@
  *
  * ── It says what it is ──────────────────────────────────────────────────────
  *
- * The setup card is on screen whenever the simulation is: it opens with the
- * page and has no Close — Start reloads into it again. Practice and testing
- * need the real page's behaviour, not a page that passes for real money: the
- * card is what keeps it from that.
+ * A badge reading "Simulation · not real money" is always on screen: in the
+ * header, and on a phone pinned under it while the page scrolls, above every
+ * popup and card so nothing covers it. The setup
+ * card opens with the page until Start is pressed in that tab, and again on
+ * three clicks on the green dot. Practice and testing need the real page's
+ * behaviour, not a page that passes for real money: the badge is what keeps
+ * it from that.
  *
  * ── How an outcome is arranged ──────────────────────────────────────────────
  *
@@ -338,7 +341,7 @@
   /* No label or title of their own: the chip and the list give the real page's words
      (REAL / DEMO, Real account / Demo account, in the visitor's language) and, once the
      real session has answered, the accounts' own numbers (below). The demo trades the
-     actual demo balance; the real one the card's balance. The card says what it is. */
+     actual demo balance; the real one the card's balance. The badge says what it is. */
   var accounts = {
     real: { id: cfg.ids.real, type: "real", label: "", title: "", balance: round2(Number(cfg.real) || 0) },
     demo: { id: cfg.ids.demo, type: "demo", label: "", title: "", balance: round2(Number(cfg.demo) || 0) },
@@ -813,6 +816,10 @@
 
   /* ── the card: three clicks on the green dot in the balance chip ───── */
 
+  // Start pressed in this tab: the reload it makes lands on the page, not the card again.
+  var STARTED = "shalo_ui_s";
+  function started() { try { return sessionStorage.getItem(STARTED) === "1"; } catch (e) { return false; } }
+
   function card() {
     var c = setup();
     /* Two whole numbers, from and to: each streak, gap or ten draws its own from between them. */
@@ -909,7 +916,7 @@
       c2.firstLoss = on("simFirst");
       delete c2.count;
       save(c2);
-      try { sessionStorage.removeItem(LEDGER); sessionStorage.removeItem(PLAN); } catch (e) {}
+      try { sessionStorage.removeItem(LEDGER); sessionStorage.removeItem(PLAN); sessionStorage.setItem(STARTED, "1"); } catch (e) {}
       global.location.reload();
     });
 
@@ -927,9 +934,56 @@
       if (global.ShaloTaps) global.ShaloTaps(dot, 3, openCard);   // counted in door.js, iPhones included
     }
 
-    // Open with the page, every time, run or no run.
-    fillIn();
-    wrap.hidden = false;
+    /* The badge: what the page is — in the header beside the name where there
+       is room, on a phone pinned under the header (sim.css), always in sight. */
+    function badge(cls) {
+      var el = document.createElement("span");
+      el.className = "sim-badge " + cls;
+      el.setAttribute("data-i18n-skip", "");
+      el.innerHTML = '<i aria-hidden="true"></i><b>Simulation</b><span>not real money</span>';
+      return el;
+    }
+    var brand = document.querySelector(".tnav .brand"), main = document.getElementById("tmain"), slots = [];
+    if (brand) { slots.push(badge("sim-badge--nav")); brand.parentNode.insertBefore(slots[slots.length - 1], brand.nextSibling); }
+    if (main) { slots.push(badge("sim-badge--top")); main.insertBefore(slots[slots.length - 1], main.firstChild); }
+    // How far down the phone badge pins: just under the fixed header, whatever its height.
+    var nav = document.querySelector(".tnav");
+    function navHeight() { if (nav) document.documentElement.style.setProperty("--sim-nav-h", nav.offsetHeight + "px"); }
+    navHeight();
+    global.addEventListener("resize", navHeight);
+
+    /* Those two keep the badge's place in the header and the page; what shows is
+       a copy laid over whichever of them is on screen, above every popup, card
+       and backdrop (sim.css), so nothing covers it. With neither measurable it
+       sits at the foot of the screen — it is never left out. */
+    var shown = badge("sim-badge--pin");
+    shown.setAttribute("role", "status");
+    document.body.appendChild(shown);
+    function pin() {
+      var at = null;
+      slots.forEach(function (s) { var r = s.getBoundingClientRect(); if (r.width && r.height) at = { s: s, r: r }; });
+      shown.className = "sim-badge sim-badge--pin" + (at ? " " + at.s.className.replace(/\bsim-badge\b/, "").trim() : " sim-badge--foot");
+      shown.style.left = at ? Math.round(at.r.left) + "px" : "";
+      shown.style.top = at ? Math.round(at.r.top) + "px" : "";
+      // Its place off the screen (a popup holding the page still, say): where the phone badge pins.
+      if (at && (at.r.top < 0 || at.r.left < 0 || at.r.bottom > global.innerHeight || at.r.right > global.innerWidth)) {
+        shown.style.left = Math.round((global.innerWidth - at.r.width) / 2) + "px";
+        shown.style.top = ((nav ? nav.offsetHeight : 60) + 6) + "px";
+      }
+    }
+    pin();
+    ["scroll", "resize", "load", "orientationchange"].forEach(function (ev) { global.addEventListener(ev, pin, { passive: true }); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(pin);
+    if (global.ResizeObserver) { var ro = new ResizeObserver(pin); if (nav) ro.observe(nav); if (main) ro.observe(main); }
+    // A popup holds the page still by its root's style, with no scroll event: follow that too.
+    if (global.MutationObserver) new MutationObserver(pin).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
+    global.setInterval(pin, 250);
+
+    // Open with the page until Start has been pressed in this tab.
+    if (!started()) {
+      fillIn();
+      wrap.hidden = false;
+    }
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", card);
   else card();

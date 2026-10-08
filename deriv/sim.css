@@ -1,5 +1,5 @@
 /* SHALOBOT — the simulation's own few styles: the setup card, the green dot
-   that opens it.
+   that opens it, and the badge that says what the page is.
    Everything on the page behind it is styles.css, trading.css and bot.css,
    unchanged — the point is that it looks and behaves like the real page. */
 
@@ -65,6 +65,38 @@
 .sim-go { width: 100%; justify-content: center; border-radius: 14px; }
 .sim-note { margin: 14px 0 0; font-size: 12px; line-height: 1.55; color: var(--ink-faint); }
 
+/* What this page is: in the header beside the name, or at the top of the
+   page on a narrow screen. */
+.sim-badge {
+  display: inline-flex; align-items: center; gap: 7px; flex: none; height: 30px; padding: 0 12px 0 10px;
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--amber) 14%, var(--raise)); color: var(--ink);
+  font-size: 12px; line-height: 1; white-space: nowrap; user-select: none; -webkit-user-select: none;
+}
+.sim-badge i { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); flex: none; }
+.sim-badge b { font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--amber); }
+.sim-badge span { color: var(--ink-muted); font-weight: 600; }
+.sim-badge--top { display: none; }
+@media (max-width: 1099px) { .sim-badge--nav span { display: none; } }
+@media (max-width: 759px) {
+  .sim-badge--nav { display: none; }
+  /* Pinned under the fixed header while the page scrolls: the chip says REAL or DEMO
+     as on the real page, so this is what keeps the page saying what it is. */
+  .sim-badge--top {
+    display: inline-flex; align-self: center; margin: 0 0 12px; font-size: 11px;
+    position: sticky; top: calc(var(--sim-nav-h, 60px) + 6px); z-index: 40;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  }
+}
+/* Too narrow for the words: the badge says SIMULATION, the chip SIM. */
+@media (max-width: 359px) { .sim-badge--top span { display: none; } }
+
+/* The two above hold the badge's place; the one that shows is a copy laid over
+   whichever is on screen (sim.js), above every popup, card and backdrop the page
+   has, so nothing covers it. It takes no taps: whatever is under it still works. */
+.sim-badge--nav:not(.sim-badge--pin), .sim-badge--top:not(.sim-badge--pin) { visibility: hidden; }
+.sim-badge.sim-badge--pin { position: fixed; z-index: 2147483000; margin: 0; pointer-events: none; }
+.sim-badge.sim-badge--foot { left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); }
 
 /* The chip's green dot opens the card: the dot stays 7 px, its target is
    wider so three taps land on a phone. */
