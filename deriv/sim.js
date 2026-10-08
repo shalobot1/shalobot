@@ -29,9 +29,9 @@
  * ── It says what it is ──────────────────────────────────────────────────────
  *
  * The setup card is on screen whenever the simulation is: it opens with the
- * page and has no Close — Start reloads into it again, "Leave simulation"
- * turns the mode off. Practice and testing need the real page's behaviour,
- * not a page that passes for real money: the card is what keeps it from that.
+ * page and has no Close — Start reloads into it again. Practice and testing
+ * need the real page's behaviour, not a page that passes for real money: the
+ * card is what keeps it from that.
  *
  * ── How an outcome is arranged ──────────────────────────────────────────────
  *
@@ -826,8 +826,7 @@
     wrap.setAttribute("data-i18n-skip", "");
     wrap.innerHTML =
       '<div class="sim-card" role="dialog" aria-modal="true" aria-labelledby="simT">' +
-        '<div class="sim-head"><div><p class="sim-k">Practice — no money, no Deriv</p><h2 class="sim-t" id="simT">Set up the simulation</h2></div>' +
-        '<button class="btn btn-line sim-close" type="button" data-sim-leave>Leave simulation</button></div>' +
+        '<div class="sim-head"><div><p class="sim-k">Practice — no money, no Deriv</p><h2 class="sim-t" id="simT">Set up the simulation</h2></div></div>' +
         '<div class="sim-body">' +
           '<label class="sim-f"><span class="sim-fk">Simulation account balance (USD)</span><span class="sim-with"><input class="sim-i" id="simReal" type="number" min="0" step="0.01" inputmode="decimal" />' +
             '<button class="btn btn-line sim-rand" type="button" data-rand="simReal">Random</button></span></label>' +
@@ -899,11 +898,6 @@
       b.addEventListener("click", function () {
         $(b.getAttribute("data-rand")).value = (50 + Math.floor(Math.random() * 24951) + Math.floor(Math.random() * 100) / 100).toFixed(2);
       });
-    });
-    // No Close: the only ways off the card are Start (which reloads into it) and leaving the mode.
-    wrap.querySelector("[data-sim-leave]").addEventListener("click", function () {
-      try { localStorage.removeItem("shalo_ui_m"); } catch (e) {}   // door.js's "on" flag
-      global.location.reload();
     });
     $("simGo").addEventListener("click", function () {
       var real = Number($("simReal").value);
