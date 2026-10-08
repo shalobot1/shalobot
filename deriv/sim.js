@@ -28,14 +28,10 @@
  *
  * ── It says what it is ──────────────────────────────────────────────────────
  *
- * A badge reading "Simulation · not real money" is always on screen: in the
- * header, and on a phone pinned under it while the page scrolls. That badge
- * (and the setup card) are where the simulation says so; everything else
- * reads exactly like the real page — REAL / DEMO on the chip, Real account
- * and Demo account in the list with the user's own account numbers (read with
- * the real session), the demo holding the actual demo balance and the real
- * one the card's. Practice and testing need the real page's behaviour, not a
- * page that passes for real money: the badge is what keeps it from that.
+ * The setup card is on screen whenever the simulation is: it opens with the
+ * page and has no Close — Start reloads into it again, "Leave simulation"
+ * turns the mode off. Practice and testing need the real page's behaviour,
+ * not a page that passes for real money: the card is what keeps it from that.
  *
  * ── How an outcome is arranged ──────────────────────────────────────────────
  *
@@ -342,7 +338,7 @@
   /* No label or title of their own: the chip and the list give the real page's words
      (REAL / DEMO, Real account / Demo account, in the visitor's language) and, once the
      real session has answered, the accounts' own numbers (below). The demo trades the
-     actual demo balance; the real one the card's balance. The badge says what it is. */
+     actual demo balance; the real one the card's balance. The card says what it is. */
   var accounts = {
     real: { id: cfg.ids.real, type: "real", label: "", title: "", balance: round2(Number(cfg.real) || 0) },
     demo: { id: cfg.ids.demo, type: "demo", label: "", title: "", balance: round2(Number(cfg.demo) || 0) },
@@ -831,7 +827,7 @@
     wrap.innerHTML =
       '<div class="sim-card" role="dialog" aria-modal="true" aria-labelledby="simT">' +
         '<div class="sim-head"><div><p class="sim-k">Practice — no money, no Deriv</p><h2 class="sim-t" id="simT">Set up the simulation</h2></div>' +
-        '<button class="btn btn-line sim-close" type="button" data-sim-close>Close</button></div>' +
+        '<button class="btn btn-line sim-close" type="button" data-sim-leave>Leave simulation</button></div>' +
         '<div class="sim-body">' +
           '<label class="sim-f"><span class="sim-fk">Simulation account balance (USD)</span><span class="sim-with"><input class="sim-i" id="simReal" type="number" min="0" step="0.01" inputmode="decimal" />' +
             '<button class="btn btn-line sim-rand" type="button" data-rand="simReal">Random</button></span></label>' +
@@ -904,9 +900,11 @@
         $(b.getAttribute("data-rand")).value = (50 + Math.floor(Math.random() * 24951) + Math.floor(Math.random() * 100) / 100).toFixed(2);
       });
     });
-    function close() { wrap.hidden = true; }
-    wrap.addEventListener("click", function (e) { if (e.target === wrap || e.target.closest("[data-sim-close]")) close(); });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !wrap.hidden) close(); });
+    // No Close: the only ways off the card are Start (which reloads into it) and leaving the mode.
+    wrap.querySelector("[data-sim-leave]").addEventListener("click", function () {
+      try { localStorage.removeItem("shalo_ui_m"); } catch (e) {}   // door.js's "on" flag
+      global.location.reload();
+    });
     $("simGo").addEventListener("click", function () {
       var real = Number($("simReal").value);
       if (!isFinite(real) || real < 0) { $("simSay").textContent = "Give the account a balance to start with."; return; }
@@ -935,24 +933,9 @@
       if (global.ShaloTaps) global.ShaloTaps(dot, 3, openCard);   // counted in door.js, iPhones included
     }
 
-    /* The badge: what the page is — in the header beside the name where there
-       is room, on a phone pinned under the header (sim.css), always in sight. */
-    function badge(cls) {
-      var el = document.createElement("span");
-      el.className = "sim-badge " + cls;
-      el.setAttribute("data-i18n-skip", "");
-      el.innerHTML = '<i aria-hidden="true"></i><b>Simulation</b><span>not real money</span>';
-      return el;
-    }
-    var brand = document.querySelector(".tnav .brand"), main = document.getElementById("tmain");
-    if (brand) brand.parentNode.insertBefore(badge("sim-badge--nav"), brand.nextSibling);
-    if (main) main.insertBefore(badge("sim-badge--top"), main.firstChild);
-    // How far down the phone badge pins: just under the fixed header, whatever its height.
-    var nav = document.querySelector(".tnav");
-    function navHeight() { if (nav) document.documentElement.style.setProperty("--sim-nav-h", nav.offsetHeight + "px"); }
-    navHeight();
-    global.addEventListener("resize", navHeight);
-
+    // Open with the page, every time, run or no run.
+    fillIn();
+    wrap.hidden = false;
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", card);
   else card();
