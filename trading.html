@@ -56,6 +56,8 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
           <span class="tbal-amt" id="acctAmt" data-i18n-skip>—</span>
           <svg class="tbal-caret" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </button>
+        <!-- No account at all on this Deriv login (deriv/trading.js): the way to open a real one, in place of the chip. -->
+        <a class="tbal-real" id="acctOpenReal" href="https://home.deriv.com/dashboard/home" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg><span>Create real account</span></a>
         <div class="tbal-menu" id="acctMenu" role="menu" hidden>
           <div class="tbal-list" id="acctList"></div>
           <div class="tbal-foot">
@@ -297,6 +299,24 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
       <div class="bm-actions">
         <button class="btn btn-line btn-lg" type="button" data-bm-close>Close</button>
         <a class="btn btn-blue btn-lg" id="bmFundGo" href="https://home.deriv.com/dashboard/portfolio" target="_blank" rel="noopener" data-bm-close data-i18n-skip>Deposit on Deriv</a>
+      </div>
+    </div>
+
+    <!-- No real account yet (deriv/trading.js): why it is needed, the three steps, and the way
+         to open it on Deriv. Once a visit by itself, and again on Start with no account at all. -->
+    <div class="bm-view bm-real" id="bmReal" hidden>
+      <div class="bm-badge bm-badge--real" aria-hidden="true"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg></div>
+      <h2 id="bmRealTitle">Open your real account to start trading</h2>
+      <p class="bm-real-why" id="bmRealText"></p>
+      <p class="bm-step" id="bmRealMore"></p>
+      <ol class="bm-real-steps">
+        <li>Open your real account on Deriv</li>
+        <li>Add funds to it</li>
+        <li>Come back here and start the bot</li>
+      </ol>
+      <div class="bm-actions bm-actions--real">
+        <a class="btn btn-blue btn-lg bm-real-go" href="https://home.deriv.com/dashboard/home" target="_blank" rel="noopener noreferrer" data-bm-close><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg><span>Set up my real account</span></a>
+        <button class="btn btn-line btn-lg" type="button" data-bm-close>Later</button>
       </div>
     </div>
 

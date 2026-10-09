@@ -110,12 +110,16 @@
     $("tNote").hidden = true;
     $("tConnect").hidden = false;
     $("tConnectMsg").textContent = T(message || "Sign in on Deriv's own page and come straight back. Shalobot never sees your password.");
+    needReal = null;
+    $("acct").classList.remove("is-noreal");
     $("acct").hidden = true;
     if ($("scan")) $("scan").hidden = true;
     painted = false;
   }
   function showNote(text) {
     painted = false;
+    needReal = null;
+    $("acct").classList.remove("is-noreal");
     $("acct").hidden = true;
     if ($("scan")) $("scan").hidden = true;
     $("tState").hidden = false;
@@ -123,6 +127,7 @@
     $("tConnect").hidden = true;
     $("tNote").hidden = false;
     $("tNoteText").textContent = T(text);
+    try { global.dispatchEvent(new CustomEvent("shalo:note")); } catch (e) {}   // bot.js: the note, not a popup over it
   }
   function clearState() { $("tState").hidden = true; }
 
@@ -216,16 +221,16 @@
   var feeds = {};         // id → Feed
   var picked = null;      // the id shown in the chip
 
+  function shape(a) {
+    return { id: a.id, type: a.type === "real" ? "real" : "demo", currency: a.currency || "", balance: a.balance, status: a.status || "active", label: a.label || "", title: a.title || "", at: Date.now() };
+  }
   function start(r) {
-    accounts = (r.accounts || []).map(function (a) {
-      return { id: a.id, type: a.type === "real" ? "real" : "demo", currency: a.currency || "", balance: a.balance, status: a.status || "active", label: a.label || "", title: a.title || "", at: Date.now() };
-    });
+    accounts = (r.accounts || []).map(shape);
 
     if (!accounts.length) {
+      if (r.migration !== "pending") return noReal("none");
       $("acct").hidden = true;
-      return showNote(r.migration === "pending"
-        ? "Deriv is upgrading your account. Your balances appear here as soon as it is done — keep this page open."
-        : "This Deriv login has no trading accounts yet. Open one on Deriv, then come back here.");
+      return showNote("Deriv is upgrading your account. Your balances appear here as soon as it is done — keep this page open.");
     }
 
     var saved = store.get(PICK);
@@ -234,6 +239,9 @@
     picked = (saved && byId(saved) && saved) ||
       ((active.filter(function (a) { return a.type === "real"; })[0] || active[0] || accounts[0]).id);
 
+    // Only a demo: it stays in use as before, and the page says how to open a real one.
+    needReal = accounts.some(function (a) { return a.type === "real"; }) ? null : "real";
+    $("acct").classList.remove("is-noreal");
     clearState();
     $("acct").hidden = false;
     painted = true;
@@ -248,6 +256,74 @@
   }
 
   function account(id) { return accounts.filter(function (a) { return a.id === id; })[0] || null; }
+
+  /* ── no real account yet ───────────────────────────────────────────── */
+
+  /* A login with no account at all sees the page as it is: the bot at rest, a red way to
+     open a real account where the chip would be, and the popup saying why it is needed
+     (bot.js). A login with only a demo keeps trading on it as before; the popup and a red
+     way in the account list say how to open a real one. Coming back to the page reads the
+     accounts again, so a real account opened on Deriv meanwhile appears without a reload. */
+  var needReal = null;           // null, or "real" (only a demo) / "none" (no account at all)
+  function noReal(kind) {
+    needReal = kind;
+    accounts = [];
+    picked = null;
+    painted = false;
+    clearState();
+    if (!$("acctMenu").hidden) openMenu(false);
+    var box = $("acct");
+    box.classList.remove("is-real", "is-demo", "is-live", "is-wait");
+    box.classList.add("is-noreal");
+    box.hidden = false;
+    try { global.dispatchEvent(new CustomEvent("shalo:account")); } catch (e) {}
+  }
+  var lookedAt = 0;
+  /** A run going, or a scan on screen (its popup up before the run exists): the account
+   *  in use stays as it is until it is over. */
+  function held() {
+    var root = $("bmRoot");
+    return busy() || !!(root && !root.hidden && root.getAttribute("data-view") === "bmScan");
+  }
+  function lookAgain() {
+    // Held: looked at again once it is over (shalo:runend, or the next visit to the tab).
+    // Offline, nothing can be read: the "online" that follows looks at once.
+    if (!needReal || gone || held() || document.visibilityState === "hidden" || navigator.onLine === false || Date.now() - lookedAt < 4000) return;
+    lookedAt = Date.now();
+    // The list only: a new account's line fetches its own one-time URL (Feed.retry).
+    call("GET", "/api/deriv/session").then(function (r) {
+      if (!needReal || gone) return;
+      if (held()) { lookedAt = 0; return; }
+      if (r.connected === false) return expired();          // as the other checks do
+      if (!r.connected) return;                              // Deriv not answering: next time
+      var list = r.accounts || [];
+      var real = list.filter(function (a) { return a.type === "real"; });
+      if (!real.length) {
+        if (!list.length && r.migration === "pending") return start(r);
+        if (needReal === "none" && list.length) return start(r);   // a demo came first: in use, as above
+        return;
+      }
+      if (needReal === "none") return start(r);
+      // Only a demo until now: the real account joins the list and takes the chip; the
+      // demo's line stays open as it is.
+      accounts = list.map(shape);
+      needReal = null;
+      // The chip goes to an active real account; with none active yet it stays where it is.
+      var on = real.filter(function (a) { return a.status === "active"; })[0];
+      if (on) { picked = on.id; store.set(PICK, picked); }
+      else if (!account(picked)) picked = (accounts.filter(function (a) { return a.status === "active"; })[0] || accounts[0]).id;
+      paint();
+      list.forEach(function (a) {
+        if (a.status !== "active" || feeds[a.id]) return;
+        var f = feeds[a.id] = new Feed(a.id);
+        if (a.ws) f.open(a.ws); else f.retry();
+      });
+    }, function () { lookedAt = 0; });   // nothing came back: the next chance looks again
+  }
+  document.addEventListener("visibilitychange", lookAgain);
+  global.addEventListener("focus", lookAgain);
+  global.addEventListener("online", lookAgain);
+  global.addEventListener("shalo:runend", function () { lookedAt = 0; setTimeout(lookAgain, 0); });
 
   /* ── money ─────────────────────────────────────────────────────────── */
 
@@ -271,6 +347,8 @@
    *  simulator's accounts say what they are; Deriv's never carry one). */
   function kindOf(a) { return a.label || (a.type === "real" ? T("Real") : T("Demo")); }
 
+  var OPEN_REAL_URL = "https://home.deriv.com/dashboard/home";   // where a login opens its real account
+  var REAL_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>';
   var CHECK = '<svg class="tbal-row-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
 
@@ -340,6 +418,7 @@
     }).join("");
     if (!order.some(function (a) { return a.type === "real"; })) {
       html += '<p class="tbal-empty">' + esc(T("No real account on this Deriv login yet.")) + "</p>";
+      html += '<a class="tbal-real tbal-real--menu" href="' + OPEN_REAL_URL + '" target="_blank" rel="noopener noreferrer" role="menuitem">' + REAL_ICON + "<span>" + esc(T("Create real account")) + "</span></a>";
     }
     $("acctList").innerHTML = html;
   }
@@ -602,6 +681,7 @@
     if (busy()) { owed = "expired"; return; }
     gone = true;
     Object.keys(feeds).forEach(function (id) { feeds[id].stop(); });
+    try { global.dispatchEvent(new CustomEvent("shalo:expired")); } catch (e) {}
     if (!silentRenew(false)) showConnect("Please sign in to Deriv again to carry on.");
   }
 
@@ -688,7 +768,7 @@
     if (!global.ResizeObserver) { global.addEventListener("resize", fitNav); return; }
     var ro = new global.ResizeObserver(function () { fitNav(); });
     // The row itself, and the things in it whose size changes on their own.
-    [nav, nav.querySelector(".tnav-lang"), $("acctKind"), $("acctAmt"), nav.querySelector(".brand-name")]
+    [nav, nav.querySelector(".tnav-lang"), $("acctKind"), $("acctAmt"), nav.querySelector(".brand-name"), $("acctOpenReal")]
       .forEach(function (el) { if (el) ro.observe(el); });
   }
 
@@ -752,6 +832,8 @@
     feeds: feeds,
     revive: revive,
     current: current,
+    /** No real account yet: "real" (only a demo, still in use) or "none" (no account at all); else null. */
+    needsReal: function () { return needReal; },
     ask: function (req, ms) {
       try { return feedOfCurrent().ask(req, ms); } catch (e) { return Promise.reject(e); }
     },

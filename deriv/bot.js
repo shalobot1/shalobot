@@ -963,13 +963,14 @@
 
   var modal = { view: null, onClose: null, lastFocus: null, glide: false };
   function openModal(view) {
-    ["bmScan", "bmDone", "bmErr", "bmWin", "bmLoss", "bmFund", "bmHold"].forEach(function (id) { if ($(id)) $(id).hidden = id !== view; });
+    ["bmScan", "bmDone", "bmErr", "bmWin", "bmLoss", "bmFund", "bmHold", "bmReal"].forEach(function (id) { if ($(id)) $(id).hidden = id !== view; });
     if ($("bmRoot").hidden) {
       modal.lastFocus = document.activeElement;
       $("bmRoot").hidden = false;
       document.documentElement.style.overflow = "hidden";
     }
     $("bmRoot").setAttribute("data-view", view);
+    $("bmRoot").setAttribute("aria-labelledby", view === "bmReal" ? "bmRealTitle" : "bmTitle");
     modal.view = view;
     var focus = $("bmRoot").querySelector("#" + view + " .btn-blue") || $("bmRoot").querySelector(".bm-x");
     if (focus) setTimeout(function () { try { focus.focus(); } catch (e) {} }, 30);
@@ -1764,11 +1765,30 @@
     $("botState").className = "bot-state bot-state--" + kind;
   }
 
+  /* ── no real account yet: what it takes to start ──────────────────── */
+
+  /** No account at all on the login (trading.js): nothing to trade on until a real one is
+   *  open. A login with only a demo trades on it as before. */
+  function needsReal() { return !D.current() && D.needsReal && D.needsReal() === "none"; }
+  var realOffered = false;
+  /** The popup's words: for a login with no account, or one with only a demo (which stays in use). */
+  function realWords() {
+    var demo = D.needsReal && D.needsReal() === "real";
+    $("bmRealText").textContent = T(demo ? "This Deriv login has only a demo account so far." : "This Deriv login has no trading account yet.");
+    $("bmRealMore").textContent = T(demo
+      ? "Your demo account is there for practice. To trade real money, the Smart Scan bot needs a real Deriv account. Setting one up on Deriv takes a few minutes, and it appears here the moment it is ready."
+      : "The Smart Scan bot trades on a real Deriv account. Setting one up on Deriv takes a few minutes, and the bot is ready the moment it appears here.");
+  }
+  function offerReal() {
+    realWords();
+    openModal("bmReal");
+  }
+
   function paintButton() {
     var b = $("botGo"), c = D.current();
     var running = !!(run && run.active);
     b.classList.toggle("is-stop", running);
-    b.disabled = !!(running && run.stopping) || !c;
+    b.disabled = !!(running && run.stopping) || (!c && !needsReal());
     $("botGoText").textContent = running ? (run.stopping ? T("Stopping…") : T("Stop")) : T("Scan & start");
     b.classList.toggle("is-real", !running && !!(c && c.type === "real"));
     ["botStake", "botTp", "botSl", "botMult", "botVar"].forEach(function (id) { $(id).disabled = running; });
@@ -1786,10 +1806,23 @@
   /* ── wiring ────────────────────────────────────────────────────────── */
 
   function onAccount() {
-    var c = D.current();
-    var on = !!c && !$("acct").hidden;
+    var c = D.current(), noReal = needsReal();
+    var on = (!!c || noReal) && !$("acct").hidden;
     $("scan").hidden = !on;
     paintButton();
+    // No account at all: the page as it is with the bot at rest, and once a visit by itself
+    // (again on Start) the popup on opening a real one. Nothing here reads or trades.
+    if (noReal) {
+      // The figures from no balance (a balance left from another login would set them otherwise).
+      if (!(run && run.active)) paintFigures();
+      if (modal.view === "bmReal") realWords();   // the login's kind changed with the popup up
+      if (on && !realOffered) { realOffered = true; offerReal(); }
+      return;
+    }
+    if (modal.view === "bmReal") {
+      if (!(D.needsReal && D.needsReal())) closeModal();   // a real account came in meanwhile
+      else realWords();                                    // no account before, a demo now: its words
+    }
     // A different chip while idle: the next scan starts on that account.
     if (on && !(run && run.active) && hub.account && hub.account !== c.id) hubStop();
     if (on) idleHub();
@@ -1801,6 +1834,9 @@
     }
     if (on && !(run && run.active)) paintFigures();
     if (!resumeTried) resumeRun();
+    // Only a demo: it stays in use; once a visit, with nothing else on screen and no run
+    // going or coming back, the popup says how to open a real account.
+    if (on && !realOffered && D.needsReal && D.needsReal() === "real" && resumeTried && !(run && run.active) && !modal.view) { realOffered = true; offerReal(); }
   }
 
   loadForm();
@@ -1835,6 +1871,7 @@
   if ($("bmHoldStop")) $("bmHoldStop").addEventListener("click", function () { stop(); closeModal(); });
   $("botGo").addEventListener("click", function () {
     if (run && run.active) return stop();
+    if (needsReal()) return offerReal();          // nothing to trade on until a real account is open
     if (lockHolder()) return say(T("The bot is already running in another tab or window. Stop it there first."), "bad");
     var s = readSettings();
     var err = validate(s);
@@ -1847,7 +1884,11 @@
   $("bmRoot").addEventListener("click", function (e) { if (e.target.closest("[data-bm-close]")) closeModal(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("bmRoot").hidden) closeModal(); });
   global.addEventListener("shalo:account", onAccount);
-  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); paintType(); paintVariants(); if (dynamicMult(state.type, formVariant)) paintMult(state.type, formVariant); });   // the word, in the new language; a typed figure stays
+  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); paintType(); paintVariants(); if (dynamicMult(state.type, formVariant)) paintMult(state.type, formVariant); if (modal.view === "bmReal") realWords(); });   // the word, in the new language; a typed figure stays
+  // The sign-in ended, or a note took the page (Deriv upgrading the account), while the popup
+  // on opening a real account was up: the page says so, not the popup.
+  global.addEventListener("shalo:expired", function () { if (modal.view === "bmReal") closeModal(); });
+  global.addEventListener("shalo:note", function () { if (modal.view === "bmReal") closeModal(); });
   global.addEventListener("beforeunload", function (e) { if (run && run.active) { e.preventDefault(); e.returnValue = ""; } });
 
   // The column heads line up with the rows whatever the scrollbar takes.

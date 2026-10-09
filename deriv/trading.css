@@ -160,6 +160,24 @@
 .tbal-row[aria-checked="true"] .tbal-row-on { visibility: visible; }
 .tbal-empty { margin: 6px 12px 8px; font-size: 12.5px; color: var(--ink-muted); }
 
+/* No real account yet (trading.js): a red way to open one — in place of the chip when the
+   login has no account at all, and under the list's own line when it has only a demo. A
+   deep Deriv red that keeps its white words readable (4.8:1). */
+.tbal-real {
+  display: none; align-items: center; justify-content: center; gap: 6px;
+  height: 38px; padding: 0 14px; border-radius: 999px;
+  background: #d92b36; color: #fff; font-size: 12.5px; font-weight: 700; line-height: 1.2; white-space: nowrap; text-decoration: none;
+  box-shadow: 0 6px 18px rgba(217, 43, 54, 0.3); touch-action: manipulation; transition: filter .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tbal-real:hover { filter: brightness(1.07); }
+.tbal-real:active { transform: scale(0.98); }
+.tbal-real:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.tbal-real svg { flex: none; }
+.tbal.is-noreal .tbal-chip, .tbal.is-noreal .tbal-menu { display: none; }
+.tbal.is-noreal .tbal-real { display: inline-flex; }
+.tbal-real--menu { display: flex; height: 40px; margin: 0 6px 6px; box-shadow: none; border-radius: 11px; }
+
 .tbal-foot {
   display: flex; align-items: center; justify-content: flex-end;
   margin-top: 4px; padding: 6px 2px 0; border-top: 1px solid var(--line);
@@ -210,6 +228,8 @@
   .nav-inner.is-tight .tmt5 { width: 36px; }
   .nav-inner.is-tight .tmt5 img { width: 18px; height: 17px; }
   .tbal-menu { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; }
+  .tbal-real { height: 36px; padding: 0 10px; gap: 5px; font-size: 12px; }
+  .tbal-real--menu { height: 40px; font-size: 12.5px; }
 }
 @media (max-width: 380px) {
   :root { --gutter: 16px; }
@@ -220,4 +240,8 @@
   .tmt5 img { height: 12px; }
   .tbal-kind { font-size: 10px; letter-spacing: .07em; }
   .tbal-amt { font-size: 13.5px; }
+  .tbal-real { padding: 0 8px; gap: 4px; font-size: 11.5px; }
+  .tbal-real svg { width: 12px; height: 12px; }
+  .tbal-real--menu { font-size: 12.5px; }
+  .tbal-real--menu svg { width: 14px; height: 14px; }
 }

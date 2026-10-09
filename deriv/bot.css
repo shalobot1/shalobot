@@ -625,6 +625,20 @@
 .bm-amount--hold:not(.is-up):not(.is-down) { color: var(--ink); }
 .bm-amount--hold.is-down { color: var(--danger); }
 .bm-sum.bm-sum--hold { grid-template-columns: repeat(3, 1fr); }
+/* Opening a real account (trading.js): the badge in Deriv's red, the reason, the three steps,
+   and the way there in a deep red that keeps its white words readable (4.8:1). */
+.bm-badge--real { color: #ff6b74; background: rgba(255, 68, 79, 0.14); box-shadow: 0 0 0 10px rgba(255, 68, 79, 0.05); }
+.bm-real-why { margin: 0 auto 6px; max-width: 340px; font-size: 14px; line-height: 1.45; font-weight: 600; color: var(--ink); }
+.bm-real-steps { display: grid; gap: 7px; max-width: 330px; margin: 14px auto 0; padding: 0; list-style: none; counter-reset: step; text-align: left; }
+.bm-real-steps li { display: flex; align-items: center; gap: 9px; counter-increment: step; font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--ink); }
+.bm-real-steps li::before {
+  content: counter(step); display: grid; place-items: center; flex: none; width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(255, 68, 79, 0.16); color: #ff6b74; font-size: 11px; font-weight: 800;
+}
+:root[data-theme="light"] .bm-badge--real, :root[data-theme="light"] .bm-real-steps li::before { color: #b4232c; }   /* readable on the light card */
+.bm-actions--real { flex-direction: column; }
+.bm-actions .btn.bm-real-go { gap: 8px; background: #d92b36; border-color: #d92b36; color: #fff; }
+.bm-actions .btn.bm-real-go:hover { background: #d92b36; filter: brightness(1.07); }
 .bm-actions--hold { flex-wrap: wrap-reverse; }
 .bm-actions--hold .btn { flex: 1 1 auto; }
 

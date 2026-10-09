@@ -506,5 +506,16 @@
 "Win rate":"Acertos",
 "Running time":"Duração",
 "Deposit":"Depositar",
-"Withdraw":"Sacar"
+"Withdraw":"Sacar",
+"Create real account":"Criar conta real",
+"Open your real account to start trading":"Abra sua conta real para começar a operar",
+"This Deriv login has no trading account yet.":"Este login da Deriv ainda não tem nenhuma conta de trading.",
+"This Deriv login has only a demo account so far.":"Este login da Deriv por enquanto só tem uma conta demo.",
+"The Smart Scan bot trades on a real Deriv account. Setting one up on Deriv takes a few minutes, and the bot is ready the moment it appears here.":"O bot Smart Scan opera numa conta real da Deriv. Criá-la na Deriv leva alguns minutos, e o bot fica pronto assim que ela aparecer aqui.",
+"Open your real account on Deriv":"Abra sua conta real na Deriv",
+"Add funds to it":"Adicione fundos a ela",
+"Come back here and start the bot":"Volte aqui e inicie o bot",
+"Set up my real account":"Configurar minha conta real",
+"Later":"Depois",
+"Your demo account is there for practice. To trade real money, the Smart Scan bot needs a real Deriv account. Setting one up on Deriv takes a few minutes, and it appears here the moment it is ready.":"A sua conta demo serve para praticar. Para operar com dinheiro real, o bot Smart Scan precisa de uma conta real da Deriv. Criá-la na Deriv leva alguns minutos, e ela aparece aqui assim que estiver pronta."
 }
