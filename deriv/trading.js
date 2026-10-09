@@ -720,6 +720,33 @@
     return f;
   }
 
+  /* The MT5 buttons open the dashboard, a whole page. Once this one has settled it is fetched
+     ahead — the page only, none of its scripts run (the edge check on its cookie only reads) —
+     so a tap opens it at once. Not on a data saver or a 2G line; a browser that can do neither
+     simply loads it on tap. */
+  (function preload() {
+    var nc = navigator.connection || {};
+    if (nc.saveData || /2g/.test(String(nc.effectiveType || ""))) return;
+    var urls = [];
+    Array.prototype.forEach.call(document.querySelectorAll("a.tmt5, a.bot-link--mt5"), function (a) {
+      var u = a.getAttribute("href");
+      if (u && u.charAt(0) === "/" && urls.indexOf(u) < 0) urls.push(u);
+    });
+    if (!urls.length) return;
+    function go() {
+      if (global.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports("speculationrules")) {
+        var s = document.createElement("script");
+        s.type = "speculationrules";
+        s.textContent = JSON.stringify({ prefetch: [{ source: "list", urls: urls, eagerness: "immediate" }] });
+        document.head.appendChild(s);
+      } else {
+        urls.forEach(function (u) { var l = document.createElement("link"); l.rel = "prefetch"; l.href = u; document.head.appendChild(l); });
+      }
+    }
+    function settle() { setTimeout(function () { (global.requestIdleCallback || function (f) { setTimeout(f, 1); })(go, { timeout: 4000 }); }, 3000); }
+    if (document.readyState === "complete") settle(); else global.addEventListener("load", settle);
+  })();
+
   global.ShaloDeriv = {
     accounts: function () { return accounts; },
     feeds: feeds,
