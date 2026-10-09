@@ -987,6 +987,7 @@
     modal.glide = false;
     scanToken++;                         // a scan still running is abandoned
     if (modal.lastFocus && modal.lastFocus.focus) modal.lastFocus.focus();
+    try { global.dispatchEvent(new CustomEvent("shalo:popupclosed")); } catch (e) {}   // trading.js: a real account found meanwhile
   }
 
   /** One column (a phone, a small tablet): the trades are below the settings,
@@ -1021,9 +1022,13 @@
 
   var scanToken = 0, pending = null;
 
-  async function scanAndOffer() {
+  var scanOn = null;   // the account the last scan was started on
+  async function scanAndOffer(e) {
     var c = D.current();
     if (!c) return;
+    // Try again goes on with the scan the user started: never on another account.
+    if (e && e.currentTarget === $("bmRetry") && scanOn && scanOn !== c.id) return closeModal();
+    scanOn = c.id;
     var s = readSettings();
     var spec = makeSpec(s.type, s.variant);
     saveForm();
@@ -1836,7 +1841,8 @@
     if (!resumeTried) resumeRun();
     // Only a demo: it stays in use; once a visit, with nothing else on screen and no run
     // going or coming back, the popup says how to open a real account.
-    if (on && !realOffered && D.needsReal && D.needsReal() === "real" && resumeTried && !(run && run.active) && !modal.view) { realOffered = true; offerReal(); }
+    // Only before any run of this visit: a run's result popup is never taken over by it.
+    if (on && !realOffered && D.needsReal && D.needsReal() === "real" && resumeTried && !run && !modal.view) { realOffered = true; offerReal(); }
   }
 
   loadForm();

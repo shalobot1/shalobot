@@ -279,21 +279,25 @@
     try { global.dispatchEvent(new CustomEvent("shalo:account")); } catch (e) {}
   }
   var lookedAt = 0;
-  /** A run going, or a scan on screen (its popup up before the run exists): the account
-   *  in use stays as it is until it is over. */
+  /** A run going, or any of the bot's popups on screen (a scan, its result, a failed scan
+   *  with Try again, take profit, stop loss, top up): the account in use stays as it is
+   *  until it is over — a popup's button never acts on an account it was not opened on. */
   function held() {
     var root = $("bmRoot");
-    return busy() || !!(root && !root.hidden && root.getAttribute("data-view") === "bmScan");
+    return busy() || !!(root && !root.hidden && root.getAttribute("data-view") !== "bmReal");
   }
+  var lookOwed = false;   // a look skipped while held: made once the run or the popup is over
   function lookAgain() {
-    // Held: looked at again once it is over (shalo:runend, or the next visit to the tab).
+    // Held: looked at again once it is over (shalo:runend, a popup closed, or the next visit).
     // Offline, nothing can be read: the "online" that follows looks at once.
-    if (!needReal || gone || held() || document.visibilityState === "hidden" || navigator.onLine === false || Date.now() - lookedAt < 4000) return;
+    if (needReal && !gone && held()) { lookOwed = true; return; }
+    if (!needReal || gone || document.visibilityState === "hidden" || navigator.onLine === false || Date.now() - lookedAt < 4000) return;
+    lookOwed = false;
     lookedAt = Date.now();
     // The list only: a new account's line fetches its own one-time URL (Feed.retry).
     call("GET", "/api/deriv/session").then(function (r) {
       if (!needReal || gone) return;
-      if (held()) { lookedAt = 0; return; }
+      if (held()) { lookedAt = 0; lookOwed = true; return; }
       if (r.connected === false) return expired();          // as the other checks do
       if (!r.connected) return;                              // Deriv not answering: next time
       var list = r.accounts || [];
@@ -323,7 +327,9 @@
   document.addEventListener("visibilitychange", lookAgain);
   global.addEventListener("focus", lookAgain);
   global.addEventListener("online", lookAgain);
-  global.addEventListener("shalo:runend", function () { lookedAt = 0; setTimeout(lookAgain, 0); });
+  function owedLook() { if (lookOwed) setTimeout(lookAgain, 0); }
+  global.addEventListener("shalo:runend", owedLook);
+  global.addEventListener("shalo:popupclosed", owedLook);
 
   /* ── money ─────────────────────────────────────────────────────────── */
 
