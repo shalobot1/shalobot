@@ -310,7 +310,13 @@
   transition: background-color .15s ease, border-color .15s ease;
 }
 .bot-link:hover { background: var(--surface-2); }
+/* A tap shows the moment the finger lands, whatever the page is busy with: pressed in. */
+.bot-link { touch-action: manipulation; }
+.bot-link:active { transform: scale(0.97); background: var(--surface-2); transition-duration: 0s; }
 .bot-link:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* The WhatsApp and Telegram channels: their full-colour logos, square, so they fit the row as it is. */
+.bot-link--app { flex: none; width: 30px; padding: 0; }
+.bot-link--app svg { width: 18px; height: 18px; }
 .bot-link svg { flex: none; }
 .bot-link--dep { color: var(--real); border-color: color-mix(in srgb, var(--real) 45%, transparent); }
 .bot-link--mt5 img { display: block; height: 13px; width: auto; }
@@ -379,10 +385,26 @@
   .tnav .tmt5 { display: none; }
   .bot-link--mt5 { display: inline-flex; }
   .bot-links .bot-link { flex: 1 1 0; }
+  .bot-links .bot-link--app { flex: none; }
   .bot { margin-top: 10px; }
   .bot-grid, .bot-side, .bot-main { gap: 10px; }
   .bot-log-wrap { height: min(48vh, 440px); min-height: 220px; }
   .tmain:has(> .bot:not([hidden])) { padding-bottom: 84px; }
+}
+/* Phones: five in the row that held three, at its size — MT5 shows its mark, as the header
+   does when it is tight; Deposit and Withdraw a little tighter around their words. */
+@media (max-width: 440px) {
+  .bot-links { gap: 5px; }
+  .bot-links .bot-link--mt5 { flex: none; width: 30px; padding: 0; }
+  .bot-link--mt5 img { width: 16px; height: 15px; object-fit: cover; object-position: left center; }
+  .bot-links .bot-link:not(.bot-link--mt5):not(.bot-link--app) { padding: 4px 6px; gap: 4px; font-size: 11.5px; }
+}
+/* The narrowest phones: the same five, a little smaller still, so the row stays one line. */
+@media (max-width: 359px) {
+  .bot-links { gap: 4px; }
+  .bot-links .bot-link--mt5, .bot-links .bot-link--app { width: 28px; }
+  .bot-links .bot-link:not(.bot-link--mt5):not(.bot-link--app) { padding: 4px 4px; gap: 3px; font-size: 10.5px; }
+  .bot-links .bot-link:not(.bot-link--mt5):not(.bot-link--app) svg { width: 11px; height: 11px; }
 }
 /* A finger on the trades must still move the page. `overscroll-behavior: contain` kept every
    swipe that started on the list inside it — with few trades, or the list at its end, the

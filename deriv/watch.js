@@ -44,6 +44,8 @@
   "use strict";
 
   var HIST = 1000;      // ticks kept per market (~16 minutes of a 1-second index)
+  var SLICE_MS = 8;     // the longest a replay holds the page before a tap gets its turn
+  var now = function () { return global.performance && global.performance.now ? global.performance.now() : Date.now(); };
   var LIVE = 100;       // what the pick reads (the bot's LONG)
   var TIMES = 50;       // the tick times it reads, for speed
   var OUTS = 240;       // paper trades kept per lane
@@ -354,7 +356,9 @@
     }
 
     /** Every tick in the buffers, oldest first, through `targets`; then those lanes go live.
-     *  In slices, so a phone's page stays smooth; `sync` for tests. */
+     *  In slices of a few milliseconds, so a tap is answered between two of them rather
+     *  than after the whole history (a fixed count of ticks held a phone for a third of a
+     *  second at a time); `sync` for tests. The ticks and their order are the same either way. */
     function replay(targets, sync, done) {
       replaying++;
       var cur = {}, vw = {};
@@ -370,8 +374,9 @@
         return best;
       }
       function slice() {
-        var budget = sync ? Infinity : 2500;
-        for (var c = 0; c < budget; c++) {
+        var until = sync ? Infinity : now() + SLICE_MS;
+        for (var c = 1; ; c++) {
+          if (c % 8 === 0 && now() >= until) break;
           var s = next();
           if (s == null) return finish();
           var m = mk[s], i = cur[s]++, q = m.q[i], e = m.ep[i];

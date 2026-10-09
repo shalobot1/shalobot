@@ -367,6 +367,8 @@
     document.addEventListener("click", function (e) {
       if (!$("acctMenu").hidden && !e.target.closest("#acct")) openMenu(false);
     }, true);
+    // iPhones show a button's pressed state (bot.css .bot-link:active) only on a page that listens to touches.
+    document.addEventListener("touchstart", function () {}, { passive: true });
     $("acctMenu").addEventListener("click", function (e) {
       var row = e.target.closest(".tbal-row");
       if (row && !row.disabled) {

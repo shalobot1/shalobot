@@ -25,7 +25,7 @@
  * under /api is ever cached, and neither is any other origin.
  */
 
-const VERSION = "shalo-shell-v49";
+const VERSION = "shalo-shell-v50";
 const NET_TIMEOUT_MS = 2500;
 
 /* What the launch screen is waiting on. The start page and everything it
@@ -127,8 +127,10 @@ self.addEventListener("fetch", (e) => {
     if (fresh) return fresh;
     const cached = await cache.match(req, { ignoreSearch: true });
     if (cached) return cached;
-    /* Nothing cached and the network is gone: let the browser show its own
-       offline page rather than inventing one. */
-    return fetch(req);
+    /* Nothing cached: keep waiting on the request already in flight rather than
+       starting it again from nothing (a slow page used to take its time twice).
+       If the network is gone, it fails and the browser shows its own offline
+       page rather than one invented here. */
+    return net;
   })());
 });
