@@ -233,6 +233,53 @@ async function listPeople(limit) {
   return [...by.values()].sort((a, b) => b.last.localeCompare(a.last)).slice(0, limit || 40);
 }
 
+/**
+ * Everyone whose last word is still theirs — a question, a screenshot, an
+ * "I have downloaded it" — with nothing from us after it. Read from the rows:
+ * each person's messages newest first, and everything they sent since our last
+ * reply is open. An inbound row with seen_at set was closed by the owner
+ * without a reply (✔️ Done in /waiting); only replies use the column otherwise.
+ * Paged to the end of the table, because not missing anybody includes the
+ * oldest.
+ */
+async function unansweredChats() {
+  if (!configured()) return [];
+  const rows = [];
+  for (let page = 0; page < 30; page++) {
+    const r = await select(SUPPORT, `select=visitor_id,direction,body,email,name,tg_message_id,seen_at,created_at&order=created_at.desc,id.desc&limit=1000&offset=${page * 1000}`);
+    if (!r.ok) { console.error("[shalo] unanswered lookup failed:", r.error); break; }
+    rows.push(...(r.data || []));
+    if ((r.data || []).length < 1000) break;
+  }
+  const open = new Map(), settled = new Set();
+  for (const x of rows) {
+    const v = x.visitor_id;
+    if (!v || settled.has(v)) continue;
+    if (x.direction !== "in" || x.seen_at) { settled.add(v); continue; }
+    let p = open.get(v);
+    if (!p) {
+      p = { visitorId: v, name: null, email: null, messages: [], firstAt: x.created_at, lastAt: x.created_at, tgMessageId: null };
+      open.set(v, p);
+    }
+    p.messages.unshift({ body: x.body || "", at: x.created_at });   // rows arrive newest first
+    p.firstAt = x.created_at;
+    p.name = p.name || x.name || null;
+    p.email = p.email || x.email || null;
+    // Their newest message that reached Telegram: where /waiting jumps to.
+    if (!p.tgMessageId && x.tg_message_id) p.tgMessageId = x.tg_message_id;
+  }
+  return [...open.values()];
+}
+
+/** ✔️ Done in /waiting: their open messages are closed without a reply.
+ *  Nothing reaches them; their next message opens it again. */
+async function closeSupportChat(visitorId) {
+  if (!configured() || !visitorId) return 0;
+  const r = await update(SUPPORT, `visitor_id=eq.${encodeURIComponent(visitorId)}&direction=eq.in&seen_at=is.null`, { seen_at: new Date().toISOString() });
+  if (!r.ok) { console.error("[shalo] could not close the chat:", r.error); return 0; }
+  return (r.data || []).length;
+}
+
 /* ── the door ──────────────────────────────────────────────────────────────
  * Matched on either the browser id or the email, because neither survives on
  * its own. Every check FAILS OPEN: a database that cannot be reached means
@@ -306,6 +353,6 @@ async function clearBans(which) {
 
 module.exports = {
   configured, rest, select, insert, update, readBody, json,
-  recordSupportInbound, supportVisitorFor, supportVisitorById, recordSupportReply, collectSupportReplies, recentSupportReplies, supportThread, supportHistory, listPeople,
+  recordSupportInbound, supportVisitorFor, supportVisitorById, recordSupportReply, collectSupportReplies, recentSupportReplies, supportThread, supportHistory, listPeople, unansweredChats, closeSupportChat,
   isBanned, findBan, banPerson, unbanPerson, listBans, clearBans,
 };

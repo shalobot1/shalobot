@@ -79,9 +79,10 @@ const row = (d) => d ? ({
   id: d.id, visitorId: d.visitor_id, mt5Login: d.mt5_login, name: d.name, email: d.email,
   phone: d.phone || "", contact: d.contact || "", country: d.country || "",
   status: d.status, code: d.code || null, createdAt: d.created_at || null,
+  tgMessageId: d.tg_message_id || null, answeredAt: d.answered_at || null, decidedAt: d.decided_at || null,
 }) : null;
 
-const FIELDS = "id,visitor_id,mt5_login,name,email,phone,contact,country,status,code,created_at";
+const FIELDS = "id,visitor_id,mt5_login,name,email,phone,contact,country,status,code,created_at,tg_message_id,answered_at,decided_at";
 
 /** Record a new request. Returns its id, or null if it could not be stored. */
 async function createRequest(r) {
@@ -207,6 +208,28 @@ async function requestForKey(key, waiting) {
     if (k !== k.toUpperCase()) return requestForVisitor(k.toUpperCase());
   }
   return null;
+}
+
+/**
+ * Where each of these people stands with the EA, in one query — for the
+ * waiting list, which shows somebody who only wrote in next to the request a
+ * decision would act on: still open (asked to deposit, say, or answered by
+ * hand), declined, or already approved with a code.
+ */
+async function eaStandingFor(visitorIds) {
+  const out = new Map();
+  const ids = [...new Set((visitorIds || []).filter((v) => /^[A-Za-z0-9_-]{1,64}$/.test(v || "")))];
+  if (!configured() || !ids.length) return out;
+  const res = await select(TABLE, `select=${FIELDS}&visitor_id=in.(${ids.join(",")})&order=created_at.asc&limit=1000`);
+  if (!res.ok) { console.error("[ea] standing lookup failed:", res.error); return out; }
+  for (const d of res.data || []) {
+    const s = out.get(d.visitor_id) || { pending: null, approved: null, latest: null };
+    if (d.status === "pending" && !s.pending) s.pending = row(d);   // the oldest open one, as requestForVisitor picks
+    if (d.status === "approved" && d.code) s.approved = row(d);
+    s.latest = row(d);
+    out.set(d.visitor_id, s);
+  }
+  return out;
 }
 
 /** The live code this browser already holds, if any, and what is left of it. */
@@ -382,6 +405,6 @@ async function recentRequestCount(visitorId, withinMinutes) {
 module.exports = {
   PARTNER_ID, DERIV_SIGNUP, DERIV_PROFILE, EXAMPLE_CLIENT_ID, EA_FILE, MAX_CODE_USES, codeMessage, depositMessage, MISTAKE_LINE,
   createRequest, attachTelegramMessage, requestForTelegramMessage, requestForVisitor,
-  pendingRequests, waitingPeople, requestForKey, approvedCodeFor, approvedMatch, markAnswered, markAnsweredByEmail, approveRequest, declineRequest,
+  pendingRequests, waitingPeople, requestForKey, eaStandingFor, approvedCodeFor, approvedMatch, markAnswered, markAnsweredByEmail, approveRequest, declineRequest,
   declineCount, checkCode, recentRequestCount, normaliseCode, accessStatusFor, accessState,
 };
