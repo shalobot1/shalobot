@@ -532,5 +532,7 @@
 "Safe target: {v}.":"Objectif sûr : {v}.",
 "survives 1 loss in a row.":"tient 1 perte d'affilée.",
 "is more than the balance.":"dépasse le solde.",
-"Use {v}":"Utiliser {v}"
+"Use {v}":"Utiliser {v}",
+"Risk guide":"Guide du risque",
+"Recommended balance: {v}.":"Solde recommandé : {v}."
 }

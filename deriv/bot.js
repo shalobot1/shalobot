@@ -85,6 +85,11 @@
   var STATE_KEY = "shalo_bot_v2";
   var KEEP_KEY = "shalo_bot_keep";      // 1: "Save settings" is on
   var SAFE_KEY = "shalo_bot_safe";      // 0: "Safe" is off (it is on unless turned off)
+  /* The risk guide (the switch where "Save settings" was), 1: on — off unless turned on,
+     remembered in this browser. On, each type starts from its own stake and take profit for
+     the balance and both carry Safe / High / Too high; off, the figures start as they always
+     did (the smallest stake, a take profit of 3% of the balance, never under 3 USD), no words. */
+  var GUIDE_KEY = SAFE_KEY.replace(/safe$/, "guide");
   var PX_KEY = "shalo_bot_px", PX_TTL = 12 * 3600e3;   // payouts seen, per market and side
   var WATCH_HIST = 1000;                // ticks per market replayed through the watch
   var DEPOSIT_URL = "https://home.deriv.com/dashboard/portfolio";
@@ -545,19 +550,16 @@
 
   /* ── settings: one set per type, one multiplier per prediction ─────── */
 
-  /* Every visit starts from the defaults; what the user changes lives in this page only —
-     unless "Save settings" is on, which keeps it in this browser for the next visit. */
-  var keep = store.get(KEEP_KEY) === 1;
-  var state = (keep && store.get(STATE_KEY)) || null;
-  if (!keep) store.del(STATE_KEY);
+  /* Every visit starts from the defaults; what the user changes lives in this page only.
+     ("Save settings" gave way to the risk guide: what it kept in this browser is let go.) */
+  var keep = false;
+  store.del(KEEP_KEY);
+  var state = null;
+  store.del(STATE_KEY);
+  var guide = store.get(GUIDE_KEY) === 1;
   if (!state || !state.t) state = { type: "evenodd", t: {} };   // Even/Odd first
   if (ENABLED.indexOf(state.type) < 0) state.type = "evenodd";
   function persist() { if (keep) store.set(STATE_KEY, state); }
-  function setKeep(on) {
-    keep = on;
-    if (on) { store.set(KEEP_KEY, 1); saveForm(); }
-    else { store.del(KEEP_KEY); store.del(STATE_KEY); }
-  }
   function typeState(type) {
     var ts = state.t[type] || (state.t[type] = {});
     if (!ts.mult) ts.mult = {};
@@ -620,6 +622,12 @@
     return c.bust > 0 ? cents(c.profit * Math.log(0.95) / Math.log(1 - c.bust) - 0.005) : Infinity;
   }
   function defaultsFor(balance, type, variant) {
+    var min = hub.minStake || FALLBACK_MIN;
+    // The risk guide off: the figures as they always were.
+    if (!guide) return { stake: Math.max(min, 0.35), tp: Math.max(DEFAULT_TP_MIN, balance > 0 ? round2(balance * 0.03) : 0), sl: DEFAULT_SL };
+    return guidedDefaults(balance, type, variant);
+  }
+  function guidedDefaults(balance, type, variant) {
     var min = hub.minStake || FALLBACK_MIN, stake = min, tp = 0;
     if (balance > 0) {
       var spec = makeSpec(type, variant), m = TYPES[type].defMult(spec.variant), d = perType(SAFE_DEPTH, type, spec.variant);
@@ -641,13 +649,24 @@
     var min = hub.minStake || FALLBACK_MIN, d = perType(SAFE_DEPTH, spec.type, spec.variant);
     var c = cycleOf(spec, balance, stake, mult);
     var odds = !c.depth || !(c.profit > 0) ? 1 : 1 - Math.pow(1 - c.bust, Math.max(1, tp / c.profit));
-    var safeStake = defaultsFor(balance, spec.type, spec.variant).stake;
+    var safeStake = guidedDefaults(balance, spec.type, spec.variant).stake;
     var safeTp = safeTarget(c);
     return {
       stake: c.depth >= d ? "safe" : c.depth === d - 1 ? "high" : "over", depth: c.depth, need: d,
+      needBal: c.depth >= d ? 0 : balanceFor(spec, stake, mult, d),
       safeStake: cycleOf(spec, balance, safeStake, mult).depth >= d ? safeStake : 0,
       tp: odds < 0.05 ? "safe" : odds <= 0.12 ? "high" : "over", odds: odds, safeTp: safeTp,
     };
+  }
+  /** The balance this stake's ladder needs to cover the type's losses in a row (0: none — a
+   *  step's payout would pass Deriv's maximum first). */
+  function balanceFor(spec, stake, mult, d) {
+    var R = payRatio(spec), st = Math.max(hub.minStake || FALLBACK_MIN, stake), sum = 0;
+    for (var i = 0; i < d; i++) {
+      if (st * R > PAYOUT_CAP) return 0;
+      sum += st; st = round2(st * mult);
+    }
+    return cents(sum, true);
   }
   function balanceOf(id) {
     var acc = id && D.accountOf(id);
@@ -716,10 +735,12 @@
     var c = D.current(), bal = balanceOf(c && c.id), type = state.type, v = formVariantNow();
     var stake = round2(num("botStake")), tp = round2(num("botTp"));
     var mult = dynamicMult(type, v) ? multFor(type, v) : Math.round(num("botMult") * 100) / 100;
-    var r = bal > 0 && stake > 0 && tp > 0 && mult >= 1 ? riskOf(makeSpec(type, v), bal, stake, mult, tp) : null;
+    var r = guide && bal > 0 && stake > 0 && tp > 0 && mult >= 1 ? riskOf(makeSpec(type, v), bal, stake, mult, tp) : null;
+    // The smallest stake Deriv accepts cannot go lower: Safe, or no word on it.
+    var atMin = r && stake <= (hub.minStake || FALLBACK_MIN) + 1e-9, stakeWord = r && (atMin && r.stake !== "safe" ? null : r.stake);
     // Keys of their own ("Safe" alone is the switch's word): the English is the part after "risk: ".
     var WORD = { safe: "risk: Safe", high: "risk: High", over: "risk: Too high" }, lines = [];
-    [["botStakeRisk", r && r.stake], ["botTpRisk", r && r.tp]].forEach(function (b) {
+    [["botStakeRisk", stakeWord], ["botTpRisk", r && r.tp]].forEach(function (b) {
       var el = $(b[0]), w = b[1] && T(WORD[b[1]]);
       el.hidden = !b[1];
       if (b[1]) { el.setAttribute("data-risk", b[1]); el.textContent = w === WORD[b[1]] ? w.slice(6) : w; }
@@ -727,8 +748,9 @@
     // The safe figure is a button: a click puts it in its field (riskUse), as typing it would.
     // No safe target under 1 USD is offered: the take profit's word stands alone then.
     var USE = "\u0001";
-    if (r && r.stake !== "safe") lines.push([r.stake, T("Stake"), (r.depth === 1 ? T("survives 1 loss in a row.") : r.depth ? fill(T("survives {n} losses in a row."), { n: r.depth }) : T("is more than the balance.")) + " " +
-      (r.safeStake > 0 ? fill(T("Safe stake: {v}."), { v: USE }) : T("The balance is small for this type.")), r.safeStake > 0 && ["stake", r.safeStake]]);
+    // No stake safe on this balance: it says so, and the balance this one needs (at the smallest stake, in green — advice, not a warning).
+    if (r && r.stake !== "safe") lines.push([atMin ? "safe" : r.stake, T("Stake"), ((r.depth === 1 ? T("survives 1 loss in a row.") : r.depth ? fill(T("survives {n} losses in a row."), { n: r.depth }) : T("is more than the balance.")) + " " +
+      (r.safeStake > 0 ? fill(T("Safe stake: {v}."), { v: USE }) : T("The balance is small for this type.") + (r.needBal > 0 ? " " + fill(T("Recommended balance: {v}."), { v: money(r.needBal, hub.currency) }) : ""))).trim(), r.safeStake > 0 && ["stake", r.safeStake]]);
     if (r && r.tp !== "safe" && r.safeTp >= 1 && isFinite(r.safeTp)) lines.push([r.tp, T("Take profit"), fill(T("Safe target: {v}."), { v: USE }), ["tp", r.safeTp]]);
     $("botRisk").hidden = !lines.length;
     $("botRisk").innerHTML = lines.map(function (l) {
@@ -2004,8 +2026,13 @@
   Object.keys(FIGURES).forEach(function (id) { $(id).addEventListener("input", onFigure); });
   $("botMult").addEventListener("input", paintRisk);
   $("botRisk").addEventListener("click", riskUse);
-  $("botKeep").checked = keep;
-  $("botKeep").addEventListener("change", function () { setKeep($("botKeep").checked); });
+  $("botGuide").checked = guide;
+  $("botGuide").addEventListener("change", function () {
+    guide = $("botGuide").checked;
+    if (guide) store.set(GUIDE_KEY, 1); else store.del(GUIDE_KEY);
+    // The starting figures follow (a typed figure stays); a run's own are left alone.
+    if (run && run.active) paintRisk(); else { paintFigures(); syncLanes(); }
+  });
   if ($("botSafe")) {
     $("botSafe").checked = safe;
     $("botSafe").addEventListener("change", function () {

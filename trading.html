@@ -134,8 +134,9 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
             <span class="bot-toggles">
               <!-- Safe (on unless turned off): a run whose type turns red pauses after a win and carries on when it is green again. -->
               <label class="bot-keep bot-safe"><input type="checkbox" id="botSafe" role="switch" checked /><i aria-hidden="true"></i><span>Safe</span></label>
-              <!-- Off: every visit starts from the defaults. On: the settings stay in this browser. -->
-              <label class="bot-keep"><input type="checkbox" id="botKeep" role="switch" /><i aria-hidden="true"></i><span>Save settings</span></label>
+              <!-- The risk guide (off unless turned on): each type starts from its own stake and take profit
+                   for the balance, and both carry Safe / High / Too high. Off: the figures as they always were. -->
+              <label class="bot-keep"><input type="checkbox" id="botGuide" role="switch" /><i aria-hidden="true"></i><span>Risk guide</span></label>
             </span>
           </div>
 
