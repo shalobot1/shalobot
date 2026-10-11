@@ -717,7 +717,7 @@
       el.hidden = !b[1];
       if (b[1]) { el.setAttribute("data-risk", b[1]); el.textContent = w === WORD[b[1]] ? w.slice(6) : w; }
     });
-    if (r && r.stake !== "safe") lines.push([r.stake, T("Stake"), fill(T("survives {n} losses in a row."), { n: r.depth }) + " " +
+    if (r && r.stake !== "safe") lines.push([r.stake, T("Stake"), (r.depth === 1 ? T("survives 1 loss in a row.") : r.depth ? fill(T("survives {n} losses in a row."), { n: r.depth }) : T("is more than the balance.")) + " " +
       (r.safeStake > 0 ? fill(T("Safe stake: {v}."), { v: money(r.safeStake, hub.currency) }) : T("The balance is small for this type."))]);
     if (r && r.tp !== "safe") lines.push([r.tp, T("Take profit"), (r.odds >= 0.5 ? T("most runs end in a big loss.") : fill(T("about 1 in {x} runs ends in a big loss."), { x: Math.round(1 / r.odds) })) +
       (r.safeTp > 0 ? " " + fill(T("Safe target: {v}."), { v: money(r.safeTp, hub.currency) }) : "")]);

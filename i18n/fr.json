@@ -529,5 +529,7 @@
 "The balance is small for this type.":"Le solde est faible pour ce type.",
 "most runs end in a big loss.":"la plupart des sessions finissent par une grosse perte.",
 "about 1 in {x} runs ends in a big loss.":"environ 1 session sur {x} finit par une grosse perte.",
-"Safe target: {v}.":"Objectif sûr : {v}."
+"Safe target: {v}.":"Objectif sûr : {v}.",
+"survives 1 loss in a row.":"tient 1 perte d'affilée.",
+"is more than the balance.":"dépasse le solde."
 }
