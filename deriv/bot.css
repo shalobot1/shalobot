@@ -139,6 +139,17 @@
   font-size: 12px; line-height: 1.45; color: var(--ink-muted);
 }
 .bot-risk-line b { color: var(--rc); font-weight: 700; }
+/* The safe figure, a button: one click puts it in its field. Green — the safe choice. */
+.bot-risk-use {
+  display: inline-flex; align-items: center; gap: 4px; margin: 0 1px; padding: 1px 8px 1px 6px; vertical-align: 1px;
+  border: 1px solid color-mix(in srgb, var(--real) 45%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--real) 14%, transparent); color: var(--real);
+  font: inherit; font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.5; cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, transform .1s ease;
+}
+.bot-risk-use:hover { background: color-mix(in srgb, var(--real) 24%, transparent); border-color: var(--real); }
+.bot-risk-use:active { transform: translateY(1px); }
+.bot-risk-use:focus-visible { outline: 2px solid var(--real); outline-offset: 2px; }
 .bot-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin: 8px 2px 0; }
 .bot-min { margin: 0; font-size: 12px; color: var(--ink-muted); }
 

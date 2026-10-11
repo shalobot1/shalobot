@@ -531,5 +531,6 @@
 "about 1 in {x} runs ends in a big loss.":"cerca de 1 em cada {x} sessões termina com uma grande perda.",
 "Safe target: {v}.":"Meta segura: {v}.",
 "survives 1 loss in a row.":"aguenta 1 perda seguida.",
-"is more than the balance.":"é maior que o saldo."
+"is more than the balance.":"é maior que o saldo.",
+"Use {v}":"Usar {v}"
 }

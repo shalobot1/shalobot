@@ -550,8 +550,8 @@
   var keep = store.get(KEEP_KEY) === 1;
   var state = (keep && store.get(STATE_KEY)) || null;
   if (!keep) store.del(STATE_KEY);
-  if (!state || !state.t) state = { type: "matchdiff", t: {} };   // Differs first
-  if (ENABLED.indexOf(state.type) < 0) state.type = "matchdiff";
+  if (!state || !state.t) state = { type: "evenodd", t: {} };   // Even/Odd first
+  if (ENABLED.indexOf(state.type) < 0) state.type = "evenodd";
   function persist() { if (keep) store.set(STATE_KEY, state); }
   function setKeep(on) {
     keep = on;
@@ -717,14 +717,31 @@
       el.hidden = !b[1];
       if (b[1]) { el.setAttribute("data-risk", b[1]); el.textContent = w === WORD[b[1]] ? w.slice(6) : w; }
     });
+    // The safe figure is a button: a click puts it in its field (riskUse), as typing it would.
+    // No safe target under 1 USD is offered: the take profit's word stands alone then.
+    var USE = "\u0001";
     if (r && r.stake !== "safe") lines.push([r.stake, T("Stake"), (r.depth === 1 ? T("survives 1 loss in a row.") : r.depth ? fill(T("survives {n} losses in a row."), { n: r.depth }) : T("is more than the balance.")) + " " +
-      (r.safeStake > 0 ? fill(T("Safe stake: {v}."), { v: money(r.safeStake, hub.currency) }) : T("The balance is small for this type."))]);
-    if (r && r.tp !== "safe") lines.push([r.tp, T("Take profit"), (r.odds >= 0.5 ? T("most runs end in a big loss.") : fill(T("about 1 in {x} runs ends in a big loss."), { x: Math.round(1 / r.odds) })) +
-      (r.safeTp > 0 ? " " + fill(T("Safe target: {v}."), { v: money(r.safeTp, hub.currency) }) : "")]);
+      (r.safeStake > 0 ? fill(T("Safe stake: {v}."), { v: USE }) : T("The balance is small for this type.")), r.safeStake > 0 && ["stake", r.safeStake]]);
+    if (r && r.tp !== "safe" && r.safeTp >= 1 && isFinite(r.safeTp)) lines.push([r.tp, T("Take profit"), fill(T("Safe target: {v}."), { v: USE }), ["tp", r.safeTp]]);
     $("botRisk").hidden = !lines.length;
     $("botRisk").innerHTML = lines.map(function (l) {
-      return '<p class="bot-risk-line" data-risk="' + l[0] + '"><b>' + esc(l[1]) + ":</b> " + esc(l[2]) + "</p>";
+      var text = esc(l[2]);
+      if (l[3]) {
+        var m = money(l[3][1], hub.currency);
+        text = text.replace(USE + ".", USE).replace(USE, '<button class="bot-risk-use" type="button" data-use="' + l[3][0] + '" data-v="' + l[3][1] + '" title="' +
+          esc(fill(T("Use {v}"), { v: m })) + '"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>' + esc(m) + "</button>");
+      }
+      return '<p class="bot-risk-line" data-risk="' + l[0] + '"><b>' + esc(l[1]) + ":</b> " + text + "</p>";
     }).join("");
+  }
+  /** A safe figure clicked: into its field, as if typed (the field's own handler keeps it). */
+  function riskUse(e) {
+    var b = e.target.closest("[data-use]");
+    if (!b) return;
+    var stake = b.getAttribute("data-use") === "stake", f = $(stake ? "botStake" : "botTp"), v = Number(b.getAttribute("data-v"));
+    if (!f || f.disabled || f.readOnly || !(v > 0) || (run && run.active)) return;
+    f.value = stake || v % 1 ? v.toFixed(2) : String(v);
+    f.dispatchEvent(new Event("input", { bubbles: true }));
   }
   /** A figure typed by the user is theirs from then on (a balance change no longer moves it). */
   function onFigure(e) {
@@ -1966,6 +1983,7 @@
   $("botVar").addEventListener("change", onVariant);
   Object.keys(FIGURES).forEach(function (id) { $(id).addEventListener("input", onFigure); });
   $("botMult").addEventListener("input", paintRisk);
+  $("botRisk").addEventListener("click", riskUse);
   $("botKeep").checked = keep;
   $("botKeep").addEventListener("change", function () { setKeep($("botKeep").checked); });
   if ($("botSafe")) {
