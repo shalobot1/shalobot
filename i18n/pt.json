@@ -517,5 +517,17 @@
 "Come back here and start the bot":"Volte aqui e inicie o bot",
 "Set up my real account":"Configurar minha conta real",
 "Later":"Depois",
-"Your demo account is there for practice. To trade real money, the Smart Scan bot needs a real Deriv account. Setting one up on Deriv takes a few minutes, and it appears here the moment it is ready.":"A sua conta demo serve para praticar. Para operar com dinheiro real, o bot Smart Scan precisa de uma conta real da Deriv. Criá-la na Deriv leva alguns minutos, e ela aparece aqui assim que estiver pronta."
+"Your demo account is there for practice. To trade real money, the Smart Scan bot needs a real Deriv account. Setting one up on Deriv takes a few minutes, and it appears here the moment it is ready.":"A sua conta demo serve para praticar. Para operar com dinheiro real, o bot Smart Scan precisa de uma conta real da Deriv. Criá-la na Deriv leva alguns minutos, e ela aparece aqui assim que estiver pronta.",
+"Differs":"Diferente",
+"Scanning Differs markets":"Analisando mercados Diferente",
+"Finds the best market and digit for Differs, then trades it one 1-tick contract at a time until your take profit or stop loss.":"Encontra o melhor mercado e dígito para Diferente e o negocia um contrato de 1 tick por vez até o seu take profit ou stop loss.",
+"risk: Safe":"Seguro",
+"risk: High":"Alto",
+"risk: Too high":"Alto demais",
+"survives {n} losses in a row.":"aguenta {n} perdas seguidas.",
+"Safe stake: {v}.":"Valor seguro: {v}.",
+"The balance is small for this type.":"O saldo é pequeno para este tipo.",
+"most runs end in a big loss.":"a maioria das sessões termina com uma grande perda.",
+"about 1 in {x} runs ends in a big loss.":"cerca de 1 em cada {x} sessões termina com uma grande perda.",
+"Safe target: {v}.":"Meta segura: {v}."
 }

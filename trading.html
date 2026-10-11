@@ -108,7 +108,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
             <button class="bot-type" type="button" role="tab" data-type="evenodd">Even / Odd<i class="bot-watch" aria-hidden="true"></i></button>
             <button class="bot-type" type="button" role="tab" data-type="risefall">Rise / Fall<i class="bot-watch" aria-hidden="true"></i></button>
             <button class="bot-type" type="button" role="tab" data-type="overunder">Over / Under<i class="bot-watch" aria-hidden="true"></i></button>
-            <button class="bot-type" type="button" role="tab" data-type="matchdiff">Matches / Differs<i class="bot-watch" aria-hidden="true"></i></button>
+            <button class="bot-type" type="button" role="tab" data-type="matchdiff">Differs<i class="bot-watch" aria-hidden="true"></i></button>
           </div>
           <h1 id="botTitle">Smart Scan bot</h1>
           <!-- No description on the card (space): bot.js still writes the line here, never shown. -->
@@ -118,15 +118,17 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
             <label class="bot-f bot-f--wide" id="botVarWrap" hidden><span id="botVarLabel">Prediction</span>
               <span class="bot-in bot-in--select"><select id="botVar"></select>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></label>
-            <label class="bot-f"><span>Stake</span>
+            <!-- Safe / High / Too high for the balance (bot.js paintRisk). -->
+            <label class="bot-f"><span class="bot-fh"><span>Stake</span><b class="bot-risk" id="botStakeRisk" data-i18n-skip hidden></b></span>
               <span class="bot-in"><input id="botStake" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" /><em data-bot-cur data-i18n-skip>USD</em></span></label>
             <label class="bot-f"><span>Martingale</span>
               <span class="bot-in"><input id="botMult" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" /><em data-i18n-skip>×</em></span></label>
-            <label class="bot-f"><span>Take profit</span>
+            <label class="bot-f"><span class="bot-fh"><span>Take profit</span><b class="bot-risk" id="botTpRisk" data-i18n-skip hidden></b></span>
               <span class="bot-in"><input id="botTp" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" /><em data-bot-cur data-i18n-skip>USD</em></span></label>
             <label class="bot-f"><span>Stop loss</span>
               <span class="bot-in"><input id="botSl" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" /><em data-bot-cur data-i18n-skip>USD</em></span></label>
           </div>
+          <div class="bot-risk-note" id="botRisk" data-i18n-skip hidden></div>
           <div class="bot-note">
             <p class="bot-min" id="botMin" data-i18n-skip>Smallest stake: $0.35</p>
             <span class="bot-toggles">

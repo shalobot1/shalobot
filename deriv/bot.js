@@ -1,7 +1,7 @@
 /**
  * SHALOBOT — the Smart Scan bot for Deriv's digit contracts. A full automation:
  *
- *   Pick a trade type (Even/Odd, Over/Under, Matches/Differs), then Scan &
+ *   Pick a trade type (Even/Odd, Rise/Fall, Over/Under, Differs), then Scan &
  *   start → a popup scans every market live (progress bar), settles on the ONE
  *   best market and side (animated tick), and the bot starts on it by
  *   itself. The bot then trades one 1-tick contract at a time — re-scanning before
@@ -15,11 +15,12 @@
  *   Rise/Fall        Rise or Fall over one tick (50%). The top payout tier is
  *                    the Step indices (1.845, prices move in fixed steps so a
  *                    tick never ties); Volatility indices pay 1.783.
- *   Over/Under       the user picks a prediction pair, Over N / Under 9−N —
- *                    mirror contracts with the same chance and the same payout
- *                    (measured on all 20 markets) — and the scan picks the side.
- *   Matches/Differs  the user picks Differs (90%) or Matches (10%), and the
- *                    scan picks the digit.
+ *   Over/Under       the user picks a prediction pair, Over N / Under 9−N
+ *                    (N 0–7) — mirror contracts with the same chance and the
+ *                    same payout (measured on all 20 markets) — and the scan
+ *                    picks the side.
+ *   Differs          Differs (90%); the scan picks the digit. Matches and
+ *                    Over 8 / Under 1 (10%) are not offered: never safe.
  *
  * THE SCAN, on the account's own socket (no extra connection; Deriv allows
  * five per person): which markets sell digit contracts or 1-tick Rise/Fall
@@ -156,7 +157,7 @@
       title: "Scanning Over/Under markets",
       lede: "Finds the best market and side for your prediction, Over or Under, then trades it one 1-tick contract at a time until your take profit or stop loss.",
       variantLabel: "Prediction",
-      variants: ["0", "1", "2", "3", "4", "5", "6", "7", "8"], defVariant: "0",
+      variants: ["0", "1", "2", "3", "4", "5", "6", "7"], defVariant: "0",
       variantText: function (v) { var n = Number(v); return fill(T("Over {a} / Under {b} · {p}%"), { a: n, b: 9 - n, p: (9 - n) * 10 }); },
       defMult: function (v) { return OU_MULT[v] || 2; },
       contracts: function () { return ["DIGITOVER", "DIGITUNDER"]; },
@@ -170,24 +171,20 @@
       pricing: function (v) { var n = Number(v); return fill(T("Pricing Over {a} and Under {b} on {n} markets…"), { a: n, b: 9 - n, n: "{n}" }); },
     },
     matchdiff: {
-      title: "Scanning Matches/Differs markets",
-      lede: "Finds the best market and digit for your contract, Differs or Matches, then trades it one 1-tick contract at a time until your take profit or stop loss.",
-      variantLabel: "Contract",
-      variants: ["diff", "match"], defVariant: "diff",
-      variantText: function (v) { return v === "match" ? fill(T("Matches · {p}%"), { p: 10 }) : fill(T("Differs · {p}%"), { p: 90 }); },
-      defMult: function (v) { return v === "match" ? 1.2 : 17.7; },
-      contracts: function (v) { return v === "match" ? ["DIGITMATCH"] : ["DIGITDIFF"]; },
+      title: "Scanning Differs markets",
+      lede: "Finds the best market and digit for Differs, then trades it one 1-tick contract at a time until your take profit or stop loss.",
+      variants: null, defVariant: "diff",
+      defMult: function () { return 17.7; },
+      contracts: function () { return ["DIGITDIFF"]; },
       // Every digit has the same chance, so one price per market serves all ten.
-      sides: function (v) {
+      sides: function () {
         var out = [];
         for (var k = 0; k <= 9; k++) (function (k) {
-          out.push(v === "match"
-            ? side("match" + k, "DIGITMATCH", k, "b", function (d) { return d === k; }, function () { return fill(T("Matches {n}"), { n: k }); }, { priceBarrier: 5 })
-            : side("diff" + k, "DIGITDIFF", k, "a", function (d) { return d !== k; }, function () { return fill(T("Differs {n}"), { n: k }); }, { priceBarrier: 5 }));
+          out.push(side("diff" + k, "DIGITDIFF", k, "a", function (d) { return d !== k; }, function () { return fill(T("Differs {n}"), { n: k }); }, { priceBarrier: 5 }));
         })(k);
         return out;
       },
-      pricing: function (v) { return v === "match" ? T("Pricing Matches on {n} markets…") : T("Pricing Differs on {n} markets…"); },
+      pricing: function () { return T("Pricing Differs on {n} markets…"); },
     },
   };
 
@@ -553,7 +550,7 @@
   var keep = store.get(KEEP_KEY) === 1;
   var state = (keep && store.get(STATE_KEY)) || null;
   if (!keep) store.del(STATE_KEY);
-  if (!state || !state.t) state = { type: "matchdiff", t: {} };   // Matches/Differs (Differs) first
+  if (!state || !state.t) state = { type: "matchdiff", t: {} };   // Differs first
   if (ENABLED.indexOf(state.type) < 0) state.type = "matchdiff";
   function persist() { if (keep) store.set(STATE_KEY, state); }
   function setKeep(on) {
@@ -569,14 +566,81 @@
     return ts;
   }
 
-  /* Starting figures, until the user types their own (any figure, above or below these): a
-     0.35 stake on every account (never under the smallest stake Deriv accepts), a take profit
-     of 3% of the account's balance but never under 3 USD, and a 1,000 stop loss. Each
+  /* Starting figures, until the user types their own (any figure, above or below these):
+     each type's own stake and take profit for the balance (below; never a stake under the
+     smallest Deriv accepts, never a take profit under 3 USD), and a 1,000 stop loss. Each
      Martingale has its own tested default (TYPES). */
-  var DEFAULT_STAKE = 0.35, DEFAULT_TP_SHARE = 0.03, DEFAULT_TP_MIN = 3, DEFAULT_SL = 1000;
-  function defaultsFor(balance) {
-    var tp = balance > 0 ? round2(balance * DEFAULT_TP_SHARE) : 0;
-    return { stake: Math.max(hub.minStake || FALLBACK_MIN, DEFAULT_STAKE), tp: Math.max(DEFAULT_TP_MIN, tp), sl: DEFAULT_SL };
+  var DEFAULT_TP_MIN = 3, DEFAULT_SL = 1000;
+  /* ── the defaults and the risk badges (Oct 11) ───────────────────────── */
+
+  /* Each type's starting stake is the one whose Martingale ladder the balance covers for
+     SAFE_DEPTH losses in a row, and its take profit TP_SHARE of the balance (never under
+     3 USD): a target about 1 run in 20 or fewer ends short of. Payouts per 1 staked, the
+     app's markup in (measured 2026-10-04): Over n / Under 9−n, Differs, a 50/50 trade. */
+  var SAFE_DEPTH = { evenodd: 5, risefall: 6, matchdiff: 2, overunder: [2, 3, 4, 5, 6, 6, 9, 14] };
+  var TP_SHARE = { evenodd: 0.02, risefall: 0.03, matchdiff: 0.015, overunder: [0.015, 0.025, 0.0275, 0.0275, 0.03, 0.0325, 0.025, 0.0275] };
+  var OU_PAY = [1.06, 1.19, 1.35, 1.56, 1.85, 2.26, 2.92, 4.13], HALF_PAY = 1.845;
+  function perType(table, type, variant) { var v = table[type]; return Array.isArray(v) ? v[Number(variant)] : v; }
+  function payRatio(spec) {
+    if (spec.type === "overunder") return OU_PAY[Number(spec.variant)];
+    return spec.type === "matchdiff" ? OU_PAY[0] : HALF_PAY;
+  }
+  function cents(v, up) { return (up ? Math.ceil(v * 100 - 1e-9) : Math.floor(v * 100 + 1e-9)) / 100; }
+  /** One Martingale cycle from this stake on this balance: the losses in a row it survives,
+   *  the chance it ends with the balance short of the next stake (after the recovery, for the
+   *  types that have one), and the profit of a cycle that ends in a win. */
+  function cycleOf(spec, balance, stake, mult) {
+    var min = hub.minStake || FALLBACK_MIN, p = winChance(spec) || 0.5, R = payRatio(spec);
+    var s0 = Math.max(min, stake), st = s0, spent = 0, prob = 1, depth = 0, e = 0, ok = 0;
+    while (spent + st <= balance + 1e-9 && depth < 300) {
+      e += prob * p * (cents(st * R) - st - spent); ok += prob * p;
+      spent += st; prob *= 1 - p; st = round2(st * mult); depth++;
+    }
+    var bust = prob;
+    if (depth && recovers(spec)) {
+      var need = spent + s0 * (R - 1);
+      for (var n = Math.round(9 - 10 * winChance(spec)) + 1; n <= RECOVER_LAST; n++) {
+        var rs = Math.max(min, cents(need / (OU_PAY[n] - 1), true)), pn = (9 - n) / 10;
+        if (rs > balance - spent + 1e-9) continue;
+        e += prob * pn * (cents(rs * OU_PAY[n]) - rs - spent); ok += prob * pn; bust = prob * (1 - pn);
+        break;
+      }
+    }
+    return { depth: depth, bust: bust, profit: ok > 0 ? e / ok : 0 };
+  }
+  /** The largest take profit a run reaches 19 times in 20 from this cycle (0: none — even
+   *  one cycle at this stake ends short more often than that). */
+  function safeTarget(c) {
+    if (!c.depth || !(c.profit > 0) || c.bust >= 0.05) return 0;
+    return c.bust > 0 ? cents(c.profit * Math.log(0.95) / Math.log(1 - c.bust) - 0.005) : Infinity;
+  }
+  function defaultsFor(balance, type, variant) {
+    var min = hub.minStake || FALLBACK_MIN, stake = min, tp = 0;
+    if (balance > 0) {
+      var spec = makeSpec(type, variant), m = TYPES[type].defMult(spec.variant), d = perType(SAFE_DEPTH, type, spec.variant);
+      stake = cents(balance * (m - 1) / (Math.pow(m, d) - 1));
+      // Cent rounding up the ladder can cost a step: the largest stake that still covers them all.
+      for (var k = 0; k < 100 && stake > min && cycleOf(spec, balance, stake, m).depth < d; k++) stake = round2(stake - 0.01);
+      tp = round2(balance * perType(TP_SHARE, type, spec.variant));
+      var c = cycleOf(spec, balance, Math.max(min, stake), m), green = safeTarget(c);
+      if (green > 0 && tp > green) tp = green;   // the cents can tip it just past the green line
+    }
+    return { stake: Math.max(min, stake), tp: Math.max(DEFAULT_TP_MIN, tp), sl: DEFAULT_SL };
+  }
+  /** The figures' risk on this balance: the stake by the losses in a row it survives, the
+   *  take profit by the chance a run ends with the balance short (green under 5%, amber to
+   *  12%, red above), and the safe figure for each. */
+  function riskOf(spec, balance, stake, mult, tp) {
+    var min = hub.minStake || FALLBACK_MIN, d = perType(SAFE_DEPTH, spec.type, spec.variant);
+    var c = cycleOf(spec, balance, stake, mult);
+    var odds = !c.depth || !(c.profit > 0) ? 1 : 1 - Math.pow(1 - c.bust, Math.max(1, tp / c.profit));
+    var safeStake = defaultsFor(balance, spec.type, spec.variant).stake;
+    var safeTp = safeTarget(c);
+    return {
+      stake: c.depth >= d ? "safe" : c.depth === d - 1 ? "high" : "over", depth: c.depth, need: d,
+      safeStake: cycleOf(spec, balance, safeStake, mult).depth >= d ? safeStake : 0,
+      tp: odds < 0.05 ? "safe" : odds <= 0.12 ? "high" : "over", odds: odds, safeTp: safeTp,
+    };
   }
   function balanceOf(id) {
     var acc = id && D.accountOf(id);
@@ -623,14 +687,44 @@
     if (f.parentNode && f.parentNode.classList) f.parentNode.classList.toggle("is-dynamic", dyn);
     f.value = dyn ? T("Dynamic") : String(multFor(type, variant));
   }
-  /** Each figure: the user's own for this type, or the balance's default. */
+  /** The prediction on the form: the one picked, else the type's own. */
+  function formVariantNow() {
+    var t = TYPES[state.type], ts = typeState(state.type), v = $("botVar").value;
+    if (!t.variants) return t.defVariant;
+    return t.variants.indexOf(v) >= 0 ? v : t.variants.indexOf(ts.variant) >= 0 ? ts.variant : t.defVariant;
+  }
+  /** Each figure: the user's own for this type, or the balance's default for this type and prediction. */
   function paintFigures() {
-    var ts = typeState(state.type), c = D.current(), d = defaultsFor(balanceOf(c && c.id));
+    var ts = typeState(state.type), c = D.current(), d = defaultsFor(balanceOf(c && c.id), state.type, formVariantNow());
     Object.keys(FIGURES).forEach(function (id) {
       var k = FIGURES[id], v = ts.own[k] && ts[k] > 0 ? ts[k] : d[k];
       // Money in cents (0.35, 302.32); a whole figure stays whole (1000).
       $(id).value = k === "stake" || v % 1 ? v.toFixed(2) : String(v);
     });
+    paintRisk();
+  }
+  /** A word on the stake and on the take profit — Safe, High, Too high — for the balance on
+   *  screen, and when one is not safe a line on why and the safe figure. Nothing without a balance. */
+  function paintRisk() {
+    var c = D.current(), bal = balanceOf(c && c.id), type = state.type, v = formVariantNow();
+    var stake = round2(num("botStake")), tp = round2(num("botTp"));
+    var mult = dynamicMult(type, v) ? multFor(type, v) : Math.round(num("botMult") * 100) / 100;
+    var r = bal > 0 && stake > 0 && tp > 0 && mult >= 1 ? riskOf(makeSpec(type, v), bal, stake, mult, tp) : null;
+    // Keys of their own ("Safe" alone is the switch's word): the English is the part after "risk: ".
+    var WORD = { safe: "risk: Safe", high: "risk: High", over: "risk: Too high" }, lines = [];
+    [["botStakeRisk", r && r.stake], ["botTpRisk", r && r.tp]].forEach(function (b) {
+      var el = $(b[0]), w = b[1] && T(WORD[b[1]]);
+      el.hidden = !b[1];
+      if (b[1]) { el.setAttribute("data-risk", b[1]); el.textContent = w === WORD[b[1]] ? w.slice(6) : w; }
+    });
+    if (r && r.stake !== "safe") lines.push([r.stake, T("Stake"), fill(T("survives {n} losses in a row."), { n: r.depth }) + " " +
+      (r.safeStake > 0 ? fill(T("Safe stake: {v}."), { v: money(r.safeStake, hub.currency) }) : T("The balance is small for this type."))]);
+    if (r && r.tp !== "safe") lines.push([r.tp, T("Take profit"), (r.odds >= 0.5 ? T("most runs end in a big loss.") : fill(T("about 1 in {x} runs ends in a big loss."), { x: Math.round(1 / r.odds) })) +
+      (r.safeTp > 0 ? " " + fill(T("Safe target: {v}."), { v: money(r.safeTp, hub.currency) }) : "")]);
+    $("botRisk").hidden = !lines.length;
+    $("botRisk").innerHTML = lines.map(function (l) {
+      return '<p class="bot-risk-line" data-risk="' + l[0] + '"><b>' + esc(l[1]) + ":</b> " + esc(l[2]) + "</p>";
+    }).join("");
   }
   /** A figure typed by the user is theirs from then on (a balance change no longer moves it). */
   function onFigure(e) {
@@ -638,6 +732,7 @@
     ts.own[k] = 1;
     if (v > 0) ts[k] = v;
     persist();
+    paintRisk();
   }
   function loadForm() {
     var type = state.type, t = TYPES[type];
@@ -645,6 +740,7 @@
     paintVariants();
     formVariant = t.variants ? $("botVar").value : t.defVariant;
     paintMult(type, formVariant);
+    paintRisk();
   }
   function paintVariants() {
     var t = TYPES[state.type], ts = typeState(state.type);
@@ -685,6 +781,7 @@
     formVariant = s.variant;
     ts.variant = s.variant;
     paintMult(s.type, s.variant);
+    paintFigures();   // this prediction's own defaults (a typed figure stays)
     persist();
     syncLanes();
   }
@@ -726,7 +823,7 @@
   function figuresFor(spec) {
     var c = D.current(), bal = balanceOf(c && c.id), min = hub.minStake || FALLBACK_MIN;
     if (run && run.active && run.spec.key === spec.key) return { stake: run.stake0, mult: run.mult, tp: run.tp, sl: run.sl, balance: bal, min: min };
-    var ts = typeState(spec.type), d = defaultsFor(bal);
+    var ts = typeState(spec.type), d = defaultsFor(bal, spec.type, spec.variant);
     var own = function (k) { return ts.own[k] && ts[k] > 0 ? ts[k] : d[k]; };
     var f = { stake: own("stake"), mult: multFor(spec.type, spec.variant), tp: own("tp"), sl: own("sl"), balance: bal, min: min };
     if (spec.type === state.type) {
@@ -1210,6 +1307,9 @@
     var sv = session.get();
     if (!sv || sv.v !== 1) { resumeTried = true; return; }
     if (Date.now() - sv.savedAt > 15 * 60000 || sv.stopping || !TYPES[sv.type]) { resumeTried = true; session.del(); return; }
+    // A prediction no longer offered (Matches, Over 8): not resumed.
+    var tv = TYPES[sv.type].variants;
+    if (tv ? tv.indexOf(sv.variant) < 0 : sv.variant !== TYPES[sv.type].defVariant) { resumeTried = true; session.del(); return; }
     var acc = D.accountOf(sv.account);
     if (!acc || !lineUp(sv.account)) return;              // try again when this account's line is up
     if (lockHolder()) { resumeTried = true; return; }     // the original tab is still running it
@@ -1865,6 +1965,7 @@
   });
   $("botVar").addEventListener("change", onVariant);
   Object.keys(FIGURES).forEach(function (id) { $(id).addEventListener("input", onFigure); });
+  $("botMult").addEventListener("input", paintRisk);
   $("botKeep").checked = keep;
   $("botKeep").addEventListener("change", function () { setKeep($("botKeep").checked); });
   if ($("botSafe")) {
@@ -1890,7 +1991,7 @@
   $("bmRoot").addEventListener("click", function (e) { if (e.target.closest("[data-bm-close]")) closeModal(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("bmRoot").hidden) closeModal(); });
   global.addEventListener("shalo:account", onAccount);
-  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); paintType(); paintVariants(); if (dynamicMult(state.type, formVariant)) paintMult(state.type, formVariant); if (modal.view === "bmReal") realWords(); });   // the word, in the new language; a typed figure stays
+  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); paintType(); paintVariants(); if (dynamicMult(state.type, formVariant)) paintMult(state.type, formVariant); if (modal.view === "bmReal") realWords(); paintRisk(); });   // the word, in the new language; a typed figure stays
   // The sign-in ended, or a note took the page (Deriv upgrading the account), while the popup
   // on opening a real account was up: the page says so, not the popup.
   global.addEventListener("shalo:expired", function () { if (modal.view === "bmReal") closeModal(); });
