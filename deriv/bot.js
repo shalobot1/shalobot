@@ -627,7 +627,7 @@
       stake = Math.min(stake, cents(PAYOUT_CAP / (payRatio(spec) * Math.pow(m, d - 1))));
       // Cent rounding up the ladder can cost a step: the largest stake that still covers them all.
       for (var k = 0; k < 100 && stake > min && cycleOf(spec, balance, stake, m).depth < d; k++) stake = round2(stake - 0.01);
-      tp = round2(balance * TP_SHARE);
+      tp = cents(balance * TP_SHARE);   // to the cent below: never a hair over 10%
     }
     return { stake: Math.max(min, stake), tp: Math.max(DEFAULT_TP_MIN, tp), sl: DEFAULT_SL };
   }
@@ -637,14 +637,14 @@
   function riskOf(spec, balance, stake, mult, tp) {
     var min = hub.minStake || FALLBACK_MIN, d = perType(SAFE_DEPTH, spec.type, spec.variant);
     var c = cycleOf(spec, balance, stake, mult);
-    var share = tp / balance;
     var safeStake = guidedDefaults(balance, spec.type, spec.variant).stake;
     var safeTp = cents(balance * TP_SHARE);
     return {
       stake: c.depth >= d ? "safe" : c.depth === d - 1 ? "high" : "over", depth: c.depth, need: d,
       needBal: c.depth >= d ? 0 : balanceFor(spec, stake, mult, d),
       safeStake: cycleOf(spec, balance, safeStake, mult).depth >= d ? safeStake : 0,
-      tp: share <= TP_SHARE + 1e-9 ? "safe" : share <= TP_HIGH + 1e-9 ? "high" : "over", safeTp: safeTp,
+      // In whole cents, as the figures are typed: 10% of 1,036.67 is 103.66, and 103.67 is over it.
+      tp: tp <= safeTp + 1e-9 ? "safe" : tp <= cents(balance * TP_HIGH) + 1e-9 ? "high" : "over", safeTp: safeTp,
     };
   }
   /** The balance this stake's ladder needs to cover the type's losses in a row (0: none — a
