@@ -577,7 +577,9 @@
      SAFE_DEPTH losses in a row, and its take profit TP_SHARE of the balance (never under
      3 USD): a target about 1 run in 20 or fewer ends short of. Payouts per 1 staked, the
      app's markup in (measured 2026-10-04): Over n / Under 9−n, Differs, a 50/50 trade. */
-  var SAFE_DEPTH = { evenodd: 5, risefall: 6, matchdiff: 2, overunder: [2, 3, 4, 5, 6, 6, 9, 14] };
+  // Differs and its kind (Over 0–3, with the dynamic recovery) cover 3 losses in a row or more;
+  // Even/Odd, Rise/Fall and the high-payout Over 4–7 cover 6 or more and still win it back.
+  var SAFE_DEPTH = { evenodd: 6, risefall: 6, matchdiff: 3, overunder: [3, 3, 4, 5, 6, 6, 9, 14] };
   var TP_SHARE = { evenodd: 0.02, risefall: 0.03, matchdiff: 0.015, overunder: [0.015, 0.025, 0.0275, 0.0275, 0.03, 0.0325, 0.025, 0.0275] };
   var OU_PAY = [1.06, 1.19, 1.35, 1.56, 1.85, 2.26, 2.92, 4.13], HALF_PAY = 1.845;
   function perType(table, type, variant) { var v = table[type]; return Array.isArray(v) ? v[Number(variant)] : v; }
@@ -586,13 +588,16 @@
     return spec.type === "matchdiff" ? OU_PAY[0] : HALF_PAY;
   }
   function cents(v, up) { return (up ? Math.ceil(v * 100 - 1e-9) : Math.floor(v * 100 + 1e-9)) / 100; }
+  /* Deriv pays at most 10,000 on one contract and refuses a stake whose payout would be more
+     ("Your payout exceeds the maximum payout"); the bot stays half a percent under it. */
+  var MAX_PAYOUT = 10000, PAYOUT_CAP = MAX_PAYOUT * 0.995;
   /** One Martingale cycle from this stake on this balance: the losses in a row it survives,
    *  the chance it ends with the balance short of the next stake (after the recovery, for the
    *  types that have one), and the profit of a cycle that ends in a win. */
   function cycleOf(spec, balance, stake, mult) {
     var min = hub.minStake || FALLBACK_MIN, p = winChance(spec) || 0.5, R = payRatio(spec);
     var s0 = Math.max(min, stake), st = s0, spent = 0, prob = 1, depth = 0, e = 0, ok = 0;
-    while (spent + st <= balance + 1e-9 && depth < 300) {
+    while (spent + st <= balance + 1e-9 && st * R <= PAYOUT_CAP && depth < 300) {
       e += prob * p * (cents(st * R) - st - spent); ok += prob * p;
       spent += st; prob *= 1 - p; st = round2(st * mult); depth++;
     }
@@ -601,7 +606,7 @@
       var need = spent + s0 * (R - 1);
       for (var n = Math.round(9 - 10 * winChance(spec)) + 1; n <= RECOVER_LAST; n++) {
         var rs = Math.max(min, cents(need / (OU_PAY[n] - 1), true)), pn = (9 - n) / 10;
-        if (rs > balance - spent + 1e-9) continue;
+        if (rs > balance - spent + 1e-9 || rs * OU_PAY[n] > PAYOUT_CAP) continue;
         e += prob * pn * (cents(rs * OU_PAY[n]) - rs - spent); ok += prob * pn; bust = prob * (1 - pn);
         break;
       }
@@ -619,6 +624,8 @@
     if (balance > 0) {
       var spec = makeSpec(type, variant), m = TYPES[type].defMult(spec.variant), d = perType(SAFE_DEPTH, type, spec.variant);
       stake = cents(balance * (m - 1) / (Math.pow(m, d) - 1));
+      // On a large balance the ladder's last step must stay under Deriv's maximum payout too.
+      stake = Math.min(stake, cents(PAYOUT_CAP / (payRatio(spec) * Math.pow(m, d - 1))));
       // Cent rounding up the ladder can cost a step: the largest stake that still covers them all.
       for (var k = 0; k < 100 && stake > min && cycleOf(spec, balance, stake, m).depth < d; k++) stake = round2(stake - 0.01);
       tp = round2(balance * perType(TP_SHARE, type, spec.variant));
@@ -1480,9 +1487,22 @@
       }
       waited = 0; lastWait = 0;
 
+      /* A Martingale stake whose payout would be past Deriv's maximum is refused. The types with
+         the dynamic recovery hand over to it, as when the balance is short; the others trade the
+         largest stake Deriv takes (the ladder keeps counting). */
+      var amount = rec ? rec.stake : null;
+      if (!rec && pick.ratio > 1 && r.stake * pick.ratio > PAYOUT_CAP) {
+        if (recovers(r.spec) && owed(r) > 0 && live) {
+          try { rec = await recovery(r, Number(D.accountOf(r.account).balance)); } catch (e) { rec = null; }
+          if (r.stopping) continue;
+        }
+        if (rec) { pick = rec.pick; amount = rec.stake; }
+        else { amount = cents(PAYOUT_CAP / pick.ratio); r.showStake = amount; }
+      }
+
       var res;
       if (rec) { r.showStake = rec.stake; paintRun(fill(T("Recovering with {side}"), { side: pick.side.label() })); }
-      try { res = await buyOnce(r, pick, rec ? rec.stake : null); }
+      try { res = await buyOnce(r, pick, amount); }
       catch (e) {
         r.showStake = null;
         if (e.wait) {
@@ -1561,14 +1581,14 @@
         var p = await payoutOf(r.account, m.sym, "DIGITOVER", n, ref);
         if (!p) { if (n === from) break; continue; }             // this market does not sell Over/Under
         var stake = Math.max(hub.minStake, Math.ceil(need / (p / ref - 1) * 100) / 100);
-        if (!(p > ref) || stake > balance + 1e-9) continue;
+        if (!(p > ref) || stake > balance + 1e-9 || stake * p / ref > PAYOUT_CAP) continue;
         // Deriv's price at this very stake rounds to cents: make sure it wins back the lot.
         for (var k = 0; k < 4; k++) {
           var pay = await payoutOf(r.account, m.sym, "DIGITOVER", n, stake);
           if (!pay || round2(pay - stake) >= need - 1e-9) break;
           stake = round2(stake + Math.ceil((need - (pay - stake)) / (pay / stake - 1) * 100) / 100);
         }
-        if (stake > balance + 1e-9) continue;
+        if (stake > balance + 1e-9 || stake * p / ref > PAYOUT_CAP) continue;
         var spec = makeSpec("overunder", String(n)), best = null;
         spec.sides.forEach(function (sd) { m.ratio[sd.priceKey] = p / ref; });
         spec.sides.forEach(function (sd) { var c = candidate(m, sd); if (c && (!best || better(c, best))) best = c; });
