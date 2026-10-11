@@ -86,9 +86,9 @@
   var KEEP_KEY = "shalo_bot_keep";      // 1: "Save settings" is on
   var SAFE_KEY = "shalo_bot_safe";      // 0: "Safe" is off (it is on unless turned off)
   /* The risk guide (the switch where "Save settings" was), 1: on — off unless turned on,
-     remembered in this browser. On, each type starts from its own stake and take profit for
-     the balance and both carry Safe / High / Too high; off, the figures start as they always
-     did (the smallest stake, a take profit of 3% of the balance, never under 3 USD), no words. */
+     remembered in this browser. On, the stake and the take profit carry Safe / High / Too high
+     and the safe figure; off, no words. Either way each type starts from its own stake and a
+     take profit of 10% of the balance. */
   var GUIDE_KEY = SAFE_KEY.replace(/safe$/, "guide");
   var PX_KEY = "shalo_bot_px", PX_TTL = 12 * 3600e3;   // payouts seen, per market and side
   var WATCH_HIST = 1000;                // ticks per market replayed through the watch
@@ -577,12 +577,13 @@
 
   /* Each type's starting stake is the one whose Martingale ladder the balance covers for
      SAFE_DEPTH losses in a row, and its take profit TP_SHARE of the balance (never under
-     3 USD): a target about 1 run in 20 or fewer ends short of. Payouts per 1 staked, the
-     app's markup in (measured 2026-10-04): Over n / Under 9−n, Differs, a 50/50 trade. */
+     3 USD) — a profit worth a run. A target up to TP_SHARE is safe, up to TP_HIGH high, more
+     too high. Payouts per 1 staked, the app's markup in (measured 2026-10-04): Over n /
+     Under 9−n, Differs, a 50/50 trade. */
   // Differs and its kind (Over 0–3, with the dynamic recovery) cover 3 losses in a row or more;
   // Even/Odd, Rise/Fall and the high-payout Over 4–7 cover 6 or more and still win it back.
   var SAFE_DEPTH = { evenodd: 6, risefall: 6, matchdiff: 3, overunder: [3, 3, 4, 5, 6, 6, 9, 14] };
-  var TP_SHARE = { evenodd: 0.02, risefall: 0.03, matchdiff: 0.015, overunder: [0.015, 0.025, 0.0275, 0.0275, 0.03, 0.0325, 0.025, 0.0275] };
+  var TP_SHARE = 0.10, TP_HIGH = 0.16;
   var OU_PAY = [1.06, 1.19, 1.35, 1.56, 1.85, 2.26, 2.92, 4.13], HALF_PAY = 1.845;
   function perType(table, type, variant) { var v = table[type]; return Array.isArray(v) ? v[Number(variant)] : v; }
   function payRatio(spec) {
@@ -615,18 +616,8 @@
     }
     return { depth: depth, bust: bust, profit: ok > 0 ? e / ok : 0 };
   }
-  /** The largest take profit a run reaches 19 times in 20 from this cycle (0: none — even
-   *  one cycle at this stake ends short more often than that). */
-  function safeTarget(c) {
-    if (!c.depth || !(c.profit > 0) || c.bust >= 0.05) return 0;
-    return c.bust > 0 ? cents(c.profit * Math.log(0.95) / Math.log(1 - c.bust) - 0.005) : Infinity;
-  }
-  function defaultsFor(balance, type, variant) {
-    var min = hub.minStake || FALLBACK_MIN;
-    // The risk guide off: the figures as they always were.
-    if (!guide) return { stake: Math.max(min, 0.35), tp: Math.max(DEFAULT_TP_MIN, balance > 0 ? round2(balance * 0.03) : 0), sl: DEFAULT_SL };
-    return guidedDefaults(balance, type, variant);
-  }
+  /** The starting figures, the guide on or off: it only says what they risk. */
+  function defaultsFor(balance, type, variant) { return guidedDefaults(balance, type, variant); }
   function guidedDefaults(balance, type, variant) {
     var min = hub.minStake || FALLBACK_MIN, stake = min, tp = 0;
     if (balance > 0) {
@@ -636,26 +627,24 @@
       stake = Math.min(stake, cents(PAYOUT_CAP / (payRatio(spec) * Math.pow(m, d - 1))));
       // Cent rounding up the ladder can cost a step: the largest stake that still covers them all.
       for (var k = 0; k < 100 && stake > min && cycleOf(spec, balance, stake, m).depth < d; k++) stake = round2(stake - 0.01);
-      tp = round2(balance * perType(TP_SHARE, type, spec.variant));
-      var c = cycleOf(spec, balance, Math.max(min, stake), m), green = safeTarget(c);
-      if (green > 0 && tp > green) tp = green;   // the cents can tip it just past the green line
+      tp = round2(balance * TP_SHARE);
     }
     return { stake: Math.max(min, stake), tp: Math.max(DEFAULT_TP_MIN, tp), sl: DEFAULT_SL };
   }
   /** The figures' risk on this balance: the stake by the losses in a row it survives, the
-   *  take profit by the chance a run ends with the balance short (green under 5%, amber to
-   *  12%, red above), and the safe figure for each. */
+   *  take profit by its share of the balance (up to 10% safe, to 16% high, more too high),
+   *  and the safe figure for each. */
   function riskOf(spec, balance, stake, mult, tp) {
     var min = hub.minStake || FALLBACK_MIN, d = perType(SAFE_DEPTH, spec.type, spec.variant);
     var c = cycleOf(spec, balance, stake, mult);
-    var odds = !c.depth || !(c.profit > 0) ? 1 : 1 - Math.pow(1 - c.bust, Math.max(1, tp / c.profit));
+    var share = tp / balance;
     var safeStake = guidedDefaults(balance, spec.type, spec.variant).stake;
-    var safeTp = safeTarget(c);
+    var safeTp = cents(balance * TP_SHARE);
     return {
       stake: c.depth >= d ? "safe" : c.depth === d - 1 ? "high" : "over", depth: c.depth, need: d,
       needBal: c.depth >= d ? 0 : balanceFor(spec, stake, mult, d),
       safeStake: cycleOf(spec, balance, safeStake, mult).depth >= d ? safeStake : 0,
-      tp: odds < 0.05 ? "safe" : odds <= 0.12 ? "high" : "over", odds: odds, safeTp: safeTp,
+      tp: share <= TP_SHARE + 1e-9 ? "safe" : share <= TP_HIGH + 1e-9 ? "high" : "over", safeTp: safeTp,
     };
   }
   /** The balance this stake's ladder needs to cover the type's losses in a row (0: none — a
