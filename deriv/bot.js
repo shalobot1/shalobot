@@ -660,8 +660,10 @@
     var safeTp = cents(balance * TP_SHARE);
     return {
       stake: c.depth >= d ? "safe" : c.depth === d - 1 ? "high" : "over", depth: c.depth, need: d,
-      needBal: c.depth >= d ? 0 : balanceFor(spec, stake, mult, d),
-      safeStake: cycleOf(spec, balance, safeStake, mult).depth >= d ? safeStake : 0,
+      // The balance the type needs at the smallest stake (0.35), with this Martingale.
+      needBal: c.depth >= d ? 0 : balanceFor(spec, min, mult, d),
+      // The guide's stake, or the smallest one when only that rides this Martingale's ladder out.
+      safeStake: cycleOf(spec, balance, safeStake, mult).depth >= d ? safeStake : cycleOf(spec, balance, min, mult).depth >= d ? min : 0,
       // In whole cents, as the figures are typed: 10% of 1,036.67 is 103.66, and 103.67 is over it.
       tp: tp <= safeTp + 1e-9 ? "safe" : tp <= cents(balance * TP_HIGH) + 1e-9 ? "high" : "over", safeTp: safeTp,
     };
@@ -1927,9 +1929,12 @@
     var safe0 = guidedDefaults(B, spec.type, spec.variant).stake, room = cycleOf(spec, B, safe0, def).depth >= d;
     if (risk.stake !== "safe") {
       if (!room) {
-        // No figures are safe on this balance: the balance is what was short, and what it needed.
-        var need = balanceFor(spec, r.stake0, m, d) || balanceFor(spec, min, def, d);
+        // No figures are safe on this balance: the balance is what was short, and what it needed —
+        // at the smallest stake (0.35) and the type's own Martingale, the guide's figures. A
+        // Martingale above the type's is a point of its own.
+        var need = balanceFor(spec, min, def, d);
         out.push(need > 0 ? fill(T(WHY.bal), { bal: M(B), need: M(need) }) : fill(T(WHY.balOnly), { bal: M(B) }));
+        if (!dynamicMult(spec.type, spec.variant) && m > def + 1e-9) out.push(fill(T(WHY.mult), { m: m, def: def }));
       } else {
         if (r.stake0 > safe0 + 1e-9) out.push(fill(T(WHY.stake), { stake: M(r.stake0), safe: M(safe0) }));
         if (!dynamicMult(spec.type, spec.variant) && m > def + 1e-9) out.push(fill(T(WHY.mult), { m: m, def: def }));
@@ -1941,7 +1946,9 @@
     if (why === "sl" && r.sl > 0) {
       // The losses in a row, from the starting stake, that reach the stop loss: fewer than the type needs is too small.
       for (var st = Math.max(min, r.stake0), sum = 0, k = 0; k < 300 && sum < r.sl - 1e-9; k++) { sum = round2(sum + st); st = round2(st * m); }
-      var needSl = balanceFor(spec, r.stake0, m, d) || (room ? balanceFor(spec, safe0, def, d) : 0);
+      // The room the ladder needs: the run's own when its stake was safe, else the guide's
+      // (its safe stake, or the smallest, 0.35, at the type's Martingale), as the other points say.
+      var needSl = risk.stake === "safe" ? balanceFor(spec, r.stake0, m, d) : balanceFor(spec, room ? safe0 : min, def, d);
       if (k < d && needSl > 0) out.push(fill(T(WHY.sl), { sl: M(r.sl), need: M(needSl) }));
     }
     return out;
@@ -1956,23 +1963,16 @@
     whyShown = list.length ? { view: view, box: box, r: r, why: why } : null;
     v.classList.toggle("has-why", list.length > 0);
     b.hidden = !list.length;
-    b.innerHTML = list.length ? '<p class="bm-why-h">' + esc(T("What went wrong")) + "</p><ul>" +
-      list.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + '</ul><p class="bm-why-note">' + esc(T(WHY.note)) + "</p>" : "";
+    // The points, then the note as a tip of its own (green: advice, not a warning).
+    b.innerHTML = list.length ? '<div class="bm-why-box"><p class="bm-why-h">' + esc(T("What went wrong")) + "</p><ul>" +
+      list.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + '</ul></div><div class="bm-why-tip"><span class="bm-why-tip-i" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></span><p><b>' +
+      esc(T("Tip")) + "</b>" + esc(T(WHY.note)) + "</p></div>" : "";
     b.style.maxHeight = "";
   }
-  /** The popup no bigger than it always was: measured as it would be without the points, and
-   *  their box given what is left (it scrolls for the rest). Again when the screen turns. */
+  /** The points show in full: the popup grows to hold them, its box never scrolls. */
   function fitWhy() {
-    if (!whyShown || modal.view !== whyShown.view) return;
-    var v = $(whyShown.view), b = $(whyShown.box), card = v && v.parentNode;
-    if (!v || !b || b.hidden || !card) return;
-    b.style.maxHeight = "";
-    v.classList.remove("has-why"); b.hidden = true;
-    var plain = card.offsetHeight;
-    v.classList.add("has-why"); b.hidden = false;
-    var over = card.offsetHeight - plain;
-    if (over > 0) b.style.maxHeight = Math.max(64, b.offsetHeight - over) + "px";
-    moreWhy();
+    var b = whyShown && $(whyShown.box);
+    if (b) { b.style.maxHeight = ""; b.classList.remove("is-more"); }
   }
   /** A box holding more than it shows says so: its foot fades until it is scrolled to the end. */
   function moreWhy() {

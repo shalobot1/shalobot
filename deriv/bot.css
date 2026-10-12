@@ -695,21 +695,21 @@
 }
 
 /* What went wrong (bot.js mistakes): the run's figures past the risk guide, as points, inside
-   the stop-loss and top-up popups — which keep their size: while the points show, the badge
-   sits beside the title, the rest is set closer, and bot.js gives the points' box what is left
-   of the popup's usual height (it scrolls for the rest, its foot fading while there is more). */
+   the stop-loss and top-up popups, shown in full (the popup grows to hold them, nothing scrolls
+   inside it), then the note as a green tip. While they show, the badge sits beside the title
+   and the rest is set closer. */
 .bm-why[hidden] { display: none; }
-.bm-why {
-  margin: 12px 0 0; padding: 10px 12px; text-align: left; border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent); background: var(--surface);
-  max-height: 220px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--sb-thumb, color-mix(in srgb, var(--ink-muted) 38%, transparent)) transparent;
-}
-.bm-why.is-more { -webkit-mask-image: linear-gradient(#000 calc(100% - 26px), rgba(0, 0, 0, 0.15)); mask-image: linear-gradient(#000 calc(100% - 26px), rgba(0, 0, 0, 0.15)); }
+.bm-why { margin: 12px 0 0; display: grid; gap: 8px; text-align: left; }
+.bm-why-box { padding: 10px 12px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent); background: var(--surface); }
 .bm-why-h { margin: 0 0 5px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--danger); }
 .bm-why ul { margin: 0; padding: 0 0 0 15px; display: grid; gap: 4px; list-style: disc outside; }
-.bm-why li { display: list-item; font-size: 12.5px; line-height: 1.4; color: var(--ink); }
+.bm-why li { display: list-item; font-size: 12.5px; line-height: 1.4; color: var(--ink); overflow-wrap: anywhere; }
 .bm-why li::marker { color: var(--danger); }
-.bm-why-note { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--line); font-size: 11.5px; line-height: 1.4; font-weight: 600; color: var(--amber); }
+.bm-why-tip { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--ok) 36%, transparent); background: color-mix(in srgb, var(--ok) 10%, var(--surface)); }
+.bm-why-tip-i { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.bm-why-tip p { margin: 0; font-size: 12px; line-height: 1.45; font-weight: 600; color: var(--ink); }
+.bm-why-tip b { display: block; margin-bottom: 2px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ok); }
 /* the compact card: badge beside the title, the rest closer */
 #bmLoss.has-why, #bmFund.has-why { display: grid; grid-template-columns: 1fr auto auto 1fr; align-items: center; column-gap: 10px; }
 #bmLoss.has-why > *, #bmFund.has-why > * { grid-column: 1 / -1; }
@@ -723,7 +723,18 @@
 #bmLoss.has-why .bm-actions, #bmFund.has-why .bm-actions { margin-top: 12px; }
 .bm:has(> #bmLoss.has-why:not([hidden])), .bm:has(> #bmFund.has-why:not([hidden])) { padding-top: 24px; }
 @media (max-width: 420px) {
-  .bm-why { padding: 9px 10px; }
+  .bm-why-box, .bm-why-tip { padding: 9px 10px; }
   .bm-why li { font-size: 12px; }
+  .bm-why-tip p { font-size: 11.5px; }
   #bmLoss.has-why > h2, #bmFund.has-why > h2 { font-size: 17px; }
+}
+/* A short screen: the popup with its points set closer still, so all of it shows at once. */
+@media (max-height: 680px) {
+  .bm:has(> #bmLoss.has-why:not([hidden])), .bm:has(> #bmFund.has-why:not([hidden])) { padding-top: 18px; padding-bottom: 14px; }
+  .bm-why { margin-top: 8px; gap: 6px; }
+  .bm-why-box, .bm-why-tip { padding: 8px 10px; }
+  .bm-why-tip-i { width: 24px; height: 24px; }
+  #bmLoss.has-why .bm-step, #bmFund.has-why .bm-step { margin-top: 6px; }
+  #bmFund.has-why .bm-fund-note { margin-top: 6px; }
+  #bmLoss.has-why .bm-actions, #bmFund.has-why .bm-actions { margin-top: 10px; }
 }

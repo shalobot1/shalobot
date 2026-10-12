@@ -551,5 +551,6 @@
 "Balance too small for this type ({bal}).":"Solde trop faible pour ce type ({bal}).",
 "Take profit too high ({tp}) — safe target: {safe}.":"Take profit trop élevé ({tp}) — objectif sûr : {safe}.",
 "Stop loss too small ({sl}) — set at least {need}.":"Stop loss trop bas ({sl}) — mettez au moins {need}.",
-"Rate limited. Waiting before retry...":"Limite de requêtes atteinte. Attente avant nouvelle tentative..."
+"Rate limited. Waiting before retry...":"Limite de requêtes atteinte. Attente avant nouvelle tentative...",
+"Tip":"Conseil"
 }
