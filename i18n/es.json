@@ -554,5 +554,7 @@
 "Rate limited. Waiting before retry...":"Límite de solicitudes. Esperando antes de reintentar...",
 "Tip":"Consejo",
 "The bot carries on by itself — no need to do anything.":"El bot continúa solo; no tienes que hacer nada.",
-"Analyzing the markets…":"Analizando los mercados…"
+"Analyzing the markets…":"Analizando los mercados…",
+"If your full balance is not visible, transfer funds to your Deriv options account.":"Si no ves todo tu saldo, transfiere fondos a tu cuenta de opciones de Deriv.",
+"Transfer funds":"Transferir fondos"
 }

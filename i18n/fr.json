@@ -554,5 +554,7 @@
 "Rate limited. Waiting before retry...":"Limite de requêtes atteinte. Attente avant nouvelle tentative...",
 "Tip":"Conseil",
 "The bot carries on by itself — no need to do anything.":"Le bot reprend tout seul, vous n’avez rien à faire.",
-"Analyzing the markets…":"Analyse des marchés…"
+"Analyzing the markets…":"Analyse des marchés…",
+"If your full balance is not visible, transfer funds to your Deriv options account.":"Si votre solde complet n'apparaît pas, transférez des fonds vers votre compte options Deriv.",
+"Transfer funds":"Transférer des fonds"
 }

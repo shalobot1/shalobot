@@ -32,8 +32,10 @@
   var deferred = null;
 
   function installed() {
-    var standalone = global.matchMedia && global.matchMedia("(display-mode: standalone)").matches;
-    return !!standalone || navigator.standalone === true;
+    /* Whatever window the installed app opens in: standalone, full screen, minimal-ui, a
+       desktop app's title bar or tabs; an iPhone home-screen app; an Android app shell. */
+    var app = global.matchMedia && global.matchMedia("(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui), (display-mode: window-controls-overlay), (display-mode: tabbed)").matches;
+    return !!app || navigator.standalone === true || String(document.referrer).indexOf("android-app://") === 0;
   }
 
   function isApple() {
