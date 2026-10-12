@@ -43,7 +43,12 @@
  * normal win (Even/Odd keeps the owner's 3.1). The Martingale stake is never
  * cut for the stop loss: the recovery trade is placed in full, and the run
  * stops once the loss has reached or passed the stop loss (so the last trade
- * may take it past), with a popup as for take profit. A balance that cannot
+ * may take it past), with a popup as for take profit. The stop loss is optional:
+ * off unless its switch is on, and a run then has none at all (Safe and the risk
+ * guide's figures carry it). A run that ends on its stop loss or on the balance
+ * says in that popup what it did past the risk guide — the stake, the
+ * Martingale, the balance, the take profit, the stop loss — with the figure that
+ * keeps to it; one that kept to the guide gets the popup as it always was. A balance that cannot
  * cover the next trade ends the run with a popup pointing to Deriv to top up.
  * Each new run starts from nothing.
  *
@@ -95,6 +100,11 @@
      and the safe figure; off, no words. Either way each type starts from its own stake and a
      take profit of 10% of the balance. */
   var GUIDE_KEY = SAFE_KEY.replace(/safe$/, "guide");
+  /* The stop loss has a switch of its own, 1: on — off unless turned on, remembered in this
+     browser. Off, a run has no stop loss at all (the field is hidden and nothing ends a run on
+     it), so Safe and the risk guide's figures carry it; on, the field as it was: the default
+     or the user's own figure. */
+  var SLON_KEY = SAFE_KEY.replace(/safe$/, "slon");
   var PX_KEY = "shalo_bot_px", PX_TTL = 12 * 3600e3;   // payouts seen, per market and side
   var WATCH_HIST = 1000;                // ticks per market replayed through the watch
   var DEPOSIT_URL = "https://home.deriv.com/dashboard/portfolio";
@@ -565,6 +575,7 @@
   var state = null;
   store.del(STATE_KEY);
   var guide = store.get(GUIDE_KEY) === 1;
+  var slOn = store.get(SLON_KEY) === 1;
   if (!state || !state.t) state = { type: "evenodd", t: {} };   // Even/Odd first
   if (ENABLED.indexOf(state.type) < 0) state.type = "evenodd";
   function persist() { if (keep) store.set(STATE_KEY, state); }
@@ -681,7 +692,7 @@
     var t = TYPES[state.type], variant = t.variants ? $("botVar").value : t.defVariant;
     return {
       type: state.type, variant: variant,
-      stake: round2(num("botStake")), tp: round2(num("botTp")), sl: round2(num("botSl")),
+      stake: round2(num("botStake")), tp: round2(num("botTp")), sl: slOn ? round2(num("botSl")) : 0, slOn: slOn,
       mult: dynamicMult(state.type, variant) ? multFor(state.type, variant) : Math.round(num("botMult") * 100) / 100,
     };
   }
@@ -833,7 +844,7 @@
     if (!(s.stake > 0)) return T("Enter a stake.");
     if (s.stake < hub.minStake - 1e-9) return fill(T("The smallest stake Deriv accepts is {min}."), { min: money(hub.minStake, hub.currency) });
     if (!(s.tp > 0)) return T("Enter a take profit above zero.");
-    if (!(s.sl > 0)) return T("Enter a stop loss above zero.");
+    if (s.slOn && !(s.sl > 0)) return T("Enter a stop loss above zero.");
     if (!(s.mult >= 1 && s.mult <= MULT_MAX)) return fill(T("Martingale must be between 1 (off) and {max}."), { max: MULT_MAX });
     return "";
   }
@@ -865,16 +876,16 @@
    *  that type (the user's own figure, or the balance's default). */
   function figuresFor(spec) {
     var c = D.current(), bal = balanceOf(c && c.id), min = hub.minStake || FALLBACK_MIN;
-    if (run && run.active && run.spec.key === spec.key) return { stake: run.stake0, mult: run.mult, tp: run.tp, sl: run.sl, balance: bal, min: min };
+    if (run && run.active && run.spec.key === spec.key) return { stake: run.stake0, mult: run.mult, tp: run.tp, sl: run.sl > 0 ? run.sl : Infinity, balance: bal, min: min };
     var ts = typeState(spec.type), d = defaultsFor(bal, spec.type, spec.variant);
     var own = function (k) { return ts.own[k] && ts[k] > 0 ? ts[k] : d[k]; };
-    var f = { stake: own("stake"), mult: multFor(spec.type, spec.variant), tp: own("tp"), sl: own("sl"), balance: bal, min: min };
+    var f = { stake: own("stake"), mult: multFor(spec.type, spec.variant), tp: own("tp"), sl: slOn ? own("sl") : Infinity, balance: bal, min: min };
     if (spec.type === state.type) {
       var s = readSettings();
       if (s.variant === spec.variant) {
         if (s.stake > 0) f.stake = s.stake;
         if (s.tp > 0) f.tp = s.tp;
-        if (s.sl > 0) f.sl = s.sl;
+        if (slOn && s.sl > 0) f.sl = s.sl;
         if (s.mult >= 1) f.mult = s.mult;
       }
     }
@@ -1211,7 +1222,7 @@
       $("bmStake").textContent = money(s.stake, hub.currency);
       $("bmMult").textContent = dynamicMult(s.type, s.variant) ? T("Dynamic") : "×" + s.mult;
       $("bmTp").textContent = money(s.tp, hub.currency);
-      $("bmSl").textContent = money(s.sl, hub.currency);
+      $("bmSl").textContent = s.slOn ? money(s.sl, hub.currency) : T("Off");
       openModal("bmDone");
       // No button to press: the bot starts on what the popup shows, and the
       // popup steps aside a moment later (x closes it sooner; trading goes on).
@@ -1253,7 +1264,7 @@
   function newRun(account, s, spec) {
     return {
       account: account, active: true, stopping: false, ended: null, spec: spec,
-      stake0: s.stake, stake: s.stake, tp: s.tp, sl: s.sl, mult: s.mult,
+      stake0: s.stake, stake: s.stake, tp: s.tp, sl: s.slOn === false ? 0 : s.sl, mult: s.mult, bal0: balanceOf(account),
       pl: 0, n: 0, won: 0, lost: 0, streak: 0, errors: 0, unpaid: 0, bookedAt: 0,
       log: [], ids: {}, currency: hub.currency, startedAt: Math.floor(Date.now() / 1000) - 1,
       bought: {}, pending: null,
@@ -1302,7 +1313,7 @@
       v: 1, account: r.account, type: r.spec.type, variant: r.spec.variant, stopping: !!r.stopping, held: !!r.held,
       safety: watch ? watch.realState(r.spec.key) : null,
       settings: { stake: r.stake0, tp: r.tp, sl: r.sl, mult: r.mult }, stake: r.stake,
-      pl: r.pl, n: r.n, won: r.won, lost: r.lost, streak: r.streak, startedAt: r.startedAt, currency: r.currency,
+      pl: r.pl, n: r.n, won: r.won, lost: r.lost, streak: r.streak, startedAt: r.startedAt, currency: r.currency, bal0: r.bal0,
       ids: Object.keys(r.ids), savedAt: Date.now(),
       bought: r.bought ? Object.keys(r.bought).filter(function (id) { return !r.ids[id]; }) : null, pending: r.pending || null,
       log: r.log.slice(0, 300).map(function (x) { return { id: x.id, at: x.at, market: x.market, label: x.label, tone: x.tone, share: x.share, stake: x.stake, pl: x.pl, won: x.won, total: x.total }; }),
@@ -1362,6 +1373,7 @@
     var r = newRun(sv.account, sv.settings, spec);
     r.stake = sv.stake; r.pl = sv.pl; r.n = sv.n; r.won = sv.won; r.lost = sv.lost; r.streak = sv.streak;
     r.startedAt = sv.startedAt; r.currency = sv.currency || r.currency; r.resumed = true;
+    if (sv.bal0 > 0) r.bal0 = sv.bal0;
     sv.ids.forEach(function (id) { r.ids[id] = 1; });
     r.bought = null;
     if (Array.isArray(sv.bought)) { r.bought = {}; sv.bought.forEach(function (id) { r.bought[String(id)] = 1; }); }
@@ -1456,7 +1468,7 @@
       if (run !== r || !($("bmRoot").hidden || modal.view === "bmDone")) return;
       if (reason === "tp") celebrate(r);
       else if (reason === "sl") stopped(r);
-      else if (reason === "balance") topUp(r.account, r.stake);
+      else if (reason === "balance") topUp(r.account, r.stake, r);
     });
   }
 
@@ -1474,7 +1486,7 @@
     while (r.active) {
       if (r.stopping) return end(r, "user");
       if (r.pl >= r.tp - 1e-9) return end(r, "tp");
-      if (-r.pl >= r.sl - 1e-9) return end(r, "sl");
+      if (r.sl > 0 && -r.pl >= r.sl - 1e-9) return end(r, "sl");
       if ((r.held || safe) && await holding(r)) continue;
       var acc = D.accountOf(r.account), rec = null, live = hub.ready && hub.account === r.account;
       if (acc && acc.balance != null && r.stake > acc.balance + 1e-9) {
@@ -1876,7 +1888,100 @@
 
   /* ── the stop-loss popup ───────────────────────────────────────────── */
 
+  /* ── what went wrong: a run that ended on its stop loss or on the balance ── */
+
+  /* Read against the risk guide's own figures for the balance the run started on, whether the
+     guide was on or not: a stake whose Martingale ladder rides out fewer losses in a row than
+     the type needs (and the safe stake, and the balance that stake needed), a Martingale above
+     the type's tested one, a balance too small for the type at any stake (and the balance it
+     needed), a take profit over 10% of the balance on one run, and, at a stop loss, one that
+     ended the ladder before the losses the type needs. One point each, with the figure that
+     keeps to the guide. A run that kept to it gets none, and its popup says only what it
+     always said. Defaults are never a mistake: the smallest stake, a 3 USD take profit. */
+  var WHY = {
+    stake: "Stake too high: {stake} on a {bal} balance rides out {n} of the {d} losses in a row this type needs.",
+    stakeBal: "For this stake you needed a balance of {need}.",
+    mult: "Martingale too high: ×{m} instead of ×{def} — your stake rode out {n} of the {d} losses in a row this type needs.",
+    multShort: "Martingale too high: ×{m} instead of ×{def}.",
+    bal: "Balance too small for this type: {bal}.",
+    balNeed: "A {stake} stake needs at least {need} to ride out {d} losses in a row.",
+    tp: "Take profit too high: {tp} is {p}% of your {bal} balance on one run — that is overtrading.",
+    sl: "Stop loss too small: {sl} stopped the Martingale after {k} losses in a row — this type needs room for {d}: at least {need}.",
+    note: "Raising the stake, aiming for too much profit in one run, overtrading and trading without enough balance are why most traders fail.",
+  };
+  function mistakes(r, why) {
+    var B = r && r.bal0, spec = r && r.spec;
+    if (!(B > 0) || !spec || !TYPES[spec.type] || !(r.stake0 > 0) || !(r.mult >= 1)) return [];
+    var min = hub.minStake || FALLBACK_MIN, d = perType(SAFE_DEPTH, spec.type, spec.variant), m = r.mult, out = [];
+    var M = function (v) { return money(v, r.currency); };
+    var risk = riskOf(spec, B, r.stake0, m, r.tp), def = TYPES[spec.type].defMult(spec.variant);
+    // The guide's own figures on this balance: its stake, at the type's own Martingale.
+    var safe0 = guidedDefaults(B, spec.type, spec.variant).stake, room = cycleOf(spec, B, safe0, def).depth >= d;
+    if (risk.stake !== "safe") {
+      var hiStake = r.stake0 > safe0 + 1e-9, hiMult = !dynamicMult(spec.type, spec.variant) && m > def + 1e-9;
+      if (!room) {
+        // No figures are safe on this balance: the balance is what was short — and how much it needed,
+        // at this stake and Martingale (else at the smallest stake and the type's own).
+        var need = balanceFor(spec, r.stake0, m, d), at = r.stake0;
+        if (!(need > 0)) { need = balanceFor(spec, min, def, d); at = min; }
+        out.push((fill(T(WHY.bal), { bal: M(B) }) + (need > 0 ? " " + fill(T(WHY.balNeed), { stake: M(Math.max(min, at)), need: M(need), d: d }) : "")).trim());
+      } else {
+        if (hiStake) out.push([fill(T(WHY.stake), { stake: M(r.stake0), bal: M(B), n: risk.depth, d: d }), fill(T("Safe stake: {v}."), { v: M(safe0) }),
+          risk.needBal > 0 ? fill(T(WHY.stakeBal), { need: M(risk.needBal) }) : ""].join(" ").trim());
+        if (hiMult) out.push(hiStake ? fill(T(WHY.multShort), { m: m, def: def }) : fill(T(WHY.mult), { m: m, def: def, n: risk.depth, d: d }));
+      }
+    }
+    if (r.tp > DEFAULT_TP_MIN + 1e-9 && risk.tp !== "safe") {
+      out.push(fill(T(WHY.tp), { tp: M(r.tp), p: Math.round(100 * r.tp / B), bal: M(B) }) + " " + fill(T("Safe target: {v}."), { v: M(Math.max(DEFAULT_TP_MIN, risk.safeTp)) }));
+    }
+    if (why === "sl" && r.sl > 0) {
+      // The losses in a row, from the starting stake, that reach the stop loss.
+      for (var st = Math.max(min, r.stake0), sum = 0, k = 0; k < 300 && sum < r.sl - 1e-9; k++) { sum = round2(sum + st); st = round2(st * m); }
+      // The room the type needs: this stake's ladder, else (past Deriv's maximum payout) the guide's.
+      var needSl = balanceFor(spec, r.stake0, m, d) || (room ? balanceFor(spec, safe0, def, d) : 0);
+      if (k < d && needSl > 0) out.push(fill(T(WHY.sl), { sl: M(r.sl), k: k, d: d, need: M(needSl) }));
+    }
+    return out;
+  }
+  /** The points in their box under the popup's own words (the popup keeps its size: its
+   *  page's CSS makes the rest compact while they show), or nothing at all. */
+  var whyShown = null;
+  function paintWhy(view, box, r, why) {
+    var v = $(view), b = $(box);
+    if (!v || !b) return;
+    var list = mistakes(r, why);
+    whyShown = list.length ? { view: view, box: box, r: r, why: why } : null;
+    v.classList.toggle("has-why", list.length > 0);
+    b.hidden = !list.length;
+    b.innerHTML = list.length ? '<p class="bm-why-h">' + esc(T("What went wrong")) + "</p><ul>" +
+      list.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + '</ul><p class="bm-why-note">' + esc(T(WHY.note)) + "</p>" : "";
+    b.style.maxHeight = "";
+  }
+  /** The popup no bigger than it always was: measured as it would be without the points, and
+   *  their box given what is left (it scrolls for the rest). Again when the screen turns. */
+  function fitWhy() {
+    if (!whyShown || modal.view !== whyShown.view) return;
+    var v = $(whyShown.view), b = $(whyShown.box), card = v && v.parentNode;
+    if (!v || !b || b.hidden || !card) return;
+    b.style.maxHeight = "";
+    v.classList.remove("has-why"); b.hidden = true;
+    var plain = card.offsetHeight;
+    v.classList.add("has-why"); b.hidden = false;
+    var over = card.offsetHeight - plain;
+    if (over > 0) b.style.maxHeight = Math.max(64, b.offsetHeight - over) + "px";
+    moreWhy();
+  }
+  /** A box holding more than it shows says so: its foot fades until it is scrolled to the end. */
+  function moreWhy() {
+    var b = whyShown && $(whyShown.box);
+    if (b) b.classList.toggle("is-more", b.scrollTop + b.clientHeight < b.scrollHeight - 2);
+  }
+  global.addEventListener("resize", function () { if (whyShown) fitWhy(); });
+  ["bmLossWhy", "bmFundWhy"].forEach(function (id) { if ($(id)) $(id).addEventListener("scroll", moreWhy, { passive: true }); });
+
   function stopped(r) {
+    paintWhy("bmLoss", "bmLossWhy", r, "sl");
+    setTimeout(fitWhy, 0);
     $("bmLossAmt").textContent = signed(r.pl, r.currency);
     $("bmLossSum").textContent = fill(T("Trades: {n} · Won: {w} · Lost: {l}"), { n: r.n, w: r.won, l: r.lost });
     result("bmLoss");
@@ -1884,7 +1989,9 @@
 
   /* ── not enough balance: where to top up ───────────────────────────── */
 
-  function topUp(accountId, stake) {
+  function topUp(accountId, stake, r) {
+    paintWhy("bmFund", "bmFundWhy", r || null, "balance");
+    setTimeout(fitWhy, 0);
     var acc = D.accountOf(accountId), real = !!(acc && acc.type === "real"), cur = (acc && acc.currency) || hub.currency;
     $("bmFundText").textContent = fill(T("Your balance ({bal}) can't cover the next trade ({stake})."), { bal: money(acc ? Number(acc.balance) || 0 : 0, cur), stake: money(stake, cur) });
     $("bmFundNote").textContent = real ? T("Already deposited but don't see it here? On Deriv, tap Transfer and move the money to Options.") : T("Top up or reset your demo balance on Deriv.");
@@ -1957,7 +2064,7 @@
     b.disabled = !!(running && run.stopping) || (!c && !needsReal());
     $("botGoText").textContent = running ? (run.stopping ? T("Stopping…") : T("Stop")) : T("Scan & start");
     b.classList.toggle("is-real", !running && !!(c && c.type === "real"));
-    ["botStake", "botTp", "botSl", "botMult", "botVar"].forEach(function (id) { $(id).disabled = running; });
+    ["botStake", "botTp", "botSl", "botMult", "botVar", "botSlOn"].forEach(function (id) { if ($(id)) $(id).disabled = running; });
     $("botTypes").classList.toggle("is-locked", running);
     Array.prototype.forEach.call(document.querySelectorAll(".bot-type"), function (t) { t.disabled = running && !t.classList.contains("is-on"); });
   }
@@ -2042,6 +2149,20 @@
       if (safe) store.del(SAFE_KEY); else store.set(SAFE_KEY, 0);
     });
   }
+  /** The stop loss's switch and its field: hidden while it is off. */
+  function paintSl() {
+    if ($("botSlOn")) $("botSlOn").checked = slOn;
+    if ($("botSlWrap")) $("botSlWrap").hidden = !slOn;
+  }
+  if ($("botSlOn")) {
+    paintSl();
+    $("botSlOn").addEventListener("change", function () {
+      if (run && run.active) { paintSl(); return; }   // a run keeps the stop loss it started with
+      slOn = $("botSlOn").checked;
+      if (slOn) store.set(SLON_KEY, 1); else store.del(SLON_KEY);
+      paintSl();
+    });
+  }
   if ($("bmHoldStop")) $("bmHoldStop").addEventListener("click", function () { stop(); closeModal(); });
   $("botGo").addEventListener("click", function () {
     if (run && run.active) return stop();
@@ -2058,7 +2179,7 @@
   $("bmRoot").addEventListener("click", function (e) { if (e.target.closest("[data-bm-close]")) closeModal(); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("bmRoot").hidden) closeModal(); });
   global.addEventListener("shalo:account", onAccount);
-  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); paintType(); paintVariants(); if (dynamicMult(state.type, formVariant)) paintMult(state.type, formVariant); if (modal.view === "bmReal") realWords(); paintRisk(); });   // the word, in the new language; a typed figure stays
+  global.addEventListener("langchange", function () { paintRun(); paintButton(); paintMin(); paintNow(); paintType(); paintVariants(); if (dynamicMult(state.type, formVariant)) paintMult(state.type, formVariant); if (modal.view === "bmReal") realWords(); paintRisk(); if (whyShown && modal.view === whyShown.view) { paintWhy(whyShown.view, whyShown.box, whyShown.r, whyShown.why); fitWhy(); } });   // the word, in the new language; a typed figure stays
   // The sign-in ended, or a note took the page (Deriv upgrading the account), while the popup
   // on opening a real account was up: the page says so, not the popup.
   global.addEventListener("shalo:expired", function () { if (modal.view === "bmReal") closeModal(); });

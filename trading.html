@@ -125,7 +125,8 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
               <span class="bot-in"><input id="botMult" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" /><em data-i18n-skip>×</em></span></label>
             <label class="bot-f"><span class="bot-fh"><span>Take profit</span><b class="bot-risk" id="botTpRisk" data-i18n-skip hidden></b></span>
               <span class="bot-in"><input id="botTp" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" /><em data-bot-cur data-i18n-skip>USD</em></span></label>
-            <label class="bot-f"><span>Stop loss</span>
+            <!-- Shown while the Stop loss switch is on (off unless turned on: no stop loss). -->
+            <label class="bot-f" id="botSlWrap" hidden><span>Stop loss</span>
               <span class="bot-in"><input id="botSl" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" /><em data-bot-cur data-i18n-skip>USD</em></span></label>
           </div>
           <div class="bot-risk-note" id="botRisk" data-i18n-skip hidden></div>
@@ -137,6 +138,8 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
               <!-- The risk guide (off unless turned on): Safe / High / Too high on the stake and the take
                    profit, and the safe figure. On or off, each type starts from its own figures. -->
               <label class="bot-keep"><input type="checkbox" id="botGuide" role="switch" /><i aria-hidden="true"></i><span>Risk guide</span></label>
+              <!-- The stop loss (off unless turned on): off, a run has none and its field is hidden. -->
+              <label class="bot-keep"><input type="checkbox" id="botSlOn" role="switch" /><i aria-hidden="true"></i><span>Stop loss</span></label>
             </span>
           </div>
 
@@ -287,6 +290,8 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
       <p class="bm-step">The bot stopped at your limit.</p>
       <div class="bm-amount bm-amount--loss" id="bmLossAmt" data-i18n-skip></div>
       <p class="bm-win-sum" id="bmLossSum" data-i18n-skip></p>
+      <!-- What the run did past the risk guide (bot.js mistakes), when it did. -->
+      <div class="bm-why" id="bmLossWhy" data-i18n-skip hidden></div>
       <div class="bm-actions">
         <button class="btn btn-blue btn-lg" type="button" data-bm-close>Done</button>
       </div>
@@ -298,6 +303,7 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
       </div>
       <h2>Top up to keep trading</h2>
       <p class="bm-step" id="bmFundText" data-i18n-skip></p>
+      <div class="bm-why" id="bmFundWhy" data-i18n-skip hidden></div>
       <p class="bm-fund-note" id="bmFundNote" data-i18n-skip></p>
       <div class="bm-actions">
         <button class="btn btn-line btn-lg" type="button" data-bm-close>Close</button>

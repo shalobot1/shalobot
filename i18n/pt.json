@@ -534,5 +534,15 @@
 "is more than the balance.":"é maior que o saldo.",
 "Use {v}":"Usar {v}",
 "Risk guide":"Guia de risco",
-"Recommended balance: {v}.":"Saldo recomendado: {v}."
+"Recommended balance: {v}.":"Saldo recomendado: {v}.",
+"What went wrong":"O que deu errado",
+"Stake too high: {stake} on a {bal} balance rides out {n} of the {d} losses in a row this type needs.":"Valor alto demais: {stake} com saldo de {bal} aguenta {n} das {d} perdas seguidas de que este tipo precisa.",
+"For this stake you needed a balance of {need}.":"Para este valor você precisava de um saldo de {need}.",
+"Martingale too high: ×{m} instead of ×{def} — your stake rode out {n} of the {d} losses in a row this type needs.":"Martingale alto demais: ×{m} em vez de ×{def} — seu valor aguentou {n} das {d} perdas seguidas de que este tipo precisa.",
+"Martingale too high: ×{m} instead of ×{def}.":"Martingale alto demais: ×{m} em vez de ×{def}.",
+"Balance too small for this type: {bal}.":"Saldo pequeno demais para este tipo: {bal}.",
+"A {stake} stake needs at least {need} to ride out {d} losses in a row.":"Um valor de {stake} precisa de pelo menos {need} para aguentar {d} perdas seguidas.",
+"Take profit too high: {tp} is {p}% of your {bal} balance on one run — that is overtrading.":"Take profit alto demais: {tp} é {p}% do seu saldo de {bal} em uma só sessão — isso é overtrading.",
+"Stop loss too small: {sl} stopped the Martingale after {k} losses in a row — this type needs room for {d}: at least {need}.":"Stop loss baixo demais: {sl} parou o Martingale após {k} perdas seguidas — este tipo precisa de margem para {d}: pelo menos {need}.",
+"Raising the stake, aiming for too much profit in one run, overtrading and trading without enough balance are why most traders fail.":"Aumentar o valor, buscar lucro demais em uma só sessão, fazer overtrading e operar sem saldo suficiente é o motivo de a maioria dos traders fracassar."
 }
