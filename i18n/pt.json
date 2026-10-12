@@ -544,5 +544,11 @@
 "A {stake} stake needs at least {need} to ride out {d} losses in a row.":"Um valor de {stake} precisa de pelo menos {need} para aguentar {d} perdas seguidas.",
 "Take profit too high: {tp} is {p}% of your {bal} balance on one run — that is overtrading.":"Take profit alto demais: {tp} é {p}% do seu saldo de {bal} em uma só sessão — isso é overtrading.",
 "Stop loss too small: {sl} stopped the Martingale after {k} losses in a row — this type needs room for {d}: at least {need}.":"Stop loss baixo demais: {sl} parou o Martingale após {k} perdas seguidas — este tipo precisa de margem para {d}: pelo menos {need}.",
-"Raising the stake, aiming for too much profit in one run, overtrading and trading without enough balance are why most traders fail.":"Aumentar o valor, buscar lucro demais em uma só sessão, fazer overtrading e operar sem saldo suficiente é o motivo de a maioria dos traders fracassar."
+"Raising the stake, aiming for too much profit in one run, overtrading and trading without enough balance are why most traders fail.":"Aumentar o valor, buscar lucro demais em uma só sessão, fazer overtrading e operar sem saldo suficiente é o motivo de a maioria dos traders fracassar.",
+"Stake too high ({stake}) — safe stake: {safe}.":"Valor alto demais ({stake}) — valor seguro: {safe}.",
+"Martingale too high (×{m}) — use ×{def}.":"Martingale alto demais (×{m}) — use ×{def}.",
+"Balance too small for this type ({bal}) — recommended balance: {need}.":"Saldo pequeno demais para este tipo ({bal}) — saldo recomendado: {need}.",
+"Balance too small for this type ({bal}).":"Saldo pequeno demais para este tipo ({bal}).",
+"Take profit too high ({tp}) — safe target: {safe}.":"Take profit alto demais ({tp}) — meta segura: {safe}.",
+"Stop loss too small ({sl}) — set at least {need}.":"Stop loss baixo demais ({sl}) — coloque pelo menos {need}."
 }

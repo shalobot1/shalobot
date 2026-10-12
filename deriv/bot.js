@@ -1899,14 +1899,12 @@
      keeps to the guide. A run that kept to it gets none, and its popup says only what it
      always said. Defaults are never a mistake: the smallest stake, a 3 USD take profit. */
   var WHY = {
-    stake: "Stake too high: {stake} on a {bal} balance rides out {n} of the {d} losses in a row this type needs.",
-    stakeBal: "For this stake you needed a balance of {need}.",
-    mult: "Martingale too high: ×{m} instead of ×{def} — your stake rode out {n} of the {d} losses in a row this type needs.",
-    multShort: "Martingale too high: ×{m} instead of ×{def}.",
-    bal: "Balance too small for this type: {bal}.",
-    balNeed: "A {stake} stake needs at least {need} to ride out {d} losses in a row.",
-    tp: "Take profit too high: {tp} is {p}% of your {bal} balance on one run — that is overtrading.",
-    sl: "Stop loss too small: {sl} stopped the Martingale after {k} losses in a row — this type needs room for {d}: at least {need}.",
+    stake: "Stake too high ({stake}) — safe stake: {safe}.",
+    mult: "Martingale too high (×{m}) — use ×{def}.",
+    bal: "Balance too small for this type ({bal}) — recommended balance: {need}.",
+    balOnly: "Balance too small for this type ({bal}).",
+    tp: "Take profit too high ({tp}) — safe target: {safe}.",
+    sl: "Stop loss too small ({sl}) — set at least {need}.",
     note: "Raising the stake, aiming for too much profit in one run, overtrading and trading without enough balance are why most traders fail.",
   };
   function mistakes(r, why) {
@@ -1918,28 +1916,23 @@
     // The guide's own figures on this balance: its stake, at the type's own Martingale.
     var safe0 = guidedDefaults(B, spec.type, spec.variant).stake, room = cycleOf(spec, B, safe0, def).depth >= d;
     if (risk.stake !== "safe") {
-      var hiStake = r.stake0 > safe0 + 1e-9, hiMult = !dynamicMult(spec.type, spec.variant) && m > def + 1e-9;
       if (!room) {
-        // No figures are safe on this balance: the balance is what was short — and how much it needed,
-        // at this stake and Martingale (else at the smallest stake and the type's own).
-        var need = balanceFor(spec, r.stake0, m, d), at = r.stake0;
-        if (!(need > 0)) { need = balanceFor(spec, min, def, d); at = min; }
-        out.push((fill(T(WHY.bal), { bal: M(B) }) + (need > 0 ? " " + fill(T(WHY.balNeed), { stake: M(Math.max(min, at)), need: M(need), d: d }) : "")).trim());
+        // No figures are safe on this balance: the balance is what was short, and what it needed.
+        var need = balanceFor(spec, r.stake0, m, d) || balanceFor(spec, min, def, d);
+        out.push(need > 0 ? fill(T(WHY.bal), { bal: M(B), need: M(need) }) : fill(T(WHY.balOnly), { bal: M(B) }));
       } else {
-        if (hiStake) out.push([fill(T(WHY.stake), { stake: M(r.stake0), bal: M(B), n: risk.depth, d: d }), fill(T("Safe stake: {v}."), { v: M(safe0) }),
-          risk.needBal > 0 ? fill(T(WHY.stakeBal), { need: M(risk.needBal) }) : ""].join(" ").trim());
-        if (hiMult) out.push(hiStake ? fill(T(WHY.multShort), { m: m, def: def }) : fill(T(WHY.mult), { m: m, def: def, n: risk.depth, d: d }));
+        if (r.stake0 > safe0 + 1e-9) out.push(fill(T(WHY.stake), { stake: M(r.stake0), safe: M(safe0) }));
+        if (!dynamicMult(spec.type, spec.variant) && m > def + 1e-9) out.push(fill(T(WHY.mult), { m: m, def: def }));
       }
     }
     if (r.tp > DEFAULT_TP_MIN + 1e-9 && risk.tp !== "safe") {
-      out.push(fill(T(WHY.tp), { tp: M(r.tp), p: Math.round(100 * r.tp / B), bal: M(B) }) + " " + fill(T("Safe target: {v}."), { v: M(Math.max(DEFAULT_TP_MIN, risk.safeTp)) }));
+      out.push(fill(T(WHY.tp), { tp: M(r.tp), safe: M(Math.max(DEFAULT_TP_MIN, risk.safeTp)) }));
     }
     if (why === "sl" && r.sl > 0) {
-      // The losses in a row, from the starting stake, that reach the stop loss.
+      // The losses in a row, from the starting stake, that reach the stop loss: fewer than the type needs is too small.
       for (var st = Math.max(min, r.stake0), sum = 0, k = 0; k < 300 && sum < r.sl - 1e-9; k++) { sum = round2(sum + st); st = round2(st * m); }
-      // The room the type needs: this stake's ladder, else (past Deriv's maximum payout) the guide's.
       var needSl = balanceFor(spec, r.stake0, m, d) || (room ? balanceFor(spec, safe0, def, d) : 0);
-      if (k < d && needSl > 0) out.push(fill(T(WHY.sl), { sl: M(r.sl), k: k, d: d, need: M(needSl) }));
+      if (k < d && needSl > 0) out.push(fill(T(WHY.sl), { sl: M(r.sl), need: M(needSl) }));
     }
     return out;
   }
