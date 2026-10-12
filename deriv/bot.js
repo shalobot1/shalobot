@@ -759,9 +759,14 @@
     // No safe target under 1 USD is offered: the take profit's word stands alone then.
     var USE = "\u0001";
     // No stake safe on this balance: it says so, and the balance this one needs (at the smallest stake, in green — advice, not a warning).
+    // A figure to click whenever one is not safe: the safe stake, or the smallest (0.35) when no
+    // stake is safe on this balance; the take profit's 10% of the balance, never under 3 USD.
+    var useStake = r ? (r.safeStake > 0 ? r.safeStake : !atMin ? (hub.minStake || FALLBACK_MIN) : 0) : 0;
+    var useTp = r && isFinite(r.safeTp) ? Math.max(DEFAULT_TP_MIN, r.safeTp) : 0;
     if (r && r.stake !== "safe") lines.push([atMin ? "safe" : r.stake, T("Stake"), ((r.depth === 1 ? T("survives 1 loss in a row.") : r.depth ? fill(T("survives {n} losses in a row."), { n: r.depth }) : T("is more than the balance.")) + " " +
-      (r.safeStake > 0 ? fill(T("Safe stake: {v}."), { v: USE }) : T("The balance is small for this type.") + (r.needBal > 0 ? " " + fill(T("Recommended balance: {v}."), { v: money(r.needBal, hub.currency) }) : ""))).trim(), r.safeStake > 0 && ["stake", r.safeStake]]);
-    if (r && r.tp !== "safe" && r.safeTp >= 1 && isFinite(r.safeTp)) lines.push([r.tp, T("Take profit"), fill(T("Safe target: {v}."), { v: USE }), ["tp", r.safeTp]]);
+      (r.safeStake > 0 ? fill(T("Safe stake: {v}."), { v: USE }) : T("The balance is small for this type.") + (r.needBal > 0 ? " " + fill(T("Recommended balance: {v}."), { v: money(r.needBal, hub.currency) }) : "") +
+        (useStake > 0 ? " " + fill(T("Safe stake: {v}."), { v: USE }) : ""))).trim(), useStake > 0 && ["stake", useStake]]);
+    if (r && r.tp !== "safe" && useTp > 0 && tp > useTp + 1e-9) lines.push([r.tp, T("Take profit"), fill(T("Safe target: {v}."), { v: USE }), ["tp", useTp]]);
     $("botRisk").hidden = !lines.length;
     $("botRisk").innerHTML = lines.map(function (l) {
       var text = esc(l[2]);
@@ -1933,6 +1938,8 @@
         // at the smallest stake (0.35) and the type's own Martingale, the guide's figures. A
         // Martingale above the type's is a point of its own.
         var need = balanceFor(spec, min, def, d);
+        // A stake above the smallest is a point of its own too: the smallest is the one to use.
+        if (r.stake0 > min + 1e-9) out.push(fill(T(WHY.stake), { stake: M(r.stake0), safe: M(min) }));
         out.push(need > 0 ? fill(T(WHY.bal), { bal: M(B), need: M(need) }) : fill(T(WHY.balOnly), { bal: M(B) }));
         if (!dynamicMult(spec.type, spec.variant) && m > def + 1e-9) out.push(fill(T(WHY.mult), { m: m, def: def }));
       } else {
@@ -2014,6 +2021,14 @@
     error: "Stopped after an error.",
   };
 
+  /** The wait a running bot is in — Deriv's rate limit, a payout, the prices, the line, a check
+   *  with Deriv, Safe's pause — in the words its status shows, or "" (#botWait, the page's design). */
+  function waitOf(r, note) {
+    if (!r || !r.active || r.stopping) return "";
+    if (r.held) return T("Paused — waiting for stable conditions…");
+    var waits = [T("Rate limited. Waiting before retry..."), T("Waiting for Deriv to pay out the last trade…"), T("Waiting for live prices…"), T("Reconnecting to Deriv…"), T("Checking the trade with Deriv…")];
+    return note && waits.indexOf(note) >= 0 ? note : "";
+  }
   function paintRun(note) {
     var r = run;
     var cur = (r && r.currency) || hub.currency;
@@ -2024,7 +2039,10 @@
     $("botLost").textContent = String(r ? r.lost : 0);
     $("botNext").textContent = r && r.active ? money(r.showStake != null ? r.showStake : r.stake, cur) : "—";
     $("botStreak").textContent = String(r ? r.streak : 0);
-    $("botEmpty").hidden = !!(r && r.n);
+    // A wait the run is in: Recent trades shows it, moving, until the run trades again.
+    var waitText = waitOf(r, note), w = $("botWait");
+    $("botEmpty").hidden = !!(r && r.n) || !!(waitText && w);
+    if (w) { w.hidden = !waitText; if (waitText) $("botWaitText").textContent = waitText; }
     $("logN").textContent = r && r.n ? fill(T("{n} this run"), { n: r.n }) : "";
 
     var text, kind;

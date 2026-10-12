@@ -552,5 +552,6 @@
 "Take profit too high ({tp}) — safe target: {safe}.":"Take profit demasiado alto ({tp}) — objetivo seguro: {safe}.",
 "Stop loss too small ({sl}) — set at least {need}.":"Stop loss demasiado bajo ({sl}) — pon al menos {need}.",
 "Rate limited. Waiting before retry...":"Límite de solicitudes. Esperando antes de reintentar...",
-"Tip":"Consejo"
+"Tip":"Consejo",
+"The bot carries on by itself — no need to do anything.":"El bot continúa solo; no tienes que hacer nada."
 }

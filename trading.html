@@ -196,6 +196,12 @@ document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark");}
             <span>Time</span><span>Market</span><span>Side</span><span class="r">Stake</span><span class="r">Result</span><span class="r">Total</span>
           </div>
           <div class="bot-log-wrap">
+            <!-- A wait the run is in (bot.js waitOf): shown, moving, until it trades again. -->
+            <div class="bot-wait" id="botWait" role="status" aria-live="polite" hidden>
+              <span class="bot-wait-orb" aria-hidden="true"><i></i><i></i><i></i><b></b></span>
+              <span class="bot-wait-t"><strong id="botWaitText" data-i18n-skip></strong><span>The bot carries on by itself — no need to do anything.</span></span>
+              <span class="bot-wait-bar" aria-hidden="true"><i></i></span>
+            </div>
             <ul class="bot-log" id="botLog" translate="no"></ul>
             <div class="bot-empty" id="botEmpty">
               <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>

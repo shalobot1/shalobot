@@ -324,6 +324,30 @@
 .bot-row.is-won .br-p { color: var(--real); }
 .bot-row.is-lost .br-p { color: var(--danger); }
 
+/* A wait the run is in (bot.js waitOf): Deriv's rate limit, a payout, the prices, the line,
+   a check, Safe's pause. A radar keeps pulsing and a line sweeps under it until it trades again. */
+.bot-wait[hidden] { display: none; }
+.bot-wait {
+  position: relative; display: flex; align-items: center; gap: 14px; margin: 8px 6px 4px; padding: 14px 16px 17px;
+  border: 1px solid color-mix(in srgb, var(--ok) 30%, var(--line)); border-radius: 14px; overflow: hidden;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--ok) 10%, var(--surface)), var(--surface) 70%);
+  animation: bot-wait-in .35s ease-out both;
+}
+.bot-wait-orb { position: relative; flex: none; display: grid; place-items: center; width: 42px; height: 42px; }
+.bot-wait-orb i { position: absolute; inset: 0; border: 2px solid var(--ok); border-radius: 50%; opacity: 0; animation: bot-wait-ring 2.4s cubic-bezier(.2, .6, .3, 1) infinite; }
+.bot-wait-orb i:nth-child(2) { animation-delay: .8s; }
+.bot-wait-orb i:nth-child(3) { animation-delay: 1.6s; }
+.bot-wait-orb b { width: 14px; height: 14px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 14px color-mix(in srgb, var(--ok) 70%, transparent); animation: bot-wait-core 1.2s ease-in-out infinite alternate; }
+.bot-wait-t { display: grid; gap: 3px; min-width: 0; text-align: left; }
+.bot-wait-t strong { font-size: 13.5px; line-height: 1.35; font-weight: 700; color: var(--ink); }
+.bot-wait-t span { font-size: 12px; line-height: 1.4; color: var(--ink-muted); }
+.bot-wait-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; overflow: hidden; background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.bot-wait-bar i { position: absolute; top: 0; bottom: 0; width: 38%; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--ok), transparent); animation: bot-wait-sweep 1.7s ease-in-out infinite; }
+@keyframes bot-wait-ring { 0% { transform: scale(.32); opacity: .95; } 100% { transform: scale(1.22); opacity: 0; } }
+@keyframes bot-wait-core { from { transform: scale(.82); } to { transform: scale(1.08); } }
+@keyframes bot-wait-sweep { from { left: -38%; } to { left: 100%; } }
+@keyframes bot-wait-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .bot-wait-orb i, .bot-wait-orb b, .bot-wait-bar i { animation-duration: 4s; } }
 .bot-empty {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 6px; padding: 24px; text-align: center; color: var(--ink-muted);
