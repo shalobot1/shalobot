@@ -2026,6 +2026,8 @@
   function waitOf(r, note) {
     if (!r || !r.active || r.stopping) return "";
     if (r.held) return T("Paused — waiting for stable conditions…");
+    // Deriv's rate limit reads as what the bot is doing meanwhile (owner): analysing.
+    if (note && note === T("Rate limited. Waiting before retry...")) return T("Analyzing the markets…");
     var waits = [T("Rate limited. Waiting before retry..."), T("Waiting for Deriv to pay out the last trade…"), T("Waiting for live prices…"), T("Reconnecting to Deriv…"), T("Checking the trade with Deriv…")];
     return note && waits.indexOf(note) >= 0 ? note : "";
   }

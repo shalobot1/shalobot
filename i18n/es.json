@@ -553,5 +553,6 @@
 "Stop loss too small ({sl}) — set at least {need}.":"Stop loss demasiado bajo ({sl}) — pon al menos {need}.",
 "Rate limited. Waiting before retry...":"Límite de solicitudes. Esperando antes de reintentar...",
 "Tip":"Consejo",
-"The bot carries on by itself — no need to do anything.":"El bot continúa solo; no tienes que hacer nada."
+"The bot carries on by itself — no need to do anything.":"El bot continúa solo; no tienes que hacer nada.",
+"Analyzing the markets…":"Analizando los mercados…"
 }
