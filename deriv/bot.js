@@ -1571,7 +1571,8 @@
       // A win decided at its exit tick is paid out when Deriv books it.
       var pay = res.won ? round2(res.stake + res.pl) : 0;
       r.unpaid = round2(r.unpaid + pay);
-      res.final.then(function (f) { r.unpaid = round2(r.unpaid - pay); r.bookedAt = Date.now(); if (f) correct(r, f.id, f); });
+      // Only a payout moves the balance: a loss's booking pays nothing, so nothing waits on it.
+      res.final.then(function (f) { r.unpaid = round2(r.unpaid - pay); if (pay > 0 || (f && f.won)) r.bookedAt = Date.now(); if (f) correct(r, f.id, f); });
       r.stake = res.won ? r.stake0 : round2(r.stake * r.mult);
       saveRun(r);
       paintRun();
