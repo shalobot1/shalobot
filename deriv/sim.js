@@ -31,8 +31,7 @@
  * A badge reading "Simulation · not real money" is always on screen: in the
  * header, and on a phone pinned under it while the page scrolls, above every
  * popup and card so nothing covers it. The setup
- * card opens with the page until Start is pressed in that tab, and again on
- * three clicks on the green dot. Practice and testing need the real page's
+ * card opens only when it is asked for: three clicks on the green dot. Practice and testing need the real page's
  * behaviour, not a page that passes for real money: the badge is what keeps
  * it from that.
  *
@@ -816,9 +815,6 @@
 
   /* ── the card: three clicks on the green dot in the balance chip ───── */
 
-  // Start pressed in this tab: the reload it makes lands on the page, not the card again.
-  var STARTED = "shalo_ui_s";
-  function started() { try { return sessionStorage.getItem(STARTED) === "1"; } catch (e) { return false; } }
 
   function card() {
     var c = setup();
@@ -916,9 +912,13 @@
       c2.firstLoss = on("simFirst");
       delete c2.count;
       save(c2);
-      try { sessionStorage.removeItem(LEDGER); sessionStorage.removeItem(PLAN); sessionStorage.setItem(STARTED, "1"); } catch (e) {}
+      try { sessionStorage.removeItem(LEDGER); sessionStorage.removeItem(PLAN); } catch (e) {}
       global.location.reload();
     });
+
+    // Opened by mistake: Escape, or a click beside the card, puts it away with nothing changed.
+    wrap.addEventListener("click", function (e) { if (e.target === wrap) wrap.hidden = true; });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !wrap.hidden) wrap.hidden = true; });
 
     function openCard() {
       var r = global.ShaloBot && global.ShaloBot.run();
@@ -979,11 +979,7 @@
     if (global.MutationObserver) new MutationObserver(pin).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
     global.setInterval(pin, 250);
 
-    // Open with the page until Start has been pressed in this tab.
-    if (!started()) {
-      fillIn();
-      wrap.hidden = false;
-    }
+    // It never opens by itself, whatever the page or the tab: only the three clicks open it.
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", card);
   else card();
