@@ -1546,6 +1546,14 @@
           try { await D.whenOpenOn(r.account, 15000); } catch (x) {}
           continue;
         }
+        if (/RateLimit|TooManyRequests/.test(e.code || "") || /rate limit/i.test(e.message || "")) {
+          // Deriv's limit on how many buys an account sends in a short time: refused, so nothing
+          // was bought. Not an error: wait (longer while it repeats), then carry on as before.
+          r.rateWait = Math.min(30000, (r.rateWait || 1000) * 2);
+          paintRun(T("Rate limited. Waiting before retry..."));
+          for (var rw = 0; rw < r.rateWait && r.active && !r.stopping; rw += 250) await sleep(250);
+          continue;
+        }
         r.errors++;
         if (e.code === "InsufficientBalance") {
           if (r.errors < 3 && (await covered(r) || r.stopping)) continue;
@@ -1557,6 +1565,7 @@
         continue;
       }
       r.errors = 0;
+      r.rateWait = 0;
       r.showStake = null;
       record(r, { market: pick.m.name, sym: pick.m.sym, side: pick.side, share: pick.share }, res);
       // A win decided at its exit tick is paid out when Deriv books it.
