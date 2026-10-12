@@ -35,6 +35,17 @@
  * All of it becomes one figure, 0–100, and a state: green, yellow, red. The
  * state moves with a little hysteresis, so it does not flicker on one trade.
  *
+ * THE RUN'S OWN TRADES. While a run trades, the bot hands over each of its results
+ * (for the types that win at least half the time: Even/Odd, Rise/Fall, Differs,
+ * Over 0–4). Three patterns mark the type unstable at once, whatever the paper says
+ * — the losing streaks that hurt a Martingale: the run's first three trades all lost
+ * (counted again from a resume), four or more losses in a row, and three or more
+ * losses, one win, then three losses again. From then the type reads red until it
+ * is stable again: at least CALM paper trades since, none of the last CALM of them
+ * three losses in a row; then its own reading takes over and climbs back to green
+ * the usual way, through yellow. Safe pauses a run only after a win, so a run in
+ * such a streak trades on until its next win and pauses there.
+ *
  * WHAT IT IS NOT. The digits and ticks of these markets are random (backtested on
  * 400,000 real ticks), so a reading describes what has been happening, never the
  * odds of the next tick. It is used to keep the bot out of the way of conditions
@@ -76,6 +87,8 @@
     thin: 1.2,          // fewer than 3 markets live for the pick
   };
   var GREEN = 62, YELLOW_UP = 46, RED = 36, GREEN_DOWN = 56;
+  var CALM = 12;        // paper trades, none of them in three losses in a row, that end an alarm
+  var CAP = 30;         // the most a type reads while an alarm stands (red)
 
   var round2 = function (v) { return Math.round(v * 100) / 100; };
   function lastDigit(quote, dec) {
@@ -159,11 +172,32 @@
     return { state: "yellow", hold: 0 };
   }
 
+  /** The unstable pattern a run's trades show as the newest one settles, or null. `seq`:
+   *  its results since it started or resumed, oldest first (true = won). Pure.
+   *    "start"  — its first three trades all lost;
+   *    "streak" — four or more losses in a row;
+   *    "again"  — three or more losses in a row, one win, three losses in a row again. */
+  function unstable(seq) {
+    var n = seq.length, cur = 0;
+    for (var i = n - 1; i >= 0 && !seq[i]; i--) cur++;
+    if (n === 3 && cur === 3) return "start";
+    if (cur >= 4) return "streak";
+    if (cur >= 3) {
+      var w = n - 1 - cur, before = 0;   // the one win before this streak, and the streak before it
+      for (var j = w - 1; j >= 0 && !seq[j]; j--) before++;
+      if (w >= 0 && seq[w] && before >= 3) return "again";
+    }
+    return null;
+  }
+
   /* ── the watch ───────────────────────────────────────────────────────── */
 
   function create(o) {
     var mk = {}, order = [], lanes = {}, started = false, replaying = 0;
     var listeners = [];
+    // Per lane key, kept apart from the lanes (a lane is dropped and made again as the form
+    // changes): the run's trades since it started or resumed, and the alarm they raised.
+    var runs = {}, alarms = {};
 
     function market(sym, name) {
       var m = mk[sym];
@@ -268,7 +302,7 @@
       }
       freshSession(L);
     }
-    function settle(L, won) {
+    function settle(L, won, epoch) {
       var pos = L.pos, s = L.sess;
       L.pos = null;
       var pl = won ? round2(round2(pos.stake * pos.ratio) - pos.stake) : -pos.stake;
@@ -282,7 +316,7 @@
       var depth = isFinite(limit) && limit > 0 ? s.owed / limit : 0;
       L.depth = depth;
       if (!pos.rec) {
-        L.outs.push({ won: won, p: pos.p, d: depth });
+        L.outs.push({ won: won, p: pos.p, d: depth, e: epoch });
         if (L.outs.length > OUTS) L.outs.splice(0, L.outs.length - OUTS);
         L.n++;
       } else if (L.outs.length) {
@@ -295,12 +329,73 @@
       else refreshSession(L);
       evaluate(L);
     }
-    function evaluate(L) {
+    function evaluate(L, force) {
       var pct = reading(L.outs, L.sessions, L.n, L.thin);
+      var a = alarms[L.key];
+      if (a && calm(L, a)) { delete alarms[L.key]; runs[L.key] = []; a = null; }
+      if (a) pct = pct == null ? CAP : Math.min(pct, CAP);
       var ns = nextState(L.state, pct, L.hold);
       var changed = ns.state !== L.state || pct !== L.pct;
       L.pct = pct; L.state = ns.state; L.hold = ns.hold;
-      if (changed && L.live) emit(L);
+      if ((changed || force) && L.live) emit(L);
+    }
+    /** Stable again after an alarm: CALM paper trades decided since its tick, and none of the
+     *  last CALM of them part of three losses in a row (a streak that began just before them
+     *  counts). Ticks are the server's, so a reload and a replay of history count the same trades. */
+    function calm(L, a) {
+      var n = L.outs.length, k = n, since = 0;
+      while (k > 0 && L.outs[k - 1].e > a.ep) { k--; since++; }
+      if (since < CALM) return false;
+      for (var i = Math.max(0, n - CALM - 2), run = 0; i < n; i++) {
+        run = L.outs[i].won ? 0 : run + 1;
+        if (run >= 3 && i >= n - CALM) return false;
+      }
+      return true;
+    }
+
+    /* ── the run's own trades ── */
+
+    /** The newest tick the watch has seen, any market: the server's clock, not the page's. */
+    function latest() {
+      var e = 0;
+      for (var i = 0; i < order.length; i++) e = Math.max(e, mk[order[i]].last || 0);
+      return e;
+    }
+    /** The patterns on the run's trades; an alarm (raised again while they go on) from the newest tick. */
+    function check(key) {
+      var why = unstable((runs[key] || []).map(function (x) { return x.won; }));
+      if (why) alarms[key] = { why: why, ep: latest() };
+      if (lanes[key]) evaluate(lanes[key], true);
+    }
+    /** One of the run's trades, as it settled (`id` lets a later correction find it). */
+    function real(key, won, id) {
+      var seq = runs[key] || (runs[key] = []);
+      seq.push({ won: !!won, id: id == null ? null : String(id) });
+      if (seq.length > 400) seq.splice(0, seq.length - 400);
+      check(key);
+    }
+    /** Deriv booked a trade differently from how its exit tick read. */
+    function realFix(key, id, won) {
+      var seq = runs[key];
+      if (!seq || id == null) return;
+      for (var i = 0; i < seq.length; i++) {
+        if (seq[i].id !== String(id)) continue;
+        if (seq[i].won !== !!won) { seq[i].won = !!won; check(key); }
+        return;
+      }
+    }
+    /** A new run: its first three trades are its own. An alarm still standing stays. */
+    function realStart(key) { runs[key] = []; }
+    /** What a reload needs to carry on: the recent trades and the alarm. */
+    function realState(key) {
+      var a = alarms[key];
+      return { seq: (runs[key] || []).slice(-40), alarm: a ? { why: a.why, ep: a.ep } : null };
+    }
+    function realLoad(key, s) {
+      if (!s) return;
+      runs[key] = Array.isArray(s.seq) ? s.seq.map(function (x) { return { won: !!(x && x.won), id: x && x.id != null ? String(x.id) : null }; }) : [];
+      if (s.alarm && s.alarm.why) alarms[key] = { why: String(s.alarm.why), ep: Number(s.alarm.ep) || 0 };
+      if (lanes[key]) evaluate(lanes[key], true);
     }
     function emit(L) { for (var i = 0; i < listeners.length; i++) { try { listeners[i](L.key, info(L)); } catch (e) {} } }
 
@@ -313,7 +408,7 @@
           ? pos.side.wins(Math.sign(fixed(q, pos.dec) - fixed(pos.entry, pos.dec)))
           : pos.side.wins(lastDigit(q, pos.dec));
         if (o.trace) o.trace(L.key, pos, epoch, q, won);    // (tests)
-        settle(L, won);
+        settle(L, won, epoch);
         decide(L, getView, epoch);
         return;
       }
@@ -417,12 +512,20 @@
     function info(L) {
       return { key: L.key, state: L.state, pct: L.pct, n: L.n, warm: L.state === "warm" ? Math.min(1, L.n / MIN_N) : 1, thin: L.thin,
         streak: (function () { var c = 0; for (var i = L.outs.length - 1; i >= 0 && !L.outs[i].won; i--) c++; return c; })(),
+        alarm: alarms[L.key] ? alarms[L.key].why : null,
         sessions: L.sessions.slice(), session: L.sess ? { pl: L.sess.pl, n: L.sess.n, owed: L.sess.owed } : null };
     }
-    function state(key) { var L = lanes[key]; return L ? (L.live ? info(L) : { key: key, state: "warm", pct: null, n: 0, warm: 0 }) : null; }
+    function state(key) {
+      var L = lanes[key], a = alarms[key];
+      if (L && L.live) return info(L);
+      // Not read yet (being replayed, or not watched): an alarm still says red.
+      if (a) return { key: key, state: "red", pct: CAP, n: 0, warm: 1, alarm: a.why };
+      return L ? { key: key, state: "warm", pct: null, n: 0, warm: 0 } : null;
+    }
 
     return {
       feed: feed, load: load, start: start, track: track, untrack: untrack, rewind: rewind, state: state,
+      real: real, realFix: realFix, realStart: realStart, realState: realState, realLoad: realLoad,
       keys: function () { return Object.keys(lanes); }, started: function () { return started; },
       markets: function () { return order.slice(); }, size: function (sym) { return mk[sym] ? mk[sym].ep.length : 0; },
       on: function (f) { listeners.push(f); },
@@ -430,6 +533,6 @@
     };
   }
 
-  global.ShaloWatch = { create: create, reading: reading, nextState: nextState, chanceOf: chanceOf, K: K,
-    levels: { GREEN: GREEN, RED: RED, YELLOW_UP: YELLOW_UP, GREEN_DOWN: GREEN_DOWN } };
+  global.ShaloWatch = { create: create, reading: reading, nextState: nextState, chanceOf: chanceOf, unstable: unstable, K: K,
+    levels: { GREEN: GREEN, RED: RED, YELLOW_UP: YELLOW_UP, GREEN_DOWN: GREEN_DOWN, CALM: CALM, CAP: CAP } };
 })(typeof window !== "undefined" ? window : globalThis);

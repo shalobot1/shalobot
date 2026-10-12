@@ -54,7 +54,12 @@
  * colour and a figure; nothing is bought for it. With SAFE on (the default), a
  * run whose type turns red pauses — only ever after a winning trade, never in
  * a losing streak — says so, and carries on by itself once its type is green
- * again, to the take profit. Stop works at any moment, paused or not.
+ * again, to the take profit. Stop works at any moment, paused or not. The run's
+ * own trades count too, for the types that win at least half the time (Even/Odd,
+ * Rise/Fall, Differs, Over 0–4): its first three trades all lost, four or more
+ * losses in a row, or three losses, a win and three losses again turn its type
+ * red at once, so the run pauses at its next win and goes on once that type has
+ * been calm again (the watch's CALM paper trades, then green).
  *
  * EVERY TRADE IS LOGGED. Each buy is one `buy` with its parameters and
  * subscribe, settled from the contract stream; a line that drops with a trade
@@ -227,6 +232,9 @@
     return 0;
   }
   function recovers(spec) { return winChance(spec) > 0.5; }
+  /** The types whose runs Safe also watches by their own trades: those that win at least half
+   *  the time — Even/Odd, Rise/Fall, Differs, Over 0–4 (the watch's alarms). */
+  function guarded(spec) { return spec.type === "evenodd" || spec.type === "risefall" || winChance(spec) >= 0.5; }
   /** The contract types a run can hold: its own, and the recovery's. */
   function runContracts(spec) {
     return recovers(spec) ? spec.contracts.concat(RECOVER_CTS.filter(function (c) { return spec.contracts.indexOf(c) < 0; })) : spec.contracts;
@@ -1292,6 +1300,7 @@
     if (!r || !r.active) return;
     session.set({
       v: 1, account: r.account, type: r.spec.type, variant: r.spec.variant, stopping: !!r.stopping, held: !!r.held,
+      safety: watch ? watch.realState(r.spec.key) : null,
       settings: { stake: r.stake0, tp: r.tp, sl: r.sl, mult: r.mult }, stake: r.stake,
       pl: r.pl, n: r.n, won: r.won, lost: r.lost, streak: r.streak, startedAt: r.startedAt, currency: r.currency,
       ids: Object.keys(r.ids), savedAt: Date.now(),
@@ -1361,6 +1370,7 @@
     run = r;
     showRun(sv);
     syncLanes();
+    if (watch && sv.safety) watch.realLoad(spec.key, sv.safety);
     $("botLog").innerHTML = "";
     sv.log.slice().reverse().forEach(function (x) {
       var row = Object.assign({}, x);
@@ -1411,6 +1421,7 @@
     // A fresh start: nothing from the last run carries over.
     run = newRun(c.id, s, spec);
     run.first = first;
+    if (watch) watch.realStart(spec.key);
     $("botLog").innerHTML = "";
     syncLanes();
     holdRun(run);
@@ -1616,6 +1627,7 @@
     r.n++;
     r.pl = round2(r.pl + res.pl);
     if (res.won) { r.won++; r.streak = 0; } else { r.lost++; r.streak++; }
+    if (watch && guarded(r.spec)) watch.real(r.spec.key, res.won, res.id);
     var label = what.side ? what.side.label() : what.label;
     var tone = what.side ? what.side.tone : "a";
     var row = { id: res.id, at: res.at || Date.now(), market: what.market, side: what.side ? what.side.key : "", label: label, tone: tone, share: what.share, stake: res.stake, pl: res.pl, won: res.won, total: r.pl, late: !!what.late };
@@ -1838,6 +1850,7 @@
     r.pl = round2(r.pl - row.pl + f.pl);
     if (row.won !== f.won) {
       if (f.won) { r.won++; r.lost--; } else { r.lost++; r.won--; }
+      if (watch && guarded(r.spec)) watch.realFix(r.spec.key, id, f.won);
     }
     row.pl = f.pl; row.won = f.won;
     if (row.el) {
