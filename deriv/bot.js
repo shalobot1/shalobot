@@ -526,10 +526,10 @@
 
   /** The one best trade right now for this type — on the hub's markets, or on `list`
    *  (the watch's view of them) at the moment `now`. */
-  function choose(spec, list, now) {
+  function choose(spec, list, now, fits) {
     var all = [];
     (list || hub.order.map(function (sym) { return hub.markets[sym]; })).forEach(function (m) {
-      spec.sides.forEach(function (sd) { var c = candidate(m, sd, now); if (c) all.push(c); });
+      spec.sides.forEach(function (sd) { var c = candidate(m, sd, now); if (c && (!fits || fits(c))) all.push(c); });
     });
     if (!all.length) return null;
     var top = Math.max.apply(null, all.map(function (c) { return c.value; }));
@@ -613,6 +613,37 @@
   /* Deriv pays at most 10,000 on one contract and refuses a stake whose payout would be more
      ("Your payout exceeds the maximum payout"); the bot stays half a percent under it. */
   var MAX_PAYOUT = 10000, PAYOUT_CAP = MAX_PAYOUT * 0.995;
+  /* Some markets pay less than that on one contract, and say so when they refuse a stake ("Minimum
+     stake of 0.35 and maximum payout of 5000.00. Current payout is 9626.29."). The limit each
+     market states is kept (this visit and the next) and every stake is fitted under it; a market
+     that refuses a contract for another reason (shut for now, not offered) is passed over a while. */
+  var CAP_KEY = PX_KEY.replace(/px$/, "caps");
+  var caps = (function () { try { return JSON.parse(localStorage.getItem(CAP_KEY) || "{}") || {}; } catch (e) { return {}; } })();
+  function capGroup(sym, ct) { return sym + "|" + (/^DIGIT/.test(ct || "") ? "digits" : "moves"); }
+  /** The most one contract may pay out on this market (half a percent under its limit). */
+  function capOf(sym, ct) { var v = Number(caps[capGroup(sym, ct)]); return v > 0 ? Math.min(PAYOUT_CAP, v * 0.995) : PAYOUT_CAP; }
+  /** Reads the limit out of a refusal's words and keeps it. True when it is news (a limit
+   *  not known before, or lower than the one known). */
+  function learnCap(sym, ct, message, stake, ratio) {
+    var msg = String(message || "");
+    var num = function (re) { var x = re.exec(msg); return x ? Number(x[1].replace(/,/g, "")) : NaN; };
+    var cap = num(/maximum payout(?: of| is)?:?\s*([\d,]+(?:\.\d+)?)/i);
+    if (!(cap > 0)) { var most = num(/maximum stake(?: of| is)?:?\s*([\d,]+(?:\.\d+)?)/i); if (most > 0 && ratio > 0) cap = most * ratio; }
+    if (!(cap > 0) && /payout/i.test(msg) && /exceed|maximum|too (?:high|large)/i.test(msg)) {
+      var cur = num(/current payout(?: is)?:?\s*([\d,]+(?:\.\d+)?)/i);
+      cap = (cur > 0 ? cur : stake * ratio) * 0.95;
+    }
+    if (!(cap > 0) || !isFinite(cap)) return false;
+    var k = capGroup(sym, ct), was = Number(caps[k]);
+    if (was > 0 && cap >= was - 0.005) return false;
+    caps[k] = Math.round(cap * 100) / 100;
+    try { localStorage.setItem(CAP_KEY, JSON.stringify(caps)); } catch (e) {}
+    return true;
+  }
+  var shunUntil = {};
+  function shunKey(sym, ct, barrier) { return sym + "|" + ct + "|" + (barrier == null ? "" : barrier); }
+  function shun(sym, ct, barrier) { shunUntil[shunKey(sym, ct, barrier)] = Date.now() + 10 * 60000; }
+  function shunned(sym, ct, barrier) { return (shunUntil[shunKey(sym, ct, barrier)] || 0) > Date.now(); }
   /** One Martingale cycle from this stake on this balance: the losses in a row it survives,
    *  the chance it ends with the balance short of the next stake (after the recovery, for the
    *  types that have one), and the profit of a cycle that ends in a win. */
@@ -1532,14 +1563,23 @@
          the dynamic recovery hand over to it, as when the balance is short; the others trade the
          largest stake Deriv takes (the ladder keeps counting). */
       var amount = rec ? rec.stake : null;
-      if (!rec && pick.ratio > 1 && r.stake * pick.ratio > PAYOUT_CAP) {
-        if (recovers(r.spec) && owed(r) > 0 && live) {
-          try { rec = await recovery(r, Number(D.accountOf(r.account).balance)); } catch (e) { rec = null; }
-          if (r.stopping) continue;
+      // A market that refused this contract a moment ago (shut for now, not offered) is passed over.
+      var usable = function (c) { return !shunned(c.m.sym, c.side.ct, c.side.barrier); };
+      if (!rec && live && !usable(pick)) pick = choose(r.spec, null, null, usable) || pick;
+      if (!rec && pick.ratio > 1 && r.stake * pick.ratio > capOf(pick.m.sym, pick.side.ct)) {
+        // Past this market's own limit: the best market whose limit takes the stake, the ladder as it is.
+        var fit = live ? choose(r.spec, null, null, function (c) { return usable(c) && r.stake * c.ratio <= capOf(c.m.sym, c.side.ct); }) : null;
+        if (fit) pick = fit;
+        else {
+          if (recovers(r.spec) && owed(r) > 0 && live) {
+            try { rec = await recovery(r, Number(D.accountOf(r.account).balance)); } catch (e) { rec = null; }
+            if (r.stopping) continue;
+          }
+          if (rec) { pick = rec.pick; amount = rec.stake; }
+          else { amount = cents(capOf(pick.m.sym, pick.side.ct) / pick.ratio); r.showStake = amount; }
         }
-        if (rec) { pick = rec.pick; amount = rec.stake; }
-        else { amount = cents(PAYOUT_CAP / pick.ratio); r.showStake = amount; }
       }
+      var stakeNow = amount != null ? amount : r.stake;
 
       var res;
       if (rec) { r.showStake = rec.stake; paintRun(fill(T("Recovering with {side}"), { side: pick.side.label() })); }
@@ -1561,17 +1601,36 @@
           for (var rw = 0; rw < r.rateWait && r.active && !r.stopping; rw += 250) await sleep(250);
           continue;
         }
-        r.errors++;
         if (e.code === "InsufficientBalance") {
+          r.errors++;
           if (r.errors < 3 && (await covered(r) || r.stopping)) continue;
           return end(r, "balance");
         }
-        if (e.fatal || r.errors >= 3) return end(r, "error", e.message);
+        // The account itself (signed out, closed, its own limits) or a trade that could not be
+        // confirmed: nothing on this page can trade past that.
+        if (e.fatal) return end(r, "error", e.message);
+        if (e.refused) {
+          /* Deriv refused this contract here — a payout or stake past this market's own limit, the
+             market shut for now, the price moved. Nothing was bought. The limit it states is kept
+             and the stake fitted under it next time round (another market, the recovery, or the
+             most it takes); any other refusal passes the market over a while. Never a stop. */
+          // A limit newly learned is progress (the next pick fits it): a breath, not a wait. The same
+          // refusal again passes the market over, and the wait grows while refusals repeat.
+          var learned = learnCap(pick.m.sym, pick.side.ct, e.message, stakeNow, pick.ratio);
+          if (!learned) { shun(pick.m.sym, pick.side.ct, pick.side.barrier); r.refused = (r.refused || 0) + 1; }
+          paintRun(T("Analyzing the markets…"));
+          for (var fw = learned ? 300 : Math.min(10000, 250 * Math.pow(2, Math.min(r.refused, 6))), fx = 0; fx < fw && r.active && !r.stopping; fx += 250) await sleep(250);
+          continue;
+        }
+        // Anything else is a moment on Deriv's side, not the run's end: nothing was bought, so it
+        // waits (longer while it repeats) and carries on.
+        r.errors++;
         paintRun(e.message);
-        await sleep(1500);
+        for (var ew = Math.min(30000, 1500 * Math.pow(2, Math.min(r.errors - 1, 5))), ex = 0; ex < ew && r.active && !r.stopping; ex += 250) await sleep(250);
         continue;
       }
       r.errors = 0;
+      r.refused = 0;
       r.rateWait = 0;
       r.showStake = null;
       record(r, { market: pick.m.name, sym: pick.m.sym, side: pick.side, share: pick.share }, res);
@@ -1612,9 +1671,13 @@
   async function payoutOf(account, sym, ct, barrier, amount) {
     var q = await D.askOn(account, { proposal: 1, amount: amount, basis: "stake", currency: hub.currency, underlying_symbol: sym,
       contract_type: ct, duration: 1, duration_unit: "t", barrier: String(barrier) }, 10000);
-    return q.error ? null : Number(q.proposal.payout);
+    if (q.error) { learnCap(sym, ct, q.error.message, amount, null); return null; }   // a limit it states is kept
+    return Number(q.proposal.payout);
   }
-  /** The recovery trade ({ pick, stake }), or null when no contract's stake fits the balance. */
+  /** The recovery trade ({ pick, stake }), or null when no contract's stake fits the balance.
+   *  Each market's own payout limit counts (capOf): one that cannot pay the debt back in one
+   *  contract is passed over for one that can; when none can, the largest stake the best of them
+   *  takes wins back what it can, and the run trades on. */
   async function recovery(r, balance) {
     var debt = owed(r);
     if (!(debt > 0) || !recovers(r.spec) || !(balance >= hub.minStake)) return null;
@@ -1623,30 +1686,60 @@
     var from = Math.round(9 - 10 * winChance(r.spec)) + 1;     // less likely than the type's own: pays more
     var syms = main ? [main.m.sym] : [];
     hub.order.forEach(function (s) { if (syms.indexOf(s) < 0) syms.push(s); });
-    var ref = Math.max(PRICE_REF, hub.minStake), tried = 0;
-    for (var i = 0; i < syms.length && tried < 3; i++) {
+    var ref = Math.max(PRICE_REF, hub.minStake), tried = 0, partial = null, asked = 0, small = [];
+    // The least any Over/Under here pays the whole debt back with (its highest payout per 1 staked).
+    var least = need * OU_PAY[RECOVER_LAST] / (OU_PAY[RECOVER_LAST] - 1);
+    var quote = function (m, n, amount) { asked++; return payoutOf(r.account, m.sym, "DIGITOVER", n, amount); };
+    /** Past this market's limit: the most it takes, kept in case no market takes the lot. */
+    var keep = function (m, n, ratio) {
+      var most = Math.min(cents(capOf(m.sym, "DIGITOVER") / ratio), cents(balance));
+      if (most >= hub.minStake && (!partial || most * (ratio - 1) > partial.gain)) partial = { m: m, n: n, ratio: ratio, stake: most, gain: most * (ratio - 1) };
+    };
+    for (var i = 0; i < syms.length && tried < 6 && asked < 60; i++) {
       var m = hub.markets[syms[i]];
       if (!m || m.digits.length < WINDOW || Date.now() - m.at > 20000) continue;
-      tried++;
+      // A limit known to be too small for the whole debt: no price asked; tried last, for the most it takes.
+      if (capOf(m.sym, "DIGITOVER") < least * 0.99) { small.push(m); continue; }
+      var blocked = false;
       for (var n = from; n <= RECOVER_LAST; n++) {
-        var p = await payoutOf(r.account, m.sym, "DIGITOVER", n, ref);
+        var p = await quote(m, n, ref);
         if (!p) { if (n === from) break; continue; }             // this market does not sell Over/Under
+        if (!(p > ref)) continue;
         var stake = Math.max(hub.minStake, Math.ceil(need / (p / ref - 1) * 100) / 100);
-        if (!(p > ref) || stake > balance + 1e-9 || stake * p / ref > PAYOUT_CAP) continue;
+        if (stake > balance + 1e-9) continue;
+        if (stake * p / ref > capOf(m.sym, "DIGITOVER")) { keep(m, n, p / ref); blocked = true; continue; }
         // Deriv's price at this very stake rounds to cents: make sure it wins back the lot.
         for (var k = 0; k < 4; k++) {
-          var pay = await payoutOf(r.account, m.sym, "DIGITOVER", n, stake);
+          var pay = await quote(m, n, stake);
           if (!pay || round2(pay - stake) >= need - 1e-9) break;
           stake = round2(stake + Math.ceil((need - (pay - stake)) / (pay / stake - 1) * 100) / 100);
         }
-        if (stake > balance + 1e-9 || stake * p / ref > PAYOUT_CAP) continue;
-        var spec = makeSpec("overunder", String(n)), best = null;
-        spec.sides.forEach(function (sd) { m.ratio[sd.priceKey] = p / ref; });
-        spec.sides.forEach(function (sd) { var c = candidate(m, sd); if (c && (!best || better(c, best))) best = c; });
+        if (stake > balance + 1e-9) continue;
+        // A refusal at this very stake just now has taught the market's limit.
+        if (stake * p / ref > capOf(m.sym, "DIGITOVER")) {
+          keep(m, n, p / ref); blocked = true;
+          if (capOf(m.sym, "DIGITOVER") < least * 0.99) break;   // too small for any Over/Under here
+          continue;
+        }
+        var best = recoverPick(m, n, p / ref);
         if (best) return { pick: best, stake: stake };
       }
+      if (!blocked) tried++;                                       // a market too small does not use up a try
     }
+    // No market pays the whole debt back in one contract: the largest stake one of them takes.
+    for (var j = 0; !partial && j < small.length && j < 3; j++) {
+      var pr = await quote(small[j], RECOVER_LAST, ref);
+      if (pr && pr > ref) keep(small[j], RECOVER_LAST, pr / ref);
+    }
+    if (partial) { var pk = recoverPick(partial.m, partial.n, partial.ratio); if (pk) return { pick: pk, stake: partial.stake }; }
     return null;
+  }
+  /** The better side of Over/Under n on this market, at this payout per 1 staked. */
+  function recoverPick(m, n, ratio) {
+    var spec = makeSpec("overunder", String(n)), best = null;
+    spec.sides.forEach(function (sd) { m.ratio[sd.priceKey] = ratio; });
+    spec.sides.forEach(function (sd) { var c = candidate(m, sd); if (c && !shunned(m.sym, sd.ct, sd.barrier) && (!best || better(c, best))) best = c; });
+    return best;
   }
 
   /** One row of the log and the run's figures, once per contract. */
@@ -1848,7 +1941,13 @@
           r.pending = null;                // refused: nothing was bought
           var e = new Error(T(m.error.message || "Deriv refused the trade."));
           e.code = m.error.code || "";
-          e.fatal = /InsufficientBalance|ContractBuyValidationError|InvalidContract|AuthorizationRequired|PermissionDenied/.test(e.code);
+          // The account itself (signed out, closed, its own limits): no market can trade on it.
+          e.fatal = /AuthorizationRequired|InvalidToken|PermissionDenied|DisabledClient|AccountDisabled|ClientUnwelcome|SelfExclusion/.test(e.code) ||
+            /self[- ]?exclu|limit on (?:your )?losses|turnover limit|account (?:is|has been) (?:disabled|locked|suspended)|unwelcome/i.test(e.message);
+          // This contract on this market (its limits, the market shut, the price moved): another trade will do.
+          e.refused = !e.fatal && e.code !== "InsufficientBalance" &&
+            (/ContractBuyValidationError|InvalidContract|OfferingsValidation|ContractCreationFailure|MarketIsClosed|InvalidBarrier|InvalidSymbol|PriceMoved|InvalidPrice|ContractValidation/.test(e.code) ||
+             /payout|stake|not offered|closed|suspend|barrier|no return|moved|unavailable/i.test(e.message));
           return fail(e);
         }
         if (m.msg_type === "buy" && m.buy) {

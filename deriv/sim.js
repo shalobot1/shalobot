@@ -243,6 +243,10 @@
     ["stpRNG5", "Step Index 500", "step_index", 1, 1, 0.5, 3688.5, 0, 1.845, 1.845, null],
   ];
   var MIN_STAKE = 0.35, MAX_PAYOUT = 10000, HISTORY = 1000;
+  /* Deriv's limit on one contract's payout: 10,000, and less on some markets. A test can give a
+     market a lower one of its own (sessionStorage "shalo_ui_c": { "R_75": 5000, ... }). */
+  var CAPS = (function () { try { return JSON.parse(sessionStorage.getItem("shalo_ui_c") || "{}") || {}; } catch (e) { return {}; } })();
+  function capFor(m) { var c = Number(CAPS[m.sym]); return c > 0 ? Math.min(MAX_PAYOUT, c) : MAX_PAYOUT; }
 
   var markets = {}, order = [];
   TABLE.forEach(function (r) {
@@ -314,7 +318,9 @@
       if (p + m.c >= 1) return { error: { code: "ContractBuyValidationError", message: "This contract offers no return." } };
       payout = round2(amount / (p + m.c));
     }
-    if (payout > MAX_PAYOUT) return { error: { code: "ContractBuyValidationError", message: "Your payout exceeds the maximum payout of 10000.00." } };
+    // Past the market's limit: refused in Deriv's own words (measured live, 2026-10-13).
+    var cap = capFor(m);
+    if (payout > cap) return { error: { code: "ContractBuyValidationError", message: "Minimum stake of " + MIN_STAKE.toFixed(2) + " and maximum payout of " + cap.toFixed(2) + ". Current payout is " + payout.toFixed(2) + "." } };
     return { payout: payout };
   }
 
