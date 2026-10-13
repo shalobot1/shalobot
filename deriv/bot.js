@@ -603,6 +603,7 @@
   // Even/Odd, Rise/Fall and the high-payout Over 4–7 cover 6 or more and still win it back.
   var SAFE_DEPTH = { evenodd: 6, risefall: 6, matchdiff: 3, overunder: [3, 3, 4, 5, 6, 6, 9, 14] };
   var TP_SHARE = 0.10, TP_HIGH = 0.16;
+  var DEMO_TP_SHARE = 0.25;   // a demo's starting take profit: a quarter of the usual one
   var OU_PAY = [1.06, 1.19, 1.35, 1.56, 1.85, 2.26, 2.92, 4.13], HALF_PAY = 1.845;
   function perType(table, type, variant) { var v = table[type]; return Array.isArray(v) ? v[Number(variant)] : v; }
   function payRatio(spec) {
@@ -667,7 +668,12 @@
     return { depth: depth, bust: bust, profit: ok > 0 ? e / ok : 0 };
   }
   /** The starting figures, the guide on or off: it only says what they risk. */
-  function defaultsFor(balance, type, variant) { return guidedDefaults(balance, type, variant); }
+  function defaultsFor(balance, type, variant) {
+    var d = guidedDefaults(balance, type, variant), c = D.current();
+    // On a demo account the take profit starts at a quarter of the usual one, so a test run ends quickly.
+    if (c && c.type === "demo") d.tp = cents(d.tp * DEMO_TP_SHARE);
+    return d;
+  }
   function guidedDefaults(balance, type, variant) {
     var min = hub.minStake || FALLBACK_MIN, stake = min, tp = 0;
     if (balance > 0) {
