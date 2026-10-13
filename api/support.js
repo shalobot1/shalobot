@@ -14,7 +14,7 @@
  */
 
 const { readBody, json, recordSupportInbound, supportHistory, isBanned } = require("./_lib/db");
-const { accessStatusFor } = require("./_lib/ea");
+const { accessStatusFor, accessState } = require("./_lib/ea");
 
 /** One line the owner can act on: was this browser approved, and did it download? */
 function eaStatusLine(s) {
@@ -116,6 +116,9 @@ function renderHistory(history) {
   ].join("\n");
 }
 
+// The set-up ask, as the button words it in every language the site speaks.
+const DOWNLOADED_ASK = /have downloaded the EA|Ya descargu[eé] el EA|J[’']ai t[eé]l[eé]charg[eé] l[’']EA|J[aá] baixei o EA/i;
+
 module.exports = async (req, res) => {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." });
@@ -150,6 +153,18 @@ module.exports = async (req, res) => {
      error would say exactly what to change to get back in — a different
      address, a private window — and turn one nuisance into a game. */
   if (await isBanned(str(body.visitorId, 16), email)) return json(res, 200, { ok: true, email });
+
+  /* "I have downloaded the EA — please guide me…" is for approved people only: the button shows
+     only to them, and the ask (by the button, or typed in any of the site's languages) is taken
+     only from a browser our records approve. Anyone else is told to get approved first. */
+  if (str(body.kind, 24) === "ea-downloaded" || DOWNLOADED_ASK.test(message)) {
+    const state = await accessState(str(body.visitorId, 16));
+    if (state !== "approved") {
+      return json(res, state === "unknown" ? 503 : 403, { error: state === "unknown"
+        ? "We could not check your approval just now. Please try again in a minute."
+        : "Set-up help is for approved users. Request your download code on the MT5 page first — once you are approved, it arrives here." });
+    }
+  }
 
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chat = process.env.TELEGRAM_CHAT_ID;

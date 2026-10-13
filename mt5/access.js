@@ -455,6 +455,21 @@
   window.addEventListener("storage", function (e) { if (e.key === "shalo_support_thread" || e.key === DL_LOCK) paintDownloaded(); });
   paintDownloaded();
 
+  /* The step itself shows only to an approved browser (checked on every visit); everyone else
+     sees the set-up steps without it, numbered from 1. The server refuses the ask too. */
+  function renumber() {
+    var n = 0;
+    Array.prototype.forEach.call(document.querySelectorAll("ol.mt5-steps > li"), function (li) {
+      var k = li.querySelector(".mt5-step-n");
+      if (k && !li.hidden) k.textContent = String(++n);
+    });
+  }
+  renumber();
+  fetch("/api/mt5/ea-request?visitorId=" + encodeURIComponent(visitorId()), { cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .catch(function () { return null; })
+    .then(function (j) { var s = $("dlStep"); if (s) s.hidden = !(j && j.state === "approved"); renumber(); });
+
   // /mt5.html#get opens straight onto the sheet, for links that promise the file.
   if (location.hash === "#get") open();
 })();

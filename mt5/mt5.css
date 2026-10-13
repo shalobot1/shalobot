@@ -163,6 +163,7 @@
   line-height: 1.65;
   color: var(--ink-muted);
 }
+.mt5-steps li[hidden] { display: none; }
 .mt5-steps b { color: var(--ink); font-weight: 650; }
 
 .mt5-step-n {
